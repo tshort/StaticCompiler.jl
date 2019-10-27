@@ -4,3 +4,6 @@
 .DS_Store
 /Manifest.toml
 /dev/
+/test/standalone
+/test/Manifest.toml
+/test/test.*

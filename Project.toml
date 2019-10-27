@@ -3,6 +3,13 @@ uuid = "81625895-6c0f-48fc-b932-11a18313743c"
 authors = ["Tom Short"]
 version = "0.1.0"
 
+[deps]
+Cassette = "7057c7e9-c182-5462-911a-8362d720325c"
+LLVM = "929cbde3-209d-540e-8aea-75f648917ca0"
+Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
+MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
+TypedCodeUtils = "687fb87b-adea-59d5-9be9-82253b54685d"
+
 [compat]
 julia = "1.2"
 
