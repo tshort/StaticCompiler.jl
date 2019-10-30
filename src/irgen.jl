@@ -185,5 +185,11 @@ function optimize!(mod::LLVM.Module)
     mod
 end
 
-
+function write_object(mod::LLVM.Module, path)
+    host_triple = triple()
+    host_t = Target(host_triple)
+    TargetMachine(host_t, host_triple, "", "", LLVM.API.LLVMCodeGenLevelDefault, LLVM.API.LLVMRelocPIC) do tm
+        emit(tm, mod, LLVM.API.LLVMObjectFile, path)
+    end
+end
 

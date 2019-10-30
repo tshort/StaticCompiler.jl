@@ -1,6 +1,6 @@
 module StaticCompiler
 
-export irgen, fix_globals!, optimize!
+export irgen, write_object, fix_globals!, optimize!
 
 import Libdl
 

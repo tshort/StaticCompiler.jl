@@ -99,7 +99,7 @@ cd(mkpath("standalone")) do
         # show_inttoptr(m)
         # @show m
         write(m, "$fname.bc")
-        run(`llc -filetype=obj -o=$fname.o -relocation-model=pic $fname.bc`, wait = true)
+        write_object(m, "$fname.o")
         run(`gcc -shared -fpic $fname.o -o lib$fname.so`)
         run(`gcc -c -std=gnu99 -I$bindir/../include/julia -DJULIA_ENABLE_THREADING=1 -fPIC $fname.c`)
         run(`gcc -o $fname $fname.o -L$dir/standalone -L$bindir/../lib -Wl,--unresolved-symbols=ignore-in-object-files -Wl,-rpath,'.' -Wl,-rpath,$bindir/../lib -ljulia -l$fname`)
