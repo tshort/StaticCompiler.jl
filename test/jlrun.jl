@@ -44,14 +44,18 @@ macro jlrun(e)
     bindir = string(Sys.BINDIR, "/../tools")
     libdir = string(Sys.BINDIR, "/../lib")
 
-	# runCommand
+	# runCommand and libjulia linking
 	if Sys.isunix()
-		runCommand = :(run($(`gcc -shared -fPIC -o test.so -L$libdir -ljulia test.o`), wait = true))
+		libname = "julia"
+		shellcmd = "gcc"
 	elseif Sys.iswindows()
-		runCommand = :(run($(`cmd /c gcc -shared -fPIC -o test.so -L$libdir -ljulia test.o`), wait = true))
+		libname = "libjulia"
+		shellcmd = ["cmd", "/c", "gcc"]
 	else
 		error("run command not defined")
 	end
+
+	runCommand = :(run($(`$shellcmd -shared -fPIC -o test.so -L$libdir -l$libname test.o`), wait = true))
 
 
     quote
