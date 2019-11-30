@@ -40,6 +40,16 @@ macro jlrun(e)
 	catch
 		error("make sure gcc compiler is installed: https://gcc.gnu.org/install/binaries.html")
 	end
+
+	if Sys.isunix()
+		runCommand = :(run($(`gcc -shared -fPIC -o test.so -L$libdir -ljulia test.o`), wait = true))
+	elseif Sys.iswindows()
+		runCommand = :(run($(`cmd /c gcc -shared -fPIC -o test.so -L$libdir -ljulia test.o`), wait = true))
+	else
+		error("run command not defined")
+	end
+
+
     quote
         m = irgen($efun, $tt)
         # m = irgen($efun, $tt, overdub = false)
@@ -51,7 +61,7 @@ macro jlrun(e)
         # show_inttoptr(m)
         write(m, "test.bc")
 	write_object(m, "test.o")
-        run($(`gcc -shared -fPIC -o test.so -L$libdir -ljulia test.o`), wait = true)
+		$runCommand
         dylib = Libdl.dlopen($dylibpath)
         ccall(Libdl.dlsym(dylib, "jl_init_globals"), Cvoid, ()) 
         res = ccall(Libdl.dlsym(dylib, $(Meta.quot(fun))),
