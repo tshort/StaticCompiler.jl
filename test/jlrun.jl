@@ -52,6 +52,8 @@ macro jlrun(e)
 	elseif Sys.iswindows()
 		libname = "libjulia"
 		shellcmd = ["cmd", "/c", "gcc"]
+		# libjulia needs to be in the same directory as the embedding executable or in path
+		ENV["PATH"] = string(Sys.BINDIR, ";", ENV["PATH"])
 	else
 		error("run command not defined")
 	end
