@@ -36,6 +36,9 @@ end
     LLVM.verify(m1)
     LLVM.verify(m2)
     LLVM.verify(m3)
+    @test f1() == @jlrun f1()
+    @test f2() == @jlrun f2()
+    @test f3() == @jlrun f3()
 end
 
 
