@@ -16,6 +16,18 @@ end
 Compiles function call provided and calls it with `ccall` using the shared library that was created.
 """
 macro jlrun(e)
+
+	# Checking gcc installation
+	try
+		if Sys.isunix()
+			run(`gcc -v`)
+		elseif Sys.iswindows()
+			run(`cmd /c gcc -v`)
+		end
+	catch
+		error("make sure gcc compiler is installed: https://gcc.gnu.org/install/binaries.html")
+	end
+
     fun = e.args[1]
     efun = esc(fun)
     args = length(e.args) > 1 ? e.args[2:end] : Any[]
@@ -31,17 +43,6 @@ macro jlrun(e)
     pkgdir = @__DIR__
     bindir = string(Sys.BINDIR, "/../tools")
     libdir = string(Sys.BINDIR, "/../lib")
-
-	# Checking gcc installation
-	try
-		if Sys.isunix()
-			run(`gcc -v`)
-		elseif Sys.iswindows()
-			run(`cmd /c gcc -v`)
-		end
-	catch
-		error("make sure gcc compiler is installed: https://gcc.gnu.org/install/binaries.html")
-	end
 
 	# runCommand
 	if Sys.isunix()
