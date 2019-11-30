@@ -31,6 +31,8 @@ macro jlrun(e)
     pkgdir = @__DIR__
     bindir = string(Sys.BINDIR, "/../tools")
     libdir = string(Sys.BINDIR, "/../lib")
+
+	# Checking gcc installation
 	try
 		if Sys.isunix()
 			run(`gcc -v`)
@@ -41,6 +43,7 @@ macro jlrun(e)
 		error("make sure gcc compiler is installed: https://gcc.gnu.org/install/binaries.html")
 	end
 
+	# runCommand
 	if Sys.isunix()
 		runCommand = :(run($(`gcc -shared -fPIC -o test.so -L$libdir -ljulia test.o`), wait = true))
 	elseif Sys.iswindows()
@@ -60,7 +63,7 @@ macro jlrun(e)
         LLVM.verify(m)
         # show_inttoptr(m)
         write(m, "test.bc")
-	write_object(m, "test.o")
+		write_object(m, "test.o")
 		$runCommand
         dylib = Libdl.dlopen($dylibpath)
         ccall(Libdl.dlsym(dylib, "jl_init_globals"), Cvoid, ()) 
