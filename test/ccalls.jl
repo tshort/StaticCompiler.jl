@@ -49,5 +49,6 @@ end
 
 @testset "cglobal" begin
     m = irgen(f, Tuple{})
+    LLVM.verify(m)
     @test f() == @jlrun f()
 end
