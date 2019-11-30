@@ -59,7 +59,7 @@ macro jlrun(e)
 	end
 
 	runCommand = :(run(
-	    $(`$shellcmd -shared -fPIC -o test.so -L$libdir -l$libname test.o -I$includdir`),
+	    $(`$shellcmd -shared -fPIC -o test.so -L$libdir test.o -l$libname -I$includdir`),
 	    wait = true,
 	))
 
