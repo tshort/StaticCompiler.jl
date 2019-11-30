@@ -43,6 +43,7 @@ macro jlrun(e)
     pkgdir = @__DIR__
     bindir = joinpath(dirname(Sys.BINDIR), "tools")
     libdir = joinpath(dirname(Sys.BINDIR), "lib")
+	includdir=joinpath(dirname(Sys.BINDIR), "include", "julia")
 
 	# shellcmd and julia library linking
 	if Sys.isunix()
@@ -55,7 +56,10 @@ macro jlrun(e)
 		error("run command not defined")
 	end
 
-	runCommand = :(run($(`$shellcmd -shared -fPIC -o test.so -L$libdir -l$libname test.o`), wait = true))
+	runCommand = :(run(
+	    $(`$shellcmd -shared -fPIC -o test.so -L$libdir -l$libname test.o -I$includdir`),
+	    wait = true,
+	))
 
 
     quote
