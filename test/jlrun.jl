@@ -41,10 +41,10 @@ macro jlrun(e)
     end
     rettype = ct[1][2]
     pkgdir = @__DIR__
-    bindir = string(Sys.BINDIR, "/../tools")
-    libdir = string(Sys.BINDIR, "/../lib")
+    bindir = joinpath(dirname(Sys.BINDIR), "tools")
+    libdir = joinpath(dirname(Sys.BINDIR), "lib")
 
-	# runCommand and libjulia linking
+	# shellcmd and julia library linking
 	if Sys.isunix()
 		libname = "julia"
 		shellcmd = "gcc"
