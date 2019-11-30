@@ -6,9 +6,29 @@ include("jlrun.jl")
 # d = find_ccalls(muladd, Tuple{Array{Float64,2},Array{Float64,2},Array{Float64,2}})
 
 @testset "ccalls" begin
-    f1() = ccall(:usleep, Int, (Int,), 11)
-    f2() = ccall(:usleep, Int, (Int, Int), 21, 22)
-    f3() = ccall(:usleep, Int, (Int, Int, Int), 31, 32, 33)
+    if Sys.isunix()
+        f1() = ccall(:usleep, Int, (Int,), 11)
+        f2() = ccall(:usleep, Int, (Int, Int), 21, 22)
+        f3() = ccall(:usleep, Int, (Int, Int, Int), 31, 32, 33)
+    elseif Sys.iswindows()
+
+        function f1()
+            ccall(:Sleep, stdcall, Cvoid, (Int,), 11)
+            return Int(0)
+        end
+
+        function f2()
+            ccall(:Sleep, stdcall, Cvoid, (Int, Int), 21, 22)
+            return Int(0)
+        end
+
+        function f3()
+            ccall(:Sleep, stdcall, Cvoid, (Int, Int, Int), 31, 32, 33)
+            return Int(0)
+        end
+    else
+        error("systemsleep undefined for this OS")
+    end
     m1 = irgen(f1, Tuple{})
     m2 = irgen(f2, Tuple{})
     m3 = irgen(f3, Tuple{})
