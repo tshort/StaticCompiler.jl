@@ -31,6 +31,15 @@ macro jlrun(e)
     pkgdir = @__DIR__
     bindir = string(Sys.BINDIR, "/../tools")
     libdir = string(Sys.BINDIR, "/../lib")
+	try
+		if Sys.isunix()
+			run(`gcc -v`)
+		elseif Sys.iswindows()
+			run(`cmd /c gcc -v`)
+		end
+	catch
+		error("make sure gcc compiler is installed: https://gcc.gnu.org/install/binaries.html")
+	end
     quote
         m = irgen($efun, $tt)
         # m = irgen($efun, $tt, overdub = false)
