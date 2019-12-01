@@ -43,7 +43,6 @@ macro jlrun(e)
     pkgdir = @__DIR__
     bindir = joinpath(dirname(Sys.BINDIR), "tools")
     libdir = joinpath(dirname(Sys.BINDIR), "lib")
-	includdir=joinpath(dirname(Sys.BINDIR), "include", "julia")
 
 	# shellcmd and julia library linking
 	if Sys.isunix()
@@ -59,7 +58,7 @@ macro jlrun(e)
 	end
 
 	runCommand = :(run(
-	    $(`$shellcmd -shared -fPIC -o test.so -L$libdir test.o -l$libname -I$includdir`),
+	    $(`$shellcmd -shared -fPIC -o test.so -L$libdir test.o -l$libname`),
 	    wait = true,
 	))
 
