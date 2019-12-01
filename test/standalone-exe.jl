@@ -22,9 +22,9 @@ fode() = ode23s((t,y)->2.0t^2, 0.0, [0:.001:2;], initstep = 1e-4)[2][end]
 
 # Functions to compile and arguments to pass
 funcs = [
-    (jsin, Tuple{Float64}, 0.5),
     (twox, Tuple{Int}, 4),
     (arrayfun, Tuple{Int}, 4),
+    (jsin, Tuple{Float64}, 0.5),
     (arridx, Tuple{Int}, 4),
     (fsimple, Tuple{}, ()),
     (fode, Tuple{}, ()),         # Broken on Julia v1.2.0; works on Julia v1.3.0-rc3
@@ -59,7 +59,7 @@ Cformatmap = Dict(
     Cint => "%d",
     Clong => "%ld",
     Clonglong => "%lld",
-    Cdouble => "%e",
+    Cdouble => "%f",
 )
 
 totext(x) = string(x)
@@ -77,9 +77,15 @@ cd(mkpath("standalone")) do
     end
     
     dir = @__DIR__
-    bindir = string(Sys.BINDIR, "/../tools")
     bindir = string(Sys.BINDIR)
-    
+    if Sys.iswindows()
+        for fn in readdir(bindir)
+            if splitext(fn)[end] == ".dll"
+                cp(joinpath(bindir, fn), fn, force = true)
+            end
+        end
+    end
+   
     for (func, tt, val) in funcs
         fname = nameof(func)
         rettype = Base.return_types(func, tt)[1]
