@@ -44,6 +44,6 @@ See the `test` directory for more information and types of code that currently r
 
 * The use of Cassette makes it more difficult for Julia to infer some things, and only type-stable code can be statically compiled with this approach.
 
-* It's only been tested on Linux.
+* It's only been tested on Linux and Windows.
 
 Finally, this whole approach is young and likely brittle. Do not expect it to work for your code.
