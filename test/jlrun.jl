@@ -46,10 +46,8 @@ macro jlrun(e)
 
 	# shellcmd and julia library linking
 	if Sys.isunix()
-		libname = "julia"
 		shellcmd = "gcc"
 	elseif Sys.iswindows()
-		libname = "libjulia"
 		shellcmd = ["cmd", "/c", "gcc"]
 		# adding julia to the path
 		ENV["PATH"] = string(Sys.BINDIR, ";", ENV["PATH"])
@@ -58,7 +56,7 @@ macro jlrun(e)
 	end
 
 	runCommand = :(run(
-	    $(`$shellcmd -shared -fPIC -o test.so -L$libdir test.o -l$libname`),
+	    $(`$shellcmd -shared -fPIC -o test.so -L$libdir test.o -ljulia`),
 	    wait = true,
 	))
 
