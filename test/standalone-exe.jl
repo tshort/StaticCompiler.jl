@@ -22,9 +22,9 @@ fode() = ode23s((t,y)->2.0t^2, 0.0, [0:.001:2;], initstep = 1e-4)[2][end]
 
 # Functions to compile and arguments to pass
 funcs = [
+    (jsin, Tuple{Float64}, 0.5),
     (twox, Tuple{Int}, 4),
     (arrayfun, Tuple{Int}, 4),
-    (jsin, Tuple{Float64}, 0.5),
     (arridx, Tuple{Int}, 4),
     (fsimple, Tuple{}, ()),
     (fode, Tuple{}, ()),         # Broken on Julia v1.2.0; works on Julia v1.3.0-rc3
@@ -51,12 +51,14 @@ int main()
 Cmap = Dict(
     Cint => "int",
     Clong => "long",
+    Clonglong => "long long",
     Cdouble => "double",
     Nothing => "void",
 )
 Cformatmap = Dict(
     Cint => "%d",
     Clong => "%ld",
+    Clonglong => "%lld",
     Cdouble => "%e",
 )
 
@@ -98,9 +100,17 @@ cd(mkpath("standalone")) do
         StaticCompiler.optimize!(m)
         # show_inttoptr(m)
         # @show m
+        dlext = Libdl.dlext
+        exeext = Sys.iswindows() ? ".exe" : ""
+        if Sys.isapple()
+            o_file = `-Wl,-all_load $fname.o`
+        else
+            o_file = `-Wl,--whole-archive $fname.o -Wl,--no-whole-archive`
+        end
+        extra = Sys.iswindows() ? `-Wl,--export-all-symbols` : ``
         write(m, "$fname.bc")
         write_object(m, "$fname.o")
-        run(`gcc -shared -fpic $fname.o -o lib$fname.so`)
+        run(`gcc -shared -fpic -L$bindir/../lib -o lib$fname.$dlext $o_file  -Wl,-rpath,$bindir/../lib -ljulia $extra`)
         run(`gcc -c -std=gnu99 -I$bindir/../include/julia -DJULIA_ENABLE_THREADING=1 -fPIC $fname.c`)
         run(`gcc -o $fname $fname.o -L$dir/standalone -L$bindir/../lib -Wl,--unresolved-symbols=ignore-in-object-files -Wl,-rpath,'.' -Wl,-rpath,$bindir/../lib -ljulia -l$fname`)
         @test Formatting.sprintf1(fmt, func(val...)) == read(`./$fname`, String)
