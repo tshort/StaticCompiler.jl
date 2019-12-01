@@ -49,8 +49,6 @@ macro jlrun(e)
 		shellcmd = "gcc"
 	elseif Sys.iswindows()
 		shellcmd = ["cmd", "/c", "gcc"]
-		# adding julia to the path
-		ENV["PATH"] = string(Sys.BINDIR, ";", ENV["PATH"])
 	else
 		error("run command not defined")
 	end
