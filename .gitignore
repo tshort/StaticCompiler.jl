@@ -7,3 +7,8 @@
 /test/standalone
 /test/Manifest.toml
 /test/test.*
+
+test.o
+test.so
+test.bc
+/standalone/*
