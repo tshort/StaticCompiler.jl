@@ -3,6 +3,8 @@ using Test
 using LLVM
 using Libdl
 
+cd(@__DIR__)
+
 @testset "ccalls" begin
     include("ccalls.jl")
 end

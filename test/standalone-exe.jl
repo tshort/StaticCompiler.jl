@@ -1,4 +1,4 @@
-include("./jlrun.jl")
+include("jlrun.jl")
 
 using Formatting
 
@@ -106,11 +106,11 @@ cd(mkpath("standalone")) do
         run(`$(julia_path) --output-ji $(wd)/blank.ji $(wd)/blank.jl`)
     end
 
-    dir = @__DIR__
-    standalonedir = joinpath(dir, "standalone")
+    dir = pwd()
+    standalonedir = dir
     bindir = string(Sys.BINDIR)
     libdir = joinpath(dirname(Sys.BINDIR), "lib")
- 	includedir = joinpath(dirname(Sys.BINDIR), "include", "julia")
+    includedir = joinpath(dirname(Sys.BINDIR), "include", "julia")
     if Sys.iswindows()
         for fn in readdir(bindir)
             if splitext(fn)[end] == ".dll"
@@ -161,7 +161,7 @@ cd(mkpath("standalone")) do
 
         run(`$shellcmd -shared -fpic -L$libdir -o lib$fname.$dlext $o_file  -Wl,-rpath,$libdir -ljulia $extra`)
         run(`$shellcmd -c -std=gnu99 -I$includedir -DJULIA_ENABLE_THREADING=1 -fPIC $fname.c`)
-        run(`$shellcmd -o $fname $fname.o -L$standalonedir -L$libdir -Wl,--unresolved-symbols=ignore-in-object-files -Wl,-rpath,'.' -Wl,-rpath,$libdir -ljulia -l$fname`)
+        run(`$shellcmd -o $fname $fname.o -L$libdir -L$standalonedir -Wl,--unresolved-symbols=ignore-in-object-files -Wl,-rpath,'.' -Wl,-rpath,$libdir -ljulia -l$fname`)
         @test Formatting.sprintf1(fmt, func(val...)) == read(`./$fname`, String)
     end
 end
