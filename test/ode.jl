@@ -2,7 +2,7 @@
 # MIT license
 # Copyright (c) 2009-2015: various contributors: https://github.com/JuliaLang/ODE.jl/contributors
 
-using LinearAlgebra 
+using LinearAlgebra
 
 function hinit(F, x0, t0::T, tend, p, reltol, abstol) where T
     # Returns first step, direction of integration and F evaluated at t0

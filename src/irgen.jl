@@ -17,7 +17,7 @@ function xlinfo(f, tt)
     else
         meth = Base.func_for_method_checked(meth, ti)
     end
-    
+
     return ccall(:jl_specializations_get_linfo, Ref{Core.MethodInstance},
                  (Any, Any, Any, UInt), meth, ti, env, world)
 end
@@ -41,7 +41,7 @@ end
 Generates Julia IR targeted for static compilation.
 `ccall` and `cglobal` uses have pointer references changed to symbols
 meant to be linked with libjulia and other libraries.
-If `overdub == true` (the default), Cassette is used to swap out 
+If `overdub == true` (the default), Cassette is used to swap out
 `ccall`s with a tuple of library and symbol.
 """
 function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub = true)
@@ -204,4 +204,3 @@ function write_object(mod::LLVM.Module, path)
         emit(tm, mod, LLVM.API.LLVMObjectFile, path)
     end
 end
-

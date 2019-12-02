@@ -33,6 +33,6 @@ f() = Complex{Float64}
 g(@nospecialize(x)) = isa(x, Number) ? 1 : 0
 
 @testset "type" begin
-    @test string(@jlrun f()) == "Complex{Float64}" 
+    @test string(@jlrun f()) == "Complex{Float64}"
     res = g(4.0im)
 end

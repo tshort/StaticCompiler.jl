@@ -44,7 +44,7 @@ iscglobal(x) = x == cglobal || x isa GlobalRef && x.name == :cglobal
 """
     fix_ccalls!(mod::LLVM.Module, d)
 
-Replace function addresses with symbol names in `mod`. The symbol names are 
+Replace function addresses with symbol names in `mod`. The symbol names are
 meant to be linked to `libjulia` or other libraries.
 `d` is a `Dict` mapping a function address to symbol name for `ccall`s.
 """
@@ -70,7 +70,7 @@ function fix_ccalls!(mod::LLVM.Module, d)
             # dest = called_value(instr)
             for op in operands(instr)
                 lastop = op
-                if occursin("inttoptr", string(op)) 
+                if occursin("inttoptr", string(op))
                     # @show instr
                     if occursin("addrspacecast", string(op)) || occursin("getelementptr", string(op))
                         op = first(operands(op))

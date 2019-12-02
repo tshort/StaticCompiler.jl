@@ -8,7 +8,7 @@ using Cassette
 function transform(ctx, ref)
     CI = ref.code_info
     ismatch = x -> begin
-        Base.Meta.isexpr(x, :foreigncall) && 
+        Base.Meta.isexpr(x, :foreigncall) &&
         Base.Meta.isexpr(x.args[1], :call)
     end
     replace = x -> begin
@@ -31,4 +31,3 @@ const ctx = Cassette.disablehooks(Ctx(pass = Pass))
 #@inline Cassette.overdub(ctx::Ctx, ::typeof(+), a::T, b::T) where T<:Union{Float32, Float64} = add_float_contract(a, b)
 
 contextualize(f::F) where F = (args...) -> Cassette.overdub(ctx, f, args...)
-
