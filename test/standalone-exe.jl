@@ -74,9 +74,26 @@ Cmap = Dict(
     Nothing => "void",
 )
 Cformatmap = Dict(
-    Cint => "%d",
-    Clong => "%ld",
-    Cdouble => "%e",
+    Cchar => "%c",                  #Int8
+    # Cuchar => "unsigned char",    #UInt8
+    # Cshort => "short",            #Int16
+    Cstring => "%s",
+    # Cushort => "unsigned short",  #UInt16
+    Cint => "%d",  #"i"             #Int32
+    Cuint => "%u",                  #UInt32
+    Clong => "%ld",                 #Int32
+    # Culong => "unsigned long",    #UInt32
+    Clonglong => "%lld",            #Int64
+    # Culonglong => "unsigned long long", #UInt64
+    # Cintmax_t => "intmax_t",      #Int64
+    # Cuintmax_t => "uintmax_t",    #UInt64
+    # Csize_t => "size_t",          #UInt
+    # Cssize_t => "ssize_t",        #Int
+    # Cptrdiff_t => "ptrdiff_t",    #Int
+    # Cwchar_t => "wchar_t",        #Int32
+    # Cwstring =>
+    Cfloat => "%f",                 #Float32
+    Cdouble => "%e",                #Float64
 )
 
 totext(x) = string(x)
