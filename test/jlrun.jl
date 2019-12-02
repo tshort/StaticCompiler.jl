@@ -47,7 +47,7 @@ macro jlrun(e)
     bindir = joinpath(dirname(Sys.BINDIR), "tools")
     libdir = joinpath(dirname(Sys.BINDIR), "lib")
 
-# shellcmd and julia library linking
+    # shellcmd and julia library linking
     if Sys.isunix()
         shellcmd = "gcc"
     elseif Sys.iswindows()
