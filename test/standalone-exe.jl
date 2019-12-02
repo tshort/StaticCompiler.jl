@@ -45,7 +45,6 @@ int main()
    return 0;
 }
 """
-
 # "signed" is removed from signed types
 # duplicates will remove automatically
 Cmap = Dict(
@@ -90,10 +89,9 @@ Cformatmap = Dict(
     # Cptrdiff_t => "ptrdiff_t",    #Int
     # Cwchar_t => "wchar_t",        #Int32
     # Cwstring =>
-    Cfloat => "%f",                 #Float32
-    Cdouble => "%e",                #Float64
+    # Cfloat => "%f",               #Float32
+    Cdouble => "%f", #%e            #Float64
 )
-
 totext(x) = string(x)
 totext(x::Nothing) = ""
 totext(x::Tuple{}) = ""
