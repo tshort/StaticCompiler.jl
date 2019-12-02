@@ -31,13 +31,11 @@ funcs = [
 ]
 
 Ctemplate = """
-#include <stdio.h> 
-#include <julia.h> 
-
+#include <stdio.h>
+#include <julia.h>
 extern CRETTYPE FUNNAME(CARGTYPES);
 extern void jl_init_with_image(const char *, const char *);
 extern void jl_init_globals(void);
-
 int main()
 {
    jl_init_with_image(".", "blank.ji");
@@ -109,24 +107,30 @@ cd(mkpath("standalone")) do
     cd(base_dir) do
         run(`$(julia_path) --output-ji $(wd)/blank.ji $(wd)/blank.jl`)
     end
-    
+
     dir = @__DIR__
-    bindir = string(Sys.BINDIR, "/../tools")
     bindir = string(Sys.BINDIR)
-    
+    if Sys.iswindows()
+        for fn in readdir(bindir)
+            if splitext(fn)[end] == ".dll"
+                cp(joinpath(bindir, fn), fn, force = true)
+            end
+        end
+    end
+
     for (func, tt, val) in funcs
         fname = nameof(func)
         rettype = Base.return_types(func, tt)[1]
         argtype = length(tt.types) > 0 ? tt.types[1] : Nothing
         fmt = Cformatmap[rettype]
-        Ctxt = foldl(replace, 
+        Ctxt = foldl(replace,
                      (
-                      "FUNNAME" => fname, 
-                      "CRETTYPE" => Cmap[rettype], 
-                      "RETFORMAT" => fmt, 
-                      "CARGTYPES" => Cmap[argtype], 
+                      "FUNNAME" => fname,
+                      "CRETTYPE" => Cmap[rettype],
+                      "RETFORMAT" => fmt,
+                      "CARGTYPES" => Cmap[argtype],
                       "FUNARG" => totext(val),
-                     ), 
+                     ),
                      init = Ctemplate)
         write("$fname.c", Ctxt)
         m = StaticCompiler.irgen(func, tt)
@@ -134,9 +138,17 @@ cd(mkpath("standalone")) do
         StaticCompiler.optimize!(m)
         # show_inttoptr(m)
         # @show m
+        dlext = Libdl.dlext
+        exeext = Sys.iswindows() ? ".exe" : ""
+        if Sys.isapple()
+            o_file = `-Wl,-all_load $fname.o`
+        else
+            o_file = `-Wl,--whole-archive $fname.o -Wl,--no-whole-archive`
+        end
+        extra = Sys.iswindows() ? `-Wl,--export-all-symbols` : ``
         write(m, "$fname.bc")
         write_object(m, "$fname.o")
-        run(`gcc -shared -fpic $fname.o -o lib$fname.so`)
+        run(`gcc -shared -fpic -L$bindir/../lib -o lib$fname.$dlext $o_file  -Wl,-rpath,$bindir/../lib -ljulia $extra`)
         run(`gcc -c -std=gnu99 -I$bindir/../include/julia -DJULIA_ENABLE_THREADING=1 -fPIC $fname.c`)
         run(`gcc -o $fname $fname.o -L$dir/standalone -L$bindir/../lib -Wl,--unresolved-symbols=ignore-in-object-files -Wl,-rpath,'.' -Wl,-rpath,$bindir/../lib -ljulia -l$fname`)
         @test Formatting.sprintf1(fmt, func(val...)) == read(`./$fname`, String)
