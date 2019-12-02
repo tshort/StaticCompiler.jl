@@ -107,7 +107,10 @@ cd(mkpath("standalone")) do
     end
 
     dir = @__DIR__
+    standalonedir = joinpath(dir, "standalone")
     bindir = string(Sys.BINDIR)
+    libdir = joinpath(dirname(Sys.BINDIR), "lib")
+ 	includedir = joinpath(dirname(Sys.BINDIR), "include", "julia")
     if Sys.iswindows()
         for fn in readdir(bindir)
             if splitext(fn)[end] == ".dll"
@@ -156,9 +159,9 @@ cd(mkpath("standalone")) do
             error("run command not defined")
         end
 
-        run(`$shellcmd -shared -fpic -L$bindir/../lib -o lib$fname.$dlext $o_file  -Wl,-rpath,$bindir/../lib -ljulia $extra`)
-        run(`$shellcmd -c -std=gnu99 -I$bindir/../include/julia -DJULIA_ENABLE_THREADING=1 -fPIC $fname.c`)
-        run(`$shellcmd -o $fname $fname.o -L$dir/standalone -L$bindir/../lib -Wl,--unresolved-symbols=ignore-in-object-files -Wl,-rpath,'.' -Wl,-rpath,$bindir/../lib -ljulia -l$fname`)
+        run(`$shellcmd -shared -fpic -L$libdir -o lib$fname.$dlext $o_file  -Wl,-rpath,$libdir -ljulia $extra`)
+        run(`$shellcmd -c -std=gnu99 -I$includedir -DJULIA_ENABLE_THREADING=1 -fPIC $fname.c`)
+        run(`$shellcmd -o $fname $fname.o -L$standalonedir -L$libdir -Wl,--unresolved-symbols=ignore-in-object-files -Wl,-rpath,'.' -Wl,-rpath,$libdir -ljulia -l$fname`)
         @test Formatting.sprintf1(fmt, func(val...)) == read(`./$fname`, String)
     end
 end
