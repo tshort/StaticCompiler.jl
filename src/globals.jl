@@ -15,7 +15,7 @@ For each global variable, two LLVM global objects are created:
 
 The `inttopt` with the function address is replaced by `jl.global`.
 
-A function `jl_init_globals` is added to `mod`. This function deserializes the data in 
+A function `jl_init_globals` is added to `mod`. This function deserializes the data in
 `jl.global.data` and updates `jl.global`.
 """
 
@@ -83,7 +83,7 @@ function fix_globals!(mod::LLVM.Module)
                 unsafe_delete!(mod, fun)
                 continue
             end
-                    
+
             for blk in blocks(fun), instr in instructions(blk)
                 # Set up functions to walk the operands of the instruction
                 # and convert appropriate ConstantExpr's to instructions.
@@ -129,7 +129,7 @@ function fix_globals!(mod::LLVM.Module)
     data = LLVM.GlobalVariable(mod, gv_typ, "jl.global.data")
     linkage!(data, LLVM.API.LLVMExternalLinkage)
     constant!(data, true)
-    LLVM.API.LLVMSetInitializer(LLVM.ref(data), 
+    LLVM.API.LLVMSetInitializer(LLVM.ref(data),
                                 LLVM.API.LLVMConstArray(LLVM.ref(uint8_t),
                                                         [LLVM.ref(ConstantInt(uint8_t, x)) for x in v],
                                                         UInt32(length(v))))
@@ -138,7 +138,7 @@ function fix_globals!(mod::LLVM.Module)
 
         # Create the Julia object from `data` and include that in `init_fun`.
         position!(builder, jl_init_global_entry)
-        gfunc_type = LLVM.FunctionType(julia_to_llvm(Cvoid), 
+        gfunc_type = LLVM.FunctionType(julia_to_llvm(Cvoid),
                                        LLVMType[LLVM.PointerType(julia_to_llvm(Int8)),
                                                 Iterators.repeated(LLVM.FunctionType(julia_to_llvm(Any)), nglobals)...])
         deserialize_globals_func = LLVM.Function(mod, "_deserialize_globals", gfunc_type)
@@ -151,7 +151,7 @@ function fix_globals!(mod::LLVM.Module)
         ret!(builder)
     end
     tt = Tuple{Ptr{UInt8}, Iterators.repeated(Ptr{Any}, nglobals)...}
-    deser_mod = irgen(deser_fun, tt, overdub = false) 
+    deser_mod = irgen(deser_fun, tt, overdub = false)
     d = find_ccalls(deser_fun, tt)
     fix_ccalls!(deser_mod, d)
     # rename deserialization function to "_deserialize_globals"
@@ -162,4 +162,3 @@ function fix_globals!(mod::LLVM.Module)
     LLVM.link!(mod, deser_mod)
     return
 end
-

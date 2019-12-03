@@ -11,7 +11,13 @@ function xlinfo(f, tt)
     sig_tt = Tuple{typeof(g), tt.parameters...}
     (ti, env) = ccall(:jl_type_intersection_with_env, Any,
                       (Any, Any), sig_tt, meth.sig)::Core.SimpleVector
-    meth = Base.func_for_method_checked(meth, ti)
+
+    if VERSION >= v"1.2.0-DEV.320"
+        meth = Base.func_for_method_checked(meth, ti, env)
+    else
+        meth = Base.func_for_method_checked(meth, ti)
+    end
+
     return ccall(:jl_specializations_get_linfo, Ref{Core.MethodInstance},
                  (Any, Any, Any, UInt), meth, ti, env, world)
 end
@@ -35,7 +41,7 @@ end
 Generates Julia IR targeted for static compilation.
 `ccall` and `cglobal` uses have pointer references changed to symbols
 meant to be linked with libjulia and other libraries.
-If `overdub == true` (the default), Cassette is used to swap out 
+If `overdub == true` (the default), Cassette is used to swap out
 `ccall`s with a tuple of library and symbol.
 """
 function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub = true)
@@ -47,7 +53,13 @@ function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub 
     sig_tt = Tuple{typeof(gfunc), tt.parameters...}
     (ti, env) = ccall(:jl_type_intersection_with_env, Any,
                       (Any, Any), sig_tt, meth.sig)::Core.SimpleVector
-    meth = Base.func_for_method_checked(meth, ti)
+
+    if VERSION >= v"1.2.0-DEV.320"
+        meth = Base.func_for_method_checked(meth, ti, env)
+    else
+        meth = Base.func_for_method_checked(meth, ti)
+    end
+
     linfo = ccall(:jl_specializations_get_linfo, Ref{Core.MethodInstance},
                   (Any, Any, Any, UInt), meth, ti, env, world)
 
@@ -192,4 +204,3 @@ function write_object(mod::LLVM.Module, path)
         emit(tm, mod, LLVM.API.LLVMObjectFile, path)
     end
 end
-

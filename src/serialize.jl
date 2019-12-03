@@ -1,7 +1,7 @@
 
 """
 A context structure for holding state related to serializing Julia
-objects. A key component is an `IOBuffer` used to hold the serialized 
+objects. A key component is an `IOBuffer` used to hold the serialized
 result.
 """
 struct SerializeContext
@@ -61,7 +61,7 @@ end
 """
     serialize(ctx::SerializeContext, x)
 
-Serialize `x` into the context object `ctx`. `ctx.io` is the `IOBuffer` where the 
+Serialize `x` into the context object `ctx`. `ctx.io` is the `IOBuffer` where the
 serialized results are stored. Get the result with `take!(ctx.io)`.
 
 This function returns an expression that will deserialize the object. Several `serialize`
@@ -72,9 +72,9 @@ to do the serialization.
 The deserialization code should be pretty low-level code that can be compiled
 relatively easily. It especially shouldn't use global variables.
 
-Serialization / deserialization code can use `ctx` to hold state information. 
+Serialization / deserialization code can use `ctx` to hold state information.
 
-Some simple types like boxed variables do not need to write anything to `ctx.io`. 
+Some simple types like boxed variables do not need to write anything to `ctx.io`.
 They can return an expression that directly creates the object.
 """
 function serialize(ctx::SerializeContext, @nospecialize(x))
@@ -102,7 +102,7 @@ function serialize(ctx::SerializeContext, @nospecialize(t::DataType))
                 local super = $(serialize(ctx, t.super))
                 local parameters = $(serialize(ctx, t.parameters))
                 local types = $(serialize(ctx, t.types))
-                local ndt = ccall(:jl_new_datatype, Any, 
+                local ndt = ccall(:jl_new_datatype, Any,
                             (Any, Any, Any, Any, Any, Any, Cint, Cint, Cint),
                             tn, tn.module, super, parameters, #=names=# unsafe_load(cglobal(:jl_any_type, Any)), types,
                             $(t.abstract), $(t.mutable), $(t.ninitialized))
@@ -196,7 +196,7 @@ function serialize(ctx::SerializeContext, a::Array{T,N}) where {T,N}
         advance!(ctx.io)
         ioptr = ctx.io.ptr
         write(ctx.io, a)
-        if N == 1 
+        if N == 1
             advance!(ctx.io)
             ioptr = ctx.io.ptr
             write(ctx.io, a)

@@ -5,16 +5,20 @@ include("jlrun.jl")
 # d = find_ccalls(time, Tuple{})
 # d = find_ccalls(muladd, Tuple{Array{Float64,2},Array{Float64,2},Array{Float64,2}})
 
+f1() = ccall(:jl_errno, Int, (Int,), 11)
+f2() = ccall(:jl_errno, Int, (Int, Int), 21, 22)
+f3() = ccall(:jl_errno, Int, (Int, Int, Int), 31, 32, 33)
+
 @testset "ccalls" begin
-    f1() = ccall(:usleep, Int, (Int,), 11)
-    f2() = ccall(:usleep, Int, (Int, Int), 21, 22)
-    f3() = ccall(:usleep, Int, (Int, Int, Int), 31, 32, 33)
     m1 = irgen(f1, Tuple{})
     m2 = irgen(f2, Tuple{})
     m3 = irgen(f3, Tuple{})
     LLVM.verify(m1)
     LLVM.verify(m2)
     LLVM.verify(m3)
+    @test f1() == @jlrun f1()
+    @test f2() == @jlrun f2()
+    @test f3() == @jlrun f3()
 end
 
 
@@ -25,5 +29,6 @@ end
 
 @testset "cglobal" begin
     m = irgen(f, Tuple{})
+    LLVM.verify(m)
     @test f() == @jlrun f()
 end

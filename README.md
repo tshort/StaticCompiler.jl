@@ -5,9 +5,9 @@
 [![Codecov](https://codecov.io/gh/tshort/StaticCompiler.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/tshort/StaticCompiler.jl)
 [![Coveralls](https://coveralls.io/repos/github/tshort/StaticCompiler.jl/badge.svg?branch=master)](https://coveralls.io/github/tshort/StaticCompiler.jl?branch=master)
 
-This is an experimental package to compile Julia code to standalone libraries. A system image is not needed. It is also meant for cross compilation, so Julia code can be compiled for other targets, including WebAssembly and embedded targets. 
+This is an experimental package to compile Julia code to standalone libraries. A system image is not needed. It is also meant for cross compilation, so Julia code can be compiled for other targets, including WebAssembly and embedded targets.
 
-Long term, a better approach may be to use Julia's standard compilation techniques with "tree shaking" to generate a reduced system image (see [here](https://github.com/JuliaLang/julia/issues/33670)). 
+Long term, a better approach may be to use Julia's standard compilation techniques with "tree shaking" to generate a reduced system image (see [here](https://github.com/JuliaLang/julia/issues/33670)).
 
 This package uses the [LLVM package](https://github.com/maleadt/LLVM.jl) to generate code in the same fashion as [CUDAnative](https://github.com/JuliaGPU/CUDAnative.jl).
 
@@ -30,7 +30,7 @@ write(m, "cos.bc")
 write_object(m, "cos.o")
 ```
 
-`cos.o` should contain a function called `cos`. From there, you need to convert to link as needed with `libjulia`. 
+`cos.o` should contain a function called `cos`. From there, you need to convert to link as needed with `libjulia`.
 
 See the `test` directory for more information and types of code that currently run. The most advanced example that works is a call to an ODE solution using modified code from [ODE.jl](https://github.com/JuliaDiffEq/ODE.jl). For information on compiling and linking to an executable, see [test/standalone-exe.jl](./blob/master/test/standalone-exe.jl).
 
@@ -44,6 +44,6 @@ See the `test` directory for more information and types of code that currently r
 
 * The use of Cassette makes it more difficult for Julia to infer some things, and only type-stable code can be statically compiled with this approach.
 
-* It's only been tested on Linux.
+* It's only been tested on Linux and Windows.
 
 Finally, this whole approach is young and likely brittle. Do not expect it to work for your code.
