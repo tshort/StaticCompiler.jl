@@ -1,4 +1,5 @@
 include("jlrun.jl")
+include("juliaconfig.jl")
 
 using Formatting
 
@@ -96,6 +97,10 @@ totext(x) = string(x)
 totext(x::Nothing) = ""
 totext(x::Tuple{}) = ""
 
+include("juliaconfig.jl")
+
+
+
 cd(mkpath("standalone")) do
     # create `blank.ji` for initialization
     julia_path = joinpath(Sys.BINDIR, Base.julia_exename())
@@ -117,6 +122,17 @@ cd(mkpath("standalone")) do
                 cp(joinpath(bindir, fn), fn, force = true)
             end
         end
+    end
+
+    flags = join((cflags(), ldflags(), ldlibs()), " ")
+    flags = Base.shell_split(flags)
+    wrapper = joinpath(@__DIR__, "embedding_wrapper.c")
+    if Sys.iswindows()
+        rpath = ``
+    elseif Sys.isapple()
+        rpath = `-Wl,-rpath,'@executable_path' -Wl,-rpath,'@executable_path/../lib'`
+    else
+        rpath = `-Wl,-rpath,\$ORIGIN:\$ORIGIN/../lib`
     end
 
     for (func, tt, val) in funcs
@@ -161,7 +177,7 @@ cd(mkpath("standalone")) do
 
         run(`$shellcmd -shared -fpic -L$libdir -o lib$fname.$dlext $o_file  -Wl,-rpath,$libdir -ljulia $extra`)
         run(`$shellcmd -c -std=gnu99 -I$includedir -DJULIA_ENABLE_THREADING=1 -fPIC $fname.c`)
-        run(`$shellcmd -o $fname $fname.o -L$libdir -L$standalonedir -Wl,--unresolved-symbols=ignore-in-object-files -Wl,-rpath,'.' -Wl,-rpath,$libdir -ljulia -l$fname`)
+        run(`$shellcmd -o $fname $fname.o -L$libdir -L$standalonedir -Wl,--unresolved-symbols=ignore-in-object-files -Wl,-rpath,'.' -Wl,-rpath,$libdir -ljulia -l$fname -O2 $rpath $flags`)
         @test Formatting.sprintf1(fmt, func(val...)) == read(`./$fname`, String)
     end
 end
