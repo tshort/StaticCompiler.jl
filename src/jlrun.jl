@@ -17,11 +17,37 @@ function show_inttoptr(mod)
 end
 
 """
+Returns shellcmd string for different OS. Optionally, checks for gcc installation.
+"""
+function shellcmd(checkInstallation::Bool = false)
+
+    if Sys.isunix()
+        shellcmd = "gcc"
+    elseif Sys.iswindows()
+        shellcmd = ["cmd", "/c", "gcc"]
+    else
+        error("run command not defined")
+    end
+
+    if checkInstallation
+        # Checking gcc installation
+        try
+            run(`$shellcmd gcc -v`)
+        catch
+            error("make sure gcc compiler is installed: https://gcc.gnu.org/install/binaries.html")
+        end
+    end
+
+    return shellcmd
+end
+
+
+"""
 Compiles function call provided and calls it with `ccall` using the shared library that was created.
 """
 macro jlrun(e)
 
-    shellcmd = shellcmd(true)
+    shellcmd = StaticCompiler.shellcmd(true)
 
     fun = e.args[1]
     efun = esc(fun)
@@ -67,29 +93,4 @@ macro jlrun(e)
         Libdl.dlclose(dylib)
         res
     end
-end
-
-"""
-Returns shellcmd string for different OS. Optionally, checks for gcc installation.
-"""
-function shellcmd(checkInstallation::Bool = false)
-
-    if Sys.isunix()
-        shellcmd = "gcc"
-    elseif Sys.iswindows()
-        shellcmd = ["cmd", "/c", "gcc"]
-    else
-        error("run command not defined")
-    end
-
-    if checkInstallation
-        # Checking gcc installation
-        try
-            run(`$shellcmd gcc -v`)
-        catch
-            error("make sure gcc compiler is installed: https://gcc.gnu.org/install/binaries.html")
-        end
-    end
-
-    return shellcmd
 end
