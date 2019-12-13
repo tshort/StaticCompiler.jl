@@ -21,16 +21,7 @@ Compiles function call provided and calls it with `ccall` using the shared libra
 """
 macro jlrun(e)
 
-    # Checking gcc installation
-    try
-        if Sys.isunix()
-            run(`gcc -v`)
-        elseif Sys.iswindows()
-            run(`cmd /c gcc -v`)
-        end
-    catch
-        error("make sure gcc compiler is installed: https://gcc.gnu.org/install/binaries.html")
-    end
+    shellcmd = shellcmd(true)
 
     fun = e.args[1]
     efun = esc(fun)
@@ -48,20 +39,10 @@ macro jlrun(e)
     bindir = joinpath(dirname(Sys.BINDIR), "tools")
     libdir = joinpath(dirname(Sys.BINDIR), "lib")
 
-    # shellcmd and julia library linking
-    if Sys.isunix()
-        shellcmd = "gcc"
-    elseif Sys.iswindows()
-        shellcmd = ["cmd", "/c", "gcc"]
-    else
-        error("run command not defined")
-    end
-
     runCommand = :(run(
         $(`$shellcmd -shared -fPIC -o test.so -L$libdir test.o -ljulia`),
         wait = true,
     ))
-
 
     quote
         m = irgen($efun, $tt)
@@ -86,4 +67,29 @@ macro jlrun(e)
         Libdl.dlclose(dylib)
         res
     end
+end
+
+"""
+Returns shellcmd string for different OS. Optionally, checks for gcc installation.
+"""
+function shellcmd(checkInstallation::Bool = false)
+
+    if Sys.isunix()
+        shellcmd = "gcc"
+    elseif Sys.iswindows()
+        shellcmd = ["cmd", "/c", "gcc"]
+    else
+        error("run command not defined")
+    end
+
+    if checkInstallation
+        # Checking gcc installation
+        try
+            run(`$shellcmd gcc -v`)
+        catch
+            error("make sure gcc compiler is installed: https://gcc.gnu.org/install/binaries.html")
+        end
+    end
+
+    return shellcmd
 end

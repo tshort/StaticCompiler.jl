@@ -66,6 +66,8 @@ cd(mkpath("standalone")) do
         rpath = `-Wl,-rpath,\$ORIGIN:\$ORIGIN/../lib`
     end
 
+    shellcmd = StaticCompiler.shellcmd(true)
+
     for (func, tt, val) in funcs
         fname = nameof(func)
         rettype = Base.return_types(func, tt)[1]
@@ -96,15 +98,6 @@ cd(mkpath("standalone")) do
         extra = Sys.iswindows() ? `-Wl,--export-all-symbols` : ``
         write(m, "$fname.bc")
         write_object(m, "$fname.o")
-
-        # shellcmd
-        if Sys.isunix()
-            shellcmd = "gcc"
-        elseif Sys.iswindows()
-            shellcmd = ["cmd", "/c", "gcc"]
-        else
-            error("run command not defined")
-        end
 
         run(`$shellcmd -shared -fpic -L$libdir -o lib$fname.$dlext $o_file  -Wl,-rpath,$libdir -ljulia $extra`)
         run(`$shellcmd -c -std=gnu99 -I$includedir -DJULIA_ENABLE_THREADING=1 -fPIC $fname.c`)
