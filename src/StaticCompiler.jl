@@ -20,5 +20,6 @@ include("ccalls.jl")
 include("globals.jl")
 include("overdub.jl")
 include("irgen.jl")
+include("jlrun.jl")
 
 end # module

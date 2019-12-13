@@ -1,5 +1,3 @@
-include("jlrun.jl")
-
 # @testset "serialize" begin
 #     ctx = StaticCompiler.SerializeContext()
 #     a = Any["abcdg", ["hi", "bye"], 3333, Int32(44), 314f0, 3.14, (1, 3.3f0), Core.svec(9.9, 9), :sym, :sym, :a]

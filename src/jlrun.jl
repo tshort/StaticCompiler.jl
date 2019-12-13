@@ -1,5 +1,6 @@
-using Test, StaticCompiler, Libdl
-using LLVM
+export @jlrun
+
+using Libdl, LLVM
 
 function show_inttoptr(mod)
     for fun in LLVM.functions(mod),

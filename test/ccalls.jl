@@ -1,6 +1,3 @@
-
-include("jlrun.jl")
-
 # d = find_ccalls(Threads.nthreads, Tuple{})
 # d = find_ccalls(time, Tuple{})
 # d = find_ccalls(muladd, Tuple{Array{Float64,2},Array{Float64,2},Array{Float64,2}})
