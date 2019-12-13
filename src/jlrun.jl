@@ -21,7 +21,7 @@ Compiles function call provided and calls it with `ccall` using the shared libra
 """
 macro jlrun(e)
 
-# Checking gcc installation
+    # Checking gcc installation
     try
         if Sys.isunix()
             run(`gcc -v`)
