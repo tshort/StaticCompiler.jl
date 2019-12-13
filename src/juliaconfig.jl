@@ -1,3 +1,4 @@
+export ldflags, ldlibs, cflags
 # from PackageCompilerX: https://github.com/KristofferC/PackageCompilerX.jl/blob/c1a90edfaa28907edf2edbbc734ef8afdeeaca80/src/juliaconfig.jl
 # adopted from https://github.com/JuliaLang/julia/blob/release-0.6/contrib/julia-config.jl
 
@@ -61,4 +62,3 @@ function cflags()
     end
     return String(take!(flags))
 end
-

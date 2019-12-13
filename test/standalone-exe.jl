@@ -1,5 +1,3 @@
-include("juliaconfig.jl")
-
 using Formatting
 
 # Definitions of functions to compile
@@ -95,10 +93,6 @@ Cformatmap = Dict(
 totext(x) = string(x)
 totext(x::Nothing) = ""
 totext(x::Tuple{}) = ""
-
-include("juliaconfig.jl")
-
-
 
 cd(mkpath("standalone")) do
     # create `blank.ji` for initialization
