@@ -32,7 +32,7 @@ write_object(m, "cos.o")
 
 `cos.o` should contain a function called `cos`. From there, you need to convert to link as needed with `libjulia`.
 
-See the `test` directory for more information and types of code that currently run. The most advanced example that works is a call to an ODE solution using modified code from [ODE.jl](https://github.com/JuliaDiffEq/ODE.jl). For information on compiling and linking to an executable, see [test/standalone-exe.jl](./blob/master/test/standalone-exe.jl).
+See the `test` directory for more information and types of code that currently run. The most advanced example that works is a call to an ODE solution using modified code from [ODE.jl](https://github.com/JuliaDiffEq/ODE.jl). For information on compiling and linking to an executable, see [test/standalone-exe.jl](./test/standalone-exe.jl).
 
 ## Known limitations
 
