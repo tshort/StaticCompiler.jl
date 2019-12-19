@@ -26,4 +26,4 @@ funcs = [
     (fode, Tuple{}, ()),         # Broken on Julia v1.2.0; works on Julia v1.3.0-rc3
 ]
 
-StaticCompiler.standaloneExe(funcs, test = true)
+CompilerUtils.standaloneExe(funcs, test = true)

@@ -2,6 +2,7 @@ using StaticCompiler
 using Test
 using LLVM
 using Libdl
+using CompilerUtils
 
 cd(@__DIR__)
 

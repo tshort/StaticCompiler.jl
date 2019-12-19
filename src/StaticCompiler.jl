@@ -21,8 +21,4 @@ include("globals.jl")
 include("overdub.jl")
 include("irgen.jl")
 
-include("../helpers/jlrun.jl")
-include("../helpers/juliaconfig.jl")
-include("../helpers/standalone-exe.jl")
-
 end # module
