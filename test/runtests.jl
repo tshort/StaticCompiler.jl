@@ -5,8 +5,11 @@ using Libdl
 
 # dep: ]add Formatting
 include("../helpers/src/CompilerUtils.jl")
-# to update:
+# to init submodule:
+# git submodule update --init --recursive
+# to update submodule reference:
 # git submodule update --remote --merge
+
 using Main.CompilerUtils
 
 cd(@__DIR__)
