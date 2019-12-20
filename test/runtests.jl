@@ -2,10 +2,14 @@ using StaticCompiler
 using Test
 using LLVM
 using Libdl
-using CompilerUtils
+
+# dep: ]add Formatting
+include("../helpers/src/CompilerUtils.jl")
+# to update:
+# git submodule update --remote --merge
+using Main.CompilerUtils
 
 cd(@__DIR__)
-
 @testset "ccalls" begin
     include("ccalls.jl")
 end
