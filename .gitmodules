@@ -1,3 +1,0 @@
-[submodule "helpers"]
-	path = helpers
-	url = https://github.com/Julia-Embedded/CompilerUtils.jl.git

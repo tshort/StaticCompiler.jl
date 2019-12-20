@@ -17,7 +17,7 @@ include("ode.jl")
 fode() = ode23s((t,y)->2.0t^2, 0.0, [0:.001:2;], initstep = 1e-4)[2][end]
 
 # Functions to compile and arguments to pass
-funcs = [
+funcalls = [
     (twox, Tuple{Int}, 4),
     (arrayfun, Tuple{Int}, 4),
     (jsin, Tuple{Float64}, 0.5),
@@ -26,4 +26,16 @@ funcs = [
     (fode, Tuple{}, ()),         # Broken on Julia v1.2.0; works on Julia v1.3.0-rc3
 ]
 
-CompilerUtils.exegen(funcs, test = true)
+StaticCompiler.exegen(funcalls)
+
+using Formatting
+@testset "exegen" begin
+    cd("standalone") do
+        for (func, tt, val) in funcalls
+            fname = nameof(func)
+            rettype = Base.return_types(func, tt)[1]
+            fmt = StaticCompiler.Cformatmap[rettype]
+            @test Formatting.sprintf1(fmt, func(val...)) == read(`./$fname`, String)
+        end
+    end
+end
