@@ -31,7 +31,6 @@ macro jlrun(e)
         ct = code_typed(Base.eval(__module__, fun))
     end
     rettype = ct[1][2]
-    pkgdir = @__DIR__
     bindir = joinpath(dirname(Sys.BINDIR), "tools")
     libdir = joinpath(dirname(Sys.BINDIR), "lib")
 
