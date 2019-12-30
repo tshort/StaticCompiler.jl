@@ -32,3 +32,10 @@ end
     LLVM.verify(m)
     @test f() == @jlrun f()
 end
+
+@testset "extern" begin
+    f() = @extern(:time, Cvoid, (Ptr{Cvoid},), C_NULL)
+    m = irgen(f, Tuple{})
+    LLVM.verify(m)
+    @test "time" in [name(f) for f in LLVM.functions(m)]
+end
