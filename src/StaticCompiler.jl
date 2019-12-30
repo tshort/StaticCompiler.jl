@@ -1,6 +1,6 @@
 module StaticCompiler
 
-export irgen, write_object, fix_globals!, optimize!
+export irgen, write_object, fix_globals!, optimize!, @extern
 
 import Libdl
 
@@ -20,5 +20,6 @@ include("ccalls.jl")
 include("globals.jl")
 include("overdub.jl")
 include("irgen.jl")
+include("extern.jl")
 
 end # module
