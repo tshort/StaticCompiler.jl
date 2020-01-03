@@ -11,20 +11,20 @@ find_ccalls(@nospecialize(f), @nospecialize(tt)) = find_ccalls(reflect(f, tt))
 function find_ccalls(ref::Reflection)
     result = Dict{Ptr{Nothing}, Symbol}()
     idx = VERSION > v"1.2" ? 5 : 4
-    foreigncalls = filter((c) -> lookthrough((c) -> c.head === :foreigncall && !(c.args[idx] isa QuoteNode && c.args[idx].value == :llvmcall), c), ref.CI.code)
-    # foreigncalls = filter((c) -> lookthrough((c) -> c.head === :foreigncall, c), ref.CI.code)
+    foreigncalls = TypedCodeUtils.filter((c) -> lookthrough((c) -> c.head === :foreigncall && !(c.args[idx] isa QuoteNode && c.args[idx].value == :llvmcall), c), ref.CI.code)
+    # foreigncalls = TypedCodeUtils.filter((c) -> lookthrough((c) -> c.head === :foreigncall, c), ref.CI.code)
     for fc in foreigncalls
         sym = getsym(fc[2].args[1])
         address = eval(:(cglobal($(sym))))
         result[address] = Symbol(sym isa Tuple ? sym[1] : sym.value)
     end
-    cglobals = filter((c) -> lookthrough(c -> c.head === :call && iscglobal(c.args[1]), c), ref.CI.code)
+    cglobals = TypedCodeUtils.filter((c) -> lookthrough(c -> c.head === :call && iscglobal(c.args[1]), c), ref.CI.code)
     for fc in cglobals
         sym = getsym(fc[2].args[2])
         address = eval(:(cglobal($(sym))))
         result[address] = Symbol(sym isa Tuple ? sym[1] : sym.value)
     end
-    invokes = filter((c) -> lookthrough(identify_invoke, c), ref.CI.code)
+    invokes = TypedCodeUtils.filter((c) -> lookthrough(identify_invoke, c), ref.CI.code)
     invokes = map((arg) -> process_invoke(DefaultConsumer(), ref, arg...), invokes)
     for fi in invokes
         canreflect(fi) || continue

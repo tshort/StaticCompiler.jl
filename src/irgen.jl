@@ -36,15 +36,17 @@ end
 # end
 
 """
-    irgen(func, tt; optimize = true, overdub = true)
+    irgen(func, tt; optimize = true, overdub = true, module_setup = (m) -> nothing)
 
 Generates Julia IR targeted for static compilation.
 `ccall` and `cglobal` uses have pointer references changed to symbols
 meant to be linked with libjulia and other libraries.
 If `overdub == true` (the default), Cassette is used to swap out
 `ccall`s with a tuple of library and symbol.
+`module_setup` is an optional function to control setup of modules. It takes an LLVM
+module as input.
 """
-function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub = true)
+function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub = true, module_setup = (m) -> nothing)
     # get the method instance
     isa(func, Core.Builtin) && error("function is not a generic function")
     world = typemax(UInt)
@@ -63,21 +65,66 @@ function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub 
     linfo = ccall(:jl_specializations_get_linfo, Ref{Core.MethodInstance},
                   (Any, Any, Any, UInt), meth, ti, env, world)
 
+    current_method = nothing
+    last_method_instance = nothing
+    call_stack = Vector{Core.MethodInstance}()
+    global method_map = Dict{String,Core.MethodInstance}()
+    global dependencies = MultiDict{Core.MethodInstance,LLVM.Function}()
     # set-up the compiler interface
     function hook_module_setup(ref::Ptr{Cvoid})
         ref = convert(LLVM.API.LLVMModuleRef, ref)
         module_setup(LLVM.Module(ref))
+        println("module setup")
     end
     function hook_raise_exception(insblock::Ptr{Cvoid}, ex::Ptr{Cvoid})
         insblock = convert(LLVM.API.LLVMValueRef, insblock)
         ex = convert(LLVM.API.LLVMValueRef, ex)
         raise_exception(BasicBlock(insblock), Value(ex))
     end
-    dependencies = Vector{LLVM.Module}()
-    function hook_module_activation(ref::Ptr{Cvoid})
-        ref = convert(LLVM.API.LLVMModuleRef, ref)
-        push!(dependencies, LLVM.Module(ref))
+    function postprocess(ir)
+        # get rid of jfptr wrappers
+        for llvmf in functions(ir)
+            startswith(LLVM.name(llvmf), "jfptr_") && unsafe_delete!(ir, llvmf)
+        end
+
+        return
     end
+    function hook_module_activation(ref::Ptr{Cvoid})
+        println("mod activation")
+        ref = convert(LLVM.API.LLVMModuleRef, ref)
+        global ir = LLVM.Module(ref)
+        postprocess(ir)
+
+        # find the function that this module defines
+        llvmfs = filter(llvmf -> !isdeclaration(llvmf) &&
+                                 linkage(llvmf) == LLVM.API.LLVMExternalLinkage,
+                        collect(functions(ir)))
+        llvmf = nothing
+        if length(llvmfs) == 1
+            llvmf = first(llvmfs)
+        elseif length(llvmfs) > 1
+            llvmfs = filter!(llvmf -> startswith(LLVM.name(llvmf), "julia_"), llvmfs)
+            if length(llvmfs) == 1
+                llvmf = first(llvmfs)
+            end
+        end
+        @show name(llvmf)
+        insert!(dependencies, last_method_instance, llvmf)
+        method_map[name(llvmf)] = current_method
+    end
+    function hook_emit_function(method_instance, code, world)
+        @show method_instance
+        push!(call_stack, method_instance)
+        # @show code
+    end
+    function hook_emitted_function(method, code, world)
+        @show current_method = method
+        last_method_instance = pop!(call_stack)
+        # @show code
+        # dump(method, maxdepth=2)
+        # global mymeth = method
+    end
+    
     params = Base.CodegenParams(cached=false,
                                 track_allocations=false,
                                 code_coverage=false,
@@ -85,7 +132,10 @@ function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub 
                                 prefer_specsig=true,
                                 module_setup=hook_module_setup,
                                 module_activation=hook_module_activation,
-                                raise_exception=hook_raise_exception)
+                                raise_exception=hook_raise_exception,
+                                emit_function=hook_emit_function,
+                                emitted_function=hook_emitted_function,
+                                )
 
     # get the code
     global mod = let
@@ -135,24 +185,31 @@ function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub 
    LLVM.name!(entry, string(nameof(func)))
 
     # link in dependent modules
-    link!.(Ref(mod), dependencies)
+    for called_method_instance in keys(dependencies)
+        llvmfs = dependencies[called_method_instance]
 
-    # clean up incompatibilities
-#    for llvmf in functions(mod)
-#        # only occurs in debug builds
-#        delete!(function_attributes(llvmf), EnumAttribute("sspreq", 0, jlctx[]))
-#
-#        # make function names safe for ptxas
-#        # (LLVM ought to do this, see eg. D17738 and D19126), but fails
-#        # TODO: fix all globals?
-#        llvmfn = LLVM.name(llvmf)
-#        if !isdeclaration(llvmf)
-#            llvmfn′ = safe_fn(llvmf)
-#            if llvmfn != llvmfn′
-#                LLVM.name!(llvmf, llvmfn′)
-#            end
-#        end
-#    end
+        # link the first module
+        llvmf = popfirst!(llvmfs)
+        llvmfn = LLVM.name(llvmf)
+        link!(mod, LLVM.parent(llvmf))
+    end
+    # rename functions to something easier to decipher
+    # especially helps with overdubbed functions
+    for (fname, mi) in method_map
+        @show fname
+        id = split(fname, "_")[end]
+        @show basename = mi.def.name
+        args = join(collect(mi.specTypes.parameters)[2:end], "_")
+        if basename == :overdub  # special handling for Cassette
+            basename = mi.specTypes.parameters[3]
+            args = join(collect(mi.specTypes.parameters)[4:end], "_")
+        end
+        @show newname = join([basename, args, id], "_")
+        if haskey(functions(mod), fname)
+            name!(functions(mod)[fname], newname)
+        end
+    end
+
     d = find_ccalls(gfunc, tt)
     fix_ccalls!(mod, d)
     #@show mod

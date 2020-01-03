@@ -7,11 +7,12 @@ import Libdl
 using LLVM
 using LLVM.Interop
 using TypedCodeUtils
-import TypedCodeUtils: reflect, filter, lookthrough, canreflect,
+import TypedCodeUtils: reflect, lookthrough, canreflect,
                        DefaultConsumer, Reflection, Callsite,
                        identify_invoke, identify_call, identify_foreigncall,
                        process_invoke, process_call
 using MacroTools
+using DataStructures: MultiDict
 
 
 include("serialize.jl")

@@ -155,7 +155,7 @@ function fix_globals!(mod::LLVM.Module)
     d = find_ccalls(deser_fun, tt)
     fix_ccalls!(deser_mod, d)
     # rename deserialization function to "_deserialize_globals"
-    fun = first(filter(x -> LLVM.name(x) == "_deserialize_globals", functions(deser_mod)))[2]
+    fun = first(TypedCodeUtils.filter(x -> LLVM.name(x) == "_deserialize_globals", functions(deser_mod)))[2]
     # LLVM.name!(fun, "_deserialize_globals")
     linkage!(fun, LLVM.API.LLVMExternalLinkage)
     # link into the main module
