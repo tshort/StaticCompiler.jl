@@ -216,7 +216,9 @@ function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub 
         basename = mi.def.name
         args = join(collect(mi.specTypes.parameters)[2:end], "_")
         if basename == :overdub  # special handling for Cassette
-            basename = mi.specTypes.parameters[3]
+            basename = string(mi.specTypes.parameters[3])
+            basename = replace(basename, r"^typeof\(" => "")
+            basename = replace(basename, r"\)$" => "")
             args = join(collect(mi.specTypes.parameters)[4:end], "_")
         end
         newname = join([basename, args, id], "_")
