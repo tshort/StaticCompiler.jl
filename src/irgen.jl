@@ -164,27 +164,28 @@ function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub 
 
     # the jlcall wrapper function should point us to the actual entry-point,
     # e.g. julia_kernel_vadd_62984
-   entry_tag = let
-       m = match(r"jfptr_(.+)_\d+", LLVM.name(wrapper))
-       @assert m != nothing
-       m.captures[1]
-   end
-   unsafe_delete!(mod, wrapper)
-   entry = let
-       re = Regex("julia_$(entry_tag)_\\d+")
-       llvmcall_re = Regex("julia_$(entry_tag)_\\d+u\\d+")
-       fs = collect(Iterators.filter(f->occursin(re, LLVM.name(f)) &&
-                              !occursin(llvmcall_re, LLVM.name(f)), definitions))
-       if length(fs) != 1
-           compiler_error(func, tt, cap, "could not find single entry-point";
-                          entry=>entry_tag, available=>[LLVM.name.(definitions)])
-       end
-       fs[1]
-   end
+    entry_tag = let
+        m = match(r"jfptr_(.+)_\d+", LLVM.name(wrapper))
+        @assert m != nothing
+        m.captures[1]
+    end
+    unsafe_delete!(mod, wrapper)
+    entry = let
+        re = Regex("julia_$(entry_tag)_\\d+")
+        llvmcall_re = Regex("julia_$(entry_tag)_\\d+u\\d+")
+        fs = collect(Iterators.filter(f->occursin(re, LLVM.name(f)) &&
+                               !occursin(llvmcall_re, LLVM.name(f)), definitions))
+        if length(fs) != 1
+            compiler_error(func, tt, cap, "could not find single entry-point";
+                           entry=>entry_tag, available=>[LLVM.name.(definitions)])
+        end
+        fs[1]
+    end
 
-   LLVM.name!(entry, string(nameof(func)))
+    LLVM.name!(entry, string(nameof(func)))
 
     # link in dependent modules
+    cache = Dict{String,String}()
     for called_method_instance in keys(dependencies)
         llvmfs = dependencies[called_method_instance]
 
@@ -192,6 +193,26 @@ function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub 
         llvmf = popfirst!(llvmfs)
         llvmfn = LLVM.name(llvmf)
         link!(mod, LLVM.parent(llvmf))
+        # process subsequent duplicate modules
+        for dup_llvmf in llvmfs
+            if Base.JLOptions().debug_level >= 2
+                # link them too, to ensure accurate backtrace reconstruction
+                link!(mod, LLVM.parent(dup_llvmf))
+            else
+                # don't link them, but note the called function name in a cache
+                dup_llvmfn = LLVM.name(dup_llvmf)
+                cache[dup_llvmfn] = llvmfn
+            end
+        end
+    end
+    # resolve function declarations with cached entries
+    for llvmf in filter(isdeclaration, collect(functions(mod)))
+        llvmfn = LLVM.name(llvmf)
+        if haskey(cache, llvmfn)
+            def_llvmfn = cache[llvmfn]
+            replace_uses!(llvmf, functions(mod)[def_llvmfn])
+            unsafe_delete!(LLVM.parent(llvmf), llvmf)
+        end
     end
     # rename functions to something easier to decipher
     # especially helps with overdubbed functions
@@ -206,7 +227,7 @@ function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub 
         end
         @show newname = join([basename, args, id], "_")
         if haskey(functions(mod), fname)
-            name!(functions(mod)[fname], newname)
+            # name!(functions(mod)[fname], newname)
         end
     end
 
