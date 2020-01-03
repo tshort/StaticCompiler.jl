@@ -74,7 +74,6 @@ function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub 
     function hook_module_setup(ref::Ptr{Cvoid})
         ref = convert(LLVM.API.LLVMModuleRef, ref)
         module_setup(LLVM.Module(ref))
-        println("module setup")
     end
     function hook_raise_exception(insblock::Ptr{Cvoid}, ex::Ptr{Cvoid})
         insblock = convert(LLVM.API.LLVMValueRef, insblock)
@@ -90,7 +89,6 @@ function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub 
         return
     end
     function hook_module_activation(ref::Ptr{Cvoid})
-        println("mod activation")
         ref = convert(LLVM.API.LLVMModuleRef, ref)
         global ir = LLVM.Module(ref)
         postprocess(ir)
@@ -108,17 +106,14 @@ function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub 
                 llvmf = first(llvmfs)
             end
         end
-        @show name(llvmf)
         insert!(dependencies, last_method_instance, llvmf)
         method_map[name(llvmf)] = current_method
     end
     function hook_emit_function(method_instance, code, world)
-        @show method_instance
         push!(call_stack, method_instance)
-        # @show code
     end
     function hook_emitted_function(method, code, world)
-        @show current_method = method
+        current_method = method
         last_method_instance = pop!(call_stack)
         # @show code
         # dump(method, maxdepth=2)
@@ -217,17 +212,16 @@ function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub 
     # rename functions to something easier to decipher
     # especially helps with overdubbed functions
     for (fname, mi) in method_map
-        @show fname
         id = split(fname, "_")[end]
-        @show basename = mi.def.name
+        basename = mi.def.name
         args = join(collect(mi.specTypes.parameters)[2:end], "_")
         if basename == :overdub  # special handling for Cassette
             basename = mi.specTypes.parameters[3]
             args = join(collect(mi.specTypes.parameters)[4:end], "_")
         end
-        @show newname = join([basename, args, id], "_")
+        newname = join([basename, args, id], "_")
         if haskey(functions(mod), fname)
-            # name!(functions(mod)[fname], newname)
+            name!(functions(mod)[fname], newname)
         end
     end
 
