@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [deps]
 Cassette = "7057c7e9-c182-5462-911a-8362d720325c"
+DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 Formatting = "59287772-0a20-5a39-b81b-1366585eb4c0"
 LLVM = "929cbde3-209d-540e-8aea-75f648917ca0"
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
