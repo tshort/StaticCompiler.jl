@@ -13,9 +13,9 @@ f3() = ccall(:jl_errno, Int, (Int, Int, Int), 31, 32, 33)
     LLVM.verify(m1)
     LLVM.verify(m2)
     LLVM.verify(m3)
-    @test_skip f1() == @jlrun f1()
-    @test_skip f2() == @jlrun f2()
-    @test_skip f3() == @jlrun f3()
+    @test (@jlrun f1()) == f1()
+    @test (@jlrun f2()) == f2()
+    @test (@jlrun f3()) == f3()
 end
 
 
@@ -27,7 +27,7 @@ end
 @testset "cglobal" begin
     m = irgen(f, Tuple{})
     LLVM.verify(m)
-    @test f() == @jlrun f()
+    @test (@jlrun f()) == f()
 end
 
 @testset "extern" begin
