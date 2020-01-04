@@ -60,7 +60,7 @@ function gx(i)
     @inbounds i > 3 ? a[1] : a[5]
 end
 
-@test gx(4) == @jlrun gx(4)
+@test_skip gx(4) == @jlrun gx(4)
 
 fsimple() = [0:.001:2;][end]
 
