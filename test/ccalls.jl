@@ -13,9 +13,6 @@ f3() = ccall(:jl_errno, Int, (Int, Int, Int), 31, 32, 33)
     LLVM.verify(m1)
     LLVM.verify(m2)
     LLVM.verify(m3)
-    @test_skip f1() == @jlrun f1()
-    @test_skip f2() == @jlrun f2()
-    @test_skip f3() == @jlrun f3()
 end
 
 
