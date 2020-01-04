@@ -142,7 +142,8 @@ function exegen(funcalls)
 
             run(`$shellcmd -shared -fpic -L$libdir -o lib$fname.$dlext $o_file  -Wl,-rpath,$libdir -ljulia $extra`)
             run(`$shellcmd -c -std=gnu99 -I$includedir -DJULIA_ENABLE_THREADING=1 -fPIC $fname.c`)
-            run(`$shellcmd -o $fname $fname.o -L$libdir -L$standalonedir -Wl,--unresolved-symbols=ignore-in-object-files -Wl,-rpath,'.' -Wl,-rpath,$libdir -ljulia -l$fname -O2 $rpath $flags`)
+            #run(`$shellcmd -o $fname $fname.o -L$libdir -L$standalonedir -Wl,--unresolved-symbols=ignore-in-object-files -Wl,-rpath,'.' -Wl,-rpath,$libdir -ljulia -l$fname -O2 $rpath $flags`)
+            run(`$shellcmd -o $fname $fname.o -L$libdir -L$standalonedir -Wl,-rpath,'.' -Wl,-rpath,$libdir -ljulia -l$fname -O2 $rpath $flags`)
         end
     end
 
