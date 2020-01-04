@@ -138,7 +138,7 @@ function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub 
                     (Any, UInt, Bool, Bool, Base.CodegenParams),
                     linfo, world, #=wrapper=#false, #=optimize=#false, params)
         if ref == C_NULL
-            # error(jlctx[], "the Julia compiler could not generate LLVM IR")
+            #  error(jlctx[], "the Julia compiler could not generate LLVM IR")
         end
 
         llvmf = LLVM.Function(ref)
