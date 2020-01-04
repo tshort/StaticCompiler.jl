@@ -6,7 +6,6 @@ version = "0.1.0"
 [deps]
 Cassette = "7057c7e9-c182-5462-911a-8362d720325c"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
-Formatting = "59287772-0a20-5a39-b81b-1366585eb4c0"
 LLVM = "929cbde3-209d-540e-8aea-75f648917ca0"
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
@@ -16,7 +15,8 @@ TypedCodeUtils = "687fb87b-adea-59d5-9be9-82253b54685d"
 julia = "1.2"
 
 [extras]
+Formatting = "59287772-0a20-5a39-b81b-1366585eb4c0"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Test", "Formatting"]

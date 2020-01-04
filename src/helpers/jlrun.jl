@@ -1,5 +1,4 @@
-using Test, StaticCompiler, Libdl
-using LLVM
+using Libdl, LLVM
 
 function show_inttoptr(mod)
     for fun in LLVM.functions(mod),
@@ -20,17 +19,6 @@ Compiles function call provided and calls it with `ccall` using the shared libra
 """
 macro jlrun(e)
 
-# Checking gcc installation
-    try
-        if Sys.isunix()
-            run(`gcc -v`)
-        elseif Sys.iswindows()
-            run(`cmd /c gcc -v`)
-        end
-    catch
-        error("make sure gcc compiler is installed: https://gcc.gnu.org/install/binaries.html")
-    end
-
     fun = e.args[1]
     efun = esc(fun)
     args = length(e.args) > 1 ? e.args[2:end] : Any[]
@@ -43,24 +31,13 @@ macro jlrun(e)
         ct = code_typed(Base.eval(__module__, fun))
     end
     rettype = ct[1][2]
-    pkgdir = @__DIR__
     bindir = joinpath(dirname(Sys.BINDIR), "tools")
     libdir = joinpath(dirname(Sys.BINDIR), "lib")
-
-    # shellcmd and julia library linking
-    if Sys.isunix()
-        shellcmd = "gcc"
-    elseif Sys.iswindows()
-        shellcmd = ["cmd", "/c", "gcc"]
-    else
-        error("run command not defined")
-    end
 
     runCommand = :(run(
         $(`$shellcmd -shared -fPIC -o test.so -L$libdir test.o -ljulia`),
         wait = true,
     ))
-
 
     quote
         m = irgen($efun, $tt)

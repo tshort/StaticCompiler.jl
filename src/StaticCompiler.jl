@@ -23,4 +23,6 @@ include("overdub.jl")
 include("irgen.jl")
 include("extern.jl")
 
+include("helpers/helpers.jl")
+
 end # module

@@ -1,8 +1,3 @@
-
-include("jlrun.jl")
-
-
-
 mutable struct AAA
     aaa::Int
     bbb::Int

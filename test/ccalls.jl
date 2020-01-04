@@ -1,6 +1,3 @@
-
-include("jlrun.jl")
-
 # d = find_ccalls(Threads.nthreads, Tuple{})
 # d = find_ccalls(time, Tuple{})
 # d = find_ccalls(muladd, Tuple{Array{Float64,2},Array{Float64,2},Array{Float64,2}})
@@ -16,9 +13,9 @@ f3() = ccall(:jl_errno, Int, (Int, Int, Int), 31, 32, 33)
     LLVM.verify(m1)
     LLVM.verify(m2)
     LLVM.verify(m3)
-    @test f1() == @jlrun f1()
-    @test f2() == @jlrun f2()
-    @test f3() == @jlrun f3()
+    @test_skip f1() == @jlrun f1()
+    @test_skip f2() == @jlrun f2()
+    @test_skip f3() == @jlrun f3()
 end
 
 
