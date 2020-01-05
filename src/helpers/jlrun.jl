@@ -42,10 +42,6 @@ macro jlrun(e)
     quote
         m = irgen($efun, $tt)
         # m = irgen($efun, $tt, overdub = false)
-        # StaticCompiler.optimize!(m)
-        StaticCompiler.fix_globals!(m)
-        # @show m
-        StaticCompiler.optimize!(m)
         LLVM.verify(m)
         # show_inttoptr(m)
         write(m, "test.bc")
