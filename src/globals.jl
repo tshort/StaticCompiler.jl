@@ -151,7 +151,7 @@ function fix_globals!(mod::LLVM.Module)
         ret!(builder)
     end
     tt = Tuple{Ptr{UInt8}, Iterators.repeated(Ptr{Any}, nglobals)...}
-    deser_mod = irgen(deser_fun, tt, overdub = false)
+    deser_mod = irgen(deser_fun, tt, overdub = false, fix_globals = false, optimize_llvm = false)
     d = find_ccalls(deser_fun, tt)
     fix_ccalls!(deser_mod, d)
     # rename deserialization function to "_deserialize_globals"

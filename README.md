@@ -24,8 +24,6 @@ The API still needs work, but here is the general approach right now:
 ```julia
 using StaticCompiler
 m = irgen(cos, Tuple{Float64})
-fix_globals!(m)
-optimize!(m)
 write(m, "cos.bc")
 write_object(m, "cos.o")
 ```

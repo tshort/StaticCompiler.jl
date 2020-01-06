@@ -125,8 +125,6 @@ function exegen(funcalls)
                          init = Ctemplate)
             write("$fname.c", Ctxt)
             m = StaticCompiler.irgen(func, tt)
-            StaticCompiler.fix_globals!(m)
-            StaticCompiler.optimize!(m)
             # StaticCompiler.show_inttoptr(m)
             # @show m
             dlext = Libdl.dlext

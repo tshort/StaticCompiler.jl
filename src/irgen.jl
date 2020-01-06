@@ -36,17 +36,32 @@ end
 # end
 
 """
-    irgen(func, tt; optimize = true, overdub = true, module_setup = (m) -> nothing)
+    irgen(func, tt; 
+          optimize = true, 
+          optimize_llvm = true, 
+          fix_globals = true, 
+          overdub = true, 
+          module_setup = (m) -> nothing)
 
 Generates Julia IR targeted for static compilation.
 `ccall` and `cglobal` uses have pointer references changed to symbols
 meant to be linked with libjulia and other libraries.
+
+`optimize` controls Julia-side optimization. `optimize_llvm` controls 
+optimization on the LLVM side.
+
 If `overdub == true` (the default), Cassette is used to swap out
 `ccall`s with a tuple of library and symbol.
+
 `module_setup` is an optional function to control setup of modules. It takes an LLVM
 module as input.
 """
-function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub = true, module_setup = (m) -> nothing)
+function irgen(@nospecialize(func), @nospecialize(tt); 
+               optimize = true, 
+               optimize_llvm = true, 
+               fix_globals = true, 
+               overdub = true, 
+               module_setup = (m) -> nothing)
     # get the method instance
     isa(func, Core.Builtin) && error("function is not a generic function")
     world = typemax(UInt)
@@ -133,7 +148,7 @@ function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub 
                                 )
 
     # get the code
-    global mod = let
+    mod = let
         ref = ccall(:jl_get_llvmf_defn, LLVM.API.LLVMValueRef,
                     (Any, UInt, Bool, Bool, Base.CodegenParams),
                     linfo, world, #=wrapper=#false, #=optimize=#false, params)
@@ -229,8 +244,13 @@ function irgen(@nospecialize(func), @nospecialize(tt); optimize = true, overdub 
 
     d = find_ccalls(gfunc, tt)
     fix_ccalls!(mod, d)
-    #@show mod
-    mod
+    if fix_globals
+        fix_globals!(mod)
+    end
+    if optimize_llvm
+        optimize!(mod)
+    end
+    return mod
 end
 
 
