@@ -10,6 +10,7 @@ LLVM = "929cbde3-209d-540e-8aea-75f648917ca0"
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 TypedCodeUtils = "687fb87b-adea-59d5-9be9-82253b54685d"
+LLVM_jll = "86de99a1-58d6-5da7-8064-bd56ce2e322c"
 
 [compat]
 julia = "1.2"
