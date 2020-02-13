@@ -1,3 +1,7 @@
+```@meta
+CurrentModule = StaticCompiler
+```
+
 # StaticCompiler
 
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://tshort.github.io/StaticCompiler.jl/dev)
