@@ -16,7 +16,8 @@ function _shellcmd(checkInstallation::Bool = false)
         try
             run(`$shellcmd -v`)
         catch
-            error("Make sure gcc compiler is installed: https://gcc.gnu.org/install/binaries.html")
+            @warn "Make sure gcc compiler is installed: https://gcc.gnu.org/install/binaries.html and is on the path, othetwise some of the functions will return errors"
+            return nothing
         end
     end
 
