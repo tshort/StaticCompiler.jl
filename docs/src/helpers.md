@@ -10,3 +10,14 @@ exegen([ (twox, Tuple{Int}, 4) ])
 ```
 
 These are not meant to be a permanent part of the API. They are just for testing.
+
+
+```@index
+Modules = [StaticCompiler]
+Pages   = ["helpers.md"]
+```
+
+```@autodocs
+Modules = [StaticCompiler]
+Pages   = readdir("../src/helpers")
+```
