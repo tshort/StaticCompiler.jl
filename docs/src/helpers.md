@@ -13,9 +13,11 @@ These are not meant to be a permanent part of the API. They are just for testing
 
 
 ```@index
+Modules = [StaticCompiler]
+Pages   = ["helpers.md"]
 ```
 
 ```@autodocs
 Modules = [StaticCompiler]
-Pages   = ["helpers.jl", "jlrun.jl", "juliaconfig.jl", "standalone-exe.jl"]
+Pages   = readdir("../src/helpers")
 ```
