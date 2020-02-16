@@ -13,6 +13,7 @@ TypedCodeUtils = "687fb87b-adea-59d5-9be9-82253b54685d"
 
 [compat]
 TypedCodeUtils = "0.1"
+MacroTools = "0.5"
 julia = "1.2"
 
 [extras]
