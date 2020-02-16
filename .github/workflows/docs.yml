@@ -21,6 +21,8 @@ jobs:
       - uses: julia-actions/setup-julia@latest
         with:
           version: ${{ matrix.julia-version }}
+      - name : Add current package # for unregistered package
+        run: julia -e 'using Pkg; Pkg.develop(PackageSpec(; path=pwd()));'
       - name: Install dependencies
         run: julia --project=docs -e 'using Pkg; Pkg.instantiate()'
       - name: Build and deploy
