@@ -151,14 +151,17 @@ function fix_globals!(mod::LLVM.Module)
         ret!(builder)
     end
     tt = Tuple{Ptr{UInt8}, Iterators.repeated(Ptr{Any}, nglobals)...}
-    deser_mod = irgen(deser_fun, tt, overdub = false, fix_globals = false, optimize_llvm = false)
+    # deser_mod = irgen(deser_fun, tt, overdub = false, fix_globals = false, optimize_llvm = false)
+    deser_mod = irgen(deser_fun, tt, overdub = false, fix_globals = false, optimize_llvm = true)
     d = find_ccalls(deser_fun, tt)
     fix_ccalls!(deser_mod, d)
+
     # rename deserialization function to "_deserialize_globals"
     fun = first(TypedCodeUtils.filter(x -> LLVM.name(x) == "_deserialize_globals", functions(deser_mod)))[2]
     # LLVM.name!(fun, "_deserialize_globals")
     linkage!(fun, LLVM.API.LLVMExternalLinkage)
     # link into the main module
     LLVM.link!(mod, deser_mod)
+    # @show mod
     return
 end

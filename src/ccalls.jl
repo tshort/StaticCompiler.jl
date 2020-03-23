@@ -53,35 +53,42 @@ function fix_ccalls!(mod::LLVM.Module, d)
         if instr isa LLVM.CallInst
             dest = called_value(instr)
             if dest isa ConstantExpr && occursin("inttoptr", string(dest))
-                # @show instr
-                # @show dest
                 argtypes = [llvmtype(op) for op in operands(instr)]
                 nargs = length(parameters(eltype(argtypes[end])))
                 # num_extra_args = 1 + length(collect(eachmatch(r"jl_roots", string(instr))))
                 ptr = Ptr{Cvoid}(convert(Int, first(operands(dest))))
                 if haskey(d, ptr)
-                    sym = d[ptr]
-                    newdest = LLVM.Function(mod, string(sym), LLVM.FunctionType(llvmtype(instr), argtypes[1:nargs]))
-                    LLVM.linkage!(newdest, LLVM.API.LLVMExternalLinkage)
-                    replace_uses!(dest, newdest)
+                    s = string(d[ptr])
+                    if s in (name(g) for g in functions(mod))
+                        replace_uses!(dest, functions(mod)[s])
+                    else
+                        newdest = LLVM.Function(mod, s, LLVM.FunctionType(llvmtype(instr), argtypes[1:nargs]))
+                        LLVM.linkage!(newdest, LLVM.API.LLVMExternalLinkage)
+                        replace_uses!(dest, newdest)
+                    end
                 end
             end
         elseif instr isa LLVM.LoadInst && occursin("inttoptr", string(instr))
-            # dest = called_value(instr)
             for op in operands(instr)
+                @show op
                 lastop = op
                 if occursin("inttoptr", string(op))
-                    # @show instr
                     if occursin("addrspacecast", string(op)) || occursin("getelementptr", string(op))
-                        op = first(operands(op))
+                        @show op = first(operands(op))
                     end
                     first(operands(op)) isa LLVM.ConstantInt || continue
                     ptr = Ptr{Cvoid}(convert(Int, first(operands(op))))
                     if haskey(d, ptr)
-                        obj = d[ptr]
-                        newdest = GlobalVariable(mod, llvmtype(instr), string(d[ptr]))
-                        LLVM.linkage!(newdest, LLVM.API.LLVMExternalLinkage)
-                        replace_uses!(op, newdest)
+                        s = string(d[ptr])
+                        if s in (name(g) for g in globals(mod))
+                            @show instr
+                            @show op
+                            replace_uses!(op, globals(mod)[s])
+                        else
+                            @show newdest = GlobalVariable(mod, llvmtype(instr), s)
+                            LLVM.linkage!(newdest, LLVM.API.LLVMExternalLinkage)
+                            replace_uses!(op, newdest)
+                        end
                     end
                 end
             end

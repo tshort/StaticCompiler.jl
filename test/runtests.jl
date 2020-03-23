@@ -4,6 +4,10 @@ using LLVM
 using Libdl
 
 cd(@__DIR__)
+@testset "basic" begin
+    include("basic.jl")
+end
+
 @testset "ccalls" begin
     include("ccalls.jl")
 end
