@@ -60,6 +60,7 @@ function fix_ccalls!(mod::LLVM.Module, d)
                 if haskey(d, ptr)
                     s = string(d[ptr])
                     if s in (name(g) for g in functions(mod))
+                        @show functions(mod)[s]
                         replace_uses!(dest, functions(mod)[s])
                     else
                         newdest = LLVM.Function(mod, s, LLVM.FunctionType(llvmtype(instr), argtypes[1:nargs]))
@@ -70,7 +71,6 @@ function fix_ccalls!(mod::LLVM.Module, d)
             end
         elseif instr isa LLVM.LoadInst && occursin("inttoptr", string(instr))
             for op in operands(instr)
-                @show op
                 lastop = op
                 if occursin("inttoptr", string(op))
                     if occursin("addrspacecast", string(op)) || occursin("getelementptr", string(op))
@@ -81,11 +81,13 @@ function fix_ccalls!(mod::LLVM.Module, d)
                     if haskey(d, ptr)
                         s = string(d[ptr])
                         if s in (name(g) for g in globals(mod))
-                            @show instr
-                            @show op
-                            replace_uses!(op, globals(mod)[s])
+                            newdest = globals(mod)[s]
+                            if addrspace(llvmtype(instr)) != addrspace(llvmtype(newdest))
+                                newdest = ConstantExpr(LLVM.API.LLVMConstAddrSpaceCast(LLVM.ref(newdest), LLVM.ref(llvmtype(instr))))
+                            end
+                            replace_uses!(op, newdest)
                         else
-                            @show newdest = GlobalVariable(mod, llvmtype(instr), s)
+                            newdest = GlobalVariable(mod, llvmtype(instr), s)
                             LLVM.linkage!(newdest, LLVM.API.LLVMExternalLinkage)
                             replace_uses!(op, newdest)
                         end

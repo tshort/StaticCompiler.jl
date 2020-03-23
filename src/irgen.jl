@@ -61,7 +61,8 @@ function irgen(@nospecialize(func), @nospecialize(tt);
     params = Base.CodegenParams(track_allocations=false,
                                 code_coverage=false,
                                 static_alloc=false,
-                                prefer_specsig=true)
+                                prefer_specsig=true,
+                                gnu_pubnames=false)
     native_code = ccall(:jl_create_native, Ptr{Cvoid},
                         (Vector{Core.MethodInstance}, Base.CodegenParams),
                         [method_instance], params)
