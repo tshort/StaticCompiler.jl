@@ -58,15 +58,19 @@ function fix_ccalls!(mod::LLVM.Module, d)
                 # num_extra_args = 1 + length(collect(eachmatch(r"jl_roots", string(instr))))
                 ptr = Ptr{Cvoid}(convert(Int, first(operands(dest))))
                 if haskey(d, ptr)
+                    # @show blk
+                    @show fun
+                    @show instr
                     s = string(d[ptr])
                     if s in (name(g) for g in functions(mod))
                         @show functions(mod)[s]
                         replace_uses!(dest, functions(mod)[s])
                     else
-                        newdest = LLVM.Function(mod, s, LLVM.FunctionType(llvmtype(instr), argtypes[1:nargs]))
+                        @show newdest = LLVM.Function(mod, s, LLVM.FunctionType(llvmtype(instr), argtypes[1:nargs]))
                         LLVM.linkage!(newdest, LLVM.API.LLVMExternalLinkage)
                         replace_uses!(dest, newdest)
                     end
+                    @show fun
                 end
             end
         elseif instr isa LLVM.LoadInst && occursin("inttoptr", string(instr))
@@ -81,13 +85,13 @@ function fix_ccalls!(mod::LLVM.Module, d)
                     if haskey(d, ptr)
                         s = string(d[ptr])
                         if s in (name(g) for g in globals(mod))
-                            newdest = globals(mod)[s]
+                            @show newdest = globals(mod)[s]
                             if addrspace(llvmtype(instr)) != addrspace(llvmtype(newdest))
                                 newdest = ConstantExpr(LLVM.API.LLVMConstAddrSpaceCast(LLVM.ref(newdest), LLVM.ref(llvmtype(instr))))
                             end
                             replace_uses!(op, newdest)
                         else
-                            newdest = GlobalVariable(mod, llvmtype(instr), s)
+                            @show newdest = GlobalVariable(mod, llvmtype(instr), s)
                             LLVM.linkage!(newdest, LLVM.API.LLVMExternalLinkage)
                             replace_uses!(op, newdest)
                         end

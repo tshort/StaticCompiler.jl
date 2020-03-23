@@ -154,7 +154,7 @@ function fix_globals!(mod::LLVM.Module)
     end
     tt = Tuple{Ptr{UInt8}, Iterators.repeated(Ptr{Any}, nglobals)...}
     # deser_mod = irgen(deser_fun, tt, overdub = false, fix_globals = false, optimize_llvm = false)
-    @show deser_mod = irgen(deser_fun, tt, overdub = false, fix_globals = false, optimize_llvm = true)
+    deser_mod = irgen(deser_fun, tt, overdub = false, fix_globals = false, optimize_llvm = true)
     d = find_ccalls(deser_fun, tt)
     fix_ccalls!(deser_mod, d)
 
