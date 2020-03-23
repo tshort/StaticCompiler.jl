@@ -64,16 +64,18 @@ function fix_globals!(mod::LLVM.Module)
                     push!(es, serialize(ctx, obj))
                     push!(objs, obj)
                     # Create pointers to the data.
-                    gptr = GlobalVariable(mod, julia_to_llvm(Any), "jl.global")
+                    # gptr = GlobalVariable(mod, julia_to_llvm(Any), "jl.global", 0)
+                    gptr = GlobalVariable(mod, llvmtype(x), "jl.global", 0)
                     linkage!(gptr, LLVM.API.LLVMInternalLinkage)
                     LLVM.API.LLVMSetInitializer(LLVM.ref(gptr), LLVM.ref(null(julia_to_llvm(Any))))
                     push!(gptrs, gptr)
                     gptridx[obj] = j
                     j += 1
                 end
-                gptr = gptrs[gptridx[obj]]
-                gptr2 = load!(builder, gptr)
-                ret = pointercast!(builder, gptr2, llvmtype(x))
+                @show gptr = gptrs[gptridx[obj]]
+                @show gptr2 = load!(builder, gptr)
+                @show llvmtype(x)
+                @show ret = pointercast!(builder, gptr2, llvmtype(x))
                 return ret
             end
             return x
@@ -121,7 +123,7 @@ function fix_globals!(mod::LLVM.Module)
             return
         end
     end
-    # @show fune
+    @show fune
     # Execute the deserializing function.
     deser_fun = eval(fune)
     v = take!(ctx.io)
@@ -152,7 +154,7 @@ function fix_globals!(mod::LLVM.Module)
     end
     tt = Tuple{Ptr{UInt8}, Iterators.repeated(Ptr{Any}, nglobals)...}
     # deser_mod = irgen(deser_fun, tt, overdub = false, fix_globals = false, optimize_llvm = false)
-    deser_mod = irgen(deser_fun, tt, overdub = false, fix_globals = false, optimize_llvm = true)
+    @show deser_mod = irgen(deser_fun, tt, overdub = false, fix_globals = false, optimize_llvm = true)
     d = find_ccalls(deser_fun, tt)
     fix_ccalls!(deser_mod, d)
 
