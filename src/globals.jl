@@ -72,10 +72,10 @@ function fix_globals!(mod::LLVM.Module)
                     gptridx[obj] = j
                     j += 1
                 end
-                @show gptr = gptrs[gptridx[obj]]
-                @show gptr2 = load!(builder, gptr)
-                @show llvmtype(x)
-                @show ret = pointercast!(builder, gptr2, llvmtype(x))
+                gptr = gptrs[gptridx[obj]]
+                gptr2 = load!(builder, gptr)
+                llvmtype(x)
+                ret = pointercast!(builder, gptr2, llvmtype(x))
                 return ret
             end
             return x

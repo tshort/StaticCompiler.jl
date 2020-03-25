@@ -1,7 +1,7 @@
 name = "StaticCompiler"
 uuid = "81625895-6c0f-48fc-b932-11a18313743c"
 authors = ["Tom Short"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 Cassette = "7057c7e9-c182-5462-911a-8362d720325c"
@@ -17,7 +17,7 @@ DataStructures = "0.17"
 LLVM = "1.3"
 MacroTools = "0.5"
 TypedCodeUtils = "0.1"
-julia = "1.2"
+julia = "1.5"
 
 [extras]
 Formatting = "59287772-0a20-5a39-b81b-1366585eb4c0"
