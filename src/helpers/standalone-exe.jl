@@ -77,14 +77,7 @@ function exegen(funcalls)
 
     cd(mkpath("standalone")) do
         # create `blank.ji` for initialization
-        julia_path = joinpath(Sys.BINDIR, Base.julia_exename())
-        base_dir = dirname(Base.find_source_file("sysimg.jl"))
-        wd = pwd()
-        open(println, "blank.jl", "w")
-        cd(base_dir) do
-            run(`$(julia_path) --output-ji $(wd)/blank.ji $(wd)/blank.jl`)
-        end
-
+        ccall(:jl_save_incremental, Cint, (Cstring, Array), "blank.ji", [])
         dir = pwd()
         standalonedir = dir
         bindir = string(Sys.BINDIR)
