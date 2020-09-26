@@ -12,11 +12,11 @@ MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 TypedCodeUtils = "687fb87b-adea-59d5-9be9-82253b54685d"
 
 [compat]
-DataStructures = "0.17"
 Cassette = "0.3"
-LLVM = "1.3"
-TypedCodeUtils = "0.1"
+DataStructures = "0.17"
+LLVM = "1.3, 3.1"
 MacroTools = "0.5"
+TypedCodeUtils = "0.1"
 julia = "1.2"
 
 [extras]
