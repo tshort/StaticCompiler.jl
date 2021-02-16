@@ -135,7 +135,7 @@ function irgen(@nospecialize(func), @nospecialize(tt);
         # global mymeth = method
     end
     
-    params = Base.CodegenParams(cached=false,
+    params = Base.CodegenParams(;
                                 track_allocations=false,
                                 code_coverage=false,
                                 static_alloc=false,
@@ -152,9 +152,9 @@ function irgen(@nospecialize(func), @nospecialize(tt);
         ref = ccall(:jl_get_llvmf_defn, LLVM.API.LLVMValueRef,
                     (Any, UInt, Bool, Bool, Base.CodegenParams),
                     linfo, world, #=wrapper=#false, #=optimize=#false, params)
-        if ref == C_NULL
-            #  error(jlctx[], "the Julia compiler could not generate LLVM IR")
-        end
+        
+        ref == C_NULL && error("could not compile the specified method")
+        
 
         llvmf = LLVM.Function(ref)
         LLVM.parent(llvmf)
