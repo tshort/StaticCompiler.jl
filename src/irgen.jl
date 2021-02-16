@@ -272,7 +272,7 @@ function optimize!(mod::LLVM.Module)
     # LLVM.API.@apicall(:LLVMInitializeWebAssemblyTargetMC, Cvoid, ())
     # LLVM.API.@apicall(:LLVMInitializeWebAssemblyTargetInfo, Cvoid, ())
     triple = "i686-pc-linux-gnu"
-    tm = TargetMachine(Target(triple), triple)
+    tm = TargetMachine(Target(;triple=triple), triple)
 
     ModulePassManager() do pm
         # add_library_info!(pm, triple(mod))
@@ -293,7 +293,7 @@ end
 
 function write_object(mod::LLVM.Module, path)
     host_triple = triple()
-    host_t = Target(host_triple)
+    host_t = Target(;triple=host_triple)
     TargetMachine(host_t, host_triple, "", "", LLVM.API.LLVMCodeGenLevelDefault, LLVM.API.LLVMRelocPIC) do tm
         emit(tm, mod, LLVM.API.LLVMObjectFile, path)
     end
