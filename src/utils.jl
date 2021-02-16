@@ -2,7 +2,7 @@
 function julia_to_llvm(@nospecialize x)
     isboxed = Ref{UInt8}()
     # LLVMType(ccall(:jl_type_to_llvm, LLVM.API.LLVMTypeRef, (Any, Ref{UInt8}), x, isboxed))    # noserialize
-    LLVMType(ccall(:julia_type_to_llvm, LLVM.API.LLVMTypeRef, (Any, Ref{UInt8}), x, isboxed))  # julia v1.1.1
+    LLVMType(ccall(:jl_type_to_llvm, LLVM.API.LLVMTypeRef, (Any, Ref{UInt8}), x, isboxed))  # julia v1.1.1
 end
 
 const jl_value_t_ptr = julia_to_llvm(Any)
