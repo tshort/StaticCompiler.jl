@@ -34,8 +34,6 @@ function generate_shlib_fptr(f, tt, name = GPUCompiler.safe_name(repr(f)))
         obj, _ = GPUCompiler.codegen(:obj, job; strip=true, only_entry=false, validate=false)
         write(io, obj)
         flush(io)
-        # FIXME: Be more portable
-        # run(`ld -shared -o $path.$(Libdl.dlext) $path`)
         run(`$(StaticCompiler.LLVM_full_jll.PATH)/$linker -shared -o $path.$(Libdl.dlext) $path`)
         ptr = Libdl.dlopen("$path.$(Libdl.dlext)", Libdl.RTLD_LOCAL)
         fptr = Libdl.dlsym(ptr, "julia_$name")
