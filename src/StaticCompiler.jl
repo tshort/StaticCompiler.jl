@@ -1,28 +1,46 @@
 module StaticCompiler
 
-export irgen, write_object, @extern
-
+import GPUCompiler
+import LLVM
+import LLVM_full_jll
 import Libdl
 
-using LLVM
-using LLVM.Interop
-using TypedCodeUtils
-import TypedCodeUtils: reflect, lookthrough, canreflect,
-                       DefaultConsumer, Reflection, Callsite,
-                       identify_invoke, identify_call, identify_foreigncall,
-                       process_invoke, process_call
-using MacroTools
-using DataStructures: MultiDict
+export generate_shlib_fptr
 
+module TestRuntime
+    # dummy methods
+    signal_exception() = return
+    malloc(sz) = C_NULL
+    report_oom(sz) = return
+    report_exception(ex) = return
+    report_exception_name(ex) = return
+    report_exception_frame(idx, func, file, line) = return
 
-include("serialize.jl")
-include("utils.jl")
-include("ccalls.jl")
-include("globals.jl")
-include("overdub.jl")
-include("irgen.jl")
-include("extern.jl")
+    # for validation
+    sin(x) = Base.sin(x)
+end
 
-include("helpers/helpers.jl")
+struct TestCompilerParams <: GPUCompiler.AbstractCompilerParams end
+GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:Any,TestCompilerParams}) = TestRuntime
+
+function generate_shlib_fptr(f, tt, name = GPUCompiler.safe_name(repr(f)))
+    mktemp() do path, io
+        target = GPUCompiler.NativeCompilerTarget(;reloc=LLVM.API.LLVMRelocPIC, extern=true)
+        source = GPUCompiler.FunctionSpec(f, Base.to_tuple_type(tt), false, name)
+        params = TestCompilerParams()
+        job = GPUCompiler.CompilerJob(target, source, params)
+        obj, _ = GPUCompiler.codegen(:obj, job; strip=true, only_entry=false, validate=false)
+        write(io, obj)
+        flush(io)
+        # FIXME: Be more portable
+        run(`ld -shared -o $path.$(Libdl.dlext) $path`)
+        ptr = Libdl.dlopen("$path.$(Libdl.dlext)", Libdl.RTLD_LOCAL)
+        fptr = Libdl.dlsym(ptr, "julia_$name")
+        @assert fptr != C_NULL
+        atexit(()->rm("$path.$(Libdl.dlext)"))
+        fptr
+    end
+end
+
 
 end # module

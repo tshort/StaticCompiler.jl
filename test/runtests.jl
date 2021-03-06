@@ -1,21 +1,10 @@
 using StaticCompiler
 using Test
-using LLVM
-using Libdl
 
-cd(@__DIR__)
-@testset "ccalls" begin
-    include("ccalls.jl")
+
+
+@testset "basics" begin
+    f1(x) = x+1
+    @test ccall(generate_shlib_fptr(f1, (Int,)), Int, (Int,), 1) == 2
 end
 
-@testset "globals" begin
-    include("globals.jl")
-end
-
-@testset "others" begin
-    include("others.jl")
-end
-
-@testset "standalone" begin
-    include("standalone-exe.jl")
-end

@@ -4,19 +4,12 @@ authors = ["Tom Short"]
 version = "0.1.0"
 
 [deps]
-Cassette = "7057c7e9-c182-5462-911a-8362d720325c"
-DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
+GPUCompiler = "61eb1bfa-7361-4325-ad38-22787b887f55"
 LLVM = "929cbde3-209d-540e-8aea-75f648917ca0"
+LLVM_full_jll = "a3ccf953-465e-511d-b87f-60a6490c289d"
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
-MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
-TypedCodeUtils = "687fb87b-adea-59d5-9be9-82253b54685d"
 
 [compat]
-DataStructures = "0.17"
-Cassette = "0.3"
-LLVM = "1.3"
-TypedCodeUtils = "0.1"
-MacroTools = "0.5"
 julia = "1.2"
 
 [extras]
