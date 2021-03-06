@@ -5,7 +5,7 @@ import LLVM
 import LLVM_full_jll
 import Libdl
 
-export generate_shlib_fptr
+export generate_shlib_fptr, compile
 
 module TestRuntime
     # dummy methods
@@ -41,6 +41,17 @@ function generate_shlib_fptr(f, tt, name = GPUCompiler.safe_name(repr(f)))
         atexit(()->rm("$path.$(Libdl.dlext)"))
         fptr
     end
+end
+
+
+# Return an LLVM module
+function compile(f, tt, name = GPUCompiler.safe_name(repr(f)))
+    target = GPUCompiler.NativeCompilerTarget(;reloc=LLVM.API.LLVMRelocPIC, extern=true)
+    source = GPUCompiler.FunctionSpec(f, Base.to_tuple_type(tt), false, name)
+    params = TestCompilerParams()
+    job = GPUCompiler.CompilerJob(target, source, params)
+    m, _ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false)
+    return m
 end
 
 
