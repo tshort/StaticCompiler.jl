@@ -23,6 +23,8 @@ end
 struct TestCompilerParams <: GPUCompiler.AbstractCompilerParams end
 GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:Any,TestCompilerParams}) = TestRuntime
 
+const linker = Sys.isunix() ? "ld.lld" : Sys.isapple() ? "ld64.lld" : "lld-link"
+
 function generate_shlib_fptr(f, tt, name = GPUCompiler.safe_name(repr(f)))
     mktemp() do path, io
         target = GPUCompiler.NativeCompilerTarget(;reloc=LLVM.API.LLVMRelocPIC, extern=true)
@@ -33,7 +35,8 @@ function generate_shlib_fptr(f, tt, name = GPUCompiler.safe_name(repr(f)))
         write(io, obj)
         flush(io)
         # FIXME: Be more portable
-        run(`ld -shared -o $path.$(Libdl.dlext) $path`)
+        # run(`ld -shared -o $path.$(Libdl.dlext) $path`)
+        run(`$(StaticCompiler.LLVM_full_jll.PATH)/$linker -shared -o $path.$(Libdl.dlext) $path`)
         ptr = Libdl.dlopen("$path.$(Libdl.dlext)", Libdl.RTLD_LOCAL)
         fptr = Libdl.dlsym(ptr, "julia_$name")
         @assert fptr != C_NULL
