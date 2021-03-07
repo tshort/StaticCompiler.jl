@@ -14,8 +14,24 @@ This is an experimental package to compile Julia code to standalone libraries. A
 using Pkg
 Pkg.add(PackageSpec( url = "https://github.com/tshort/StaticCompiler.jl", rev = "master"))
 ```
+
 ```julia
 using StaticCompiler
+f(x) = 2x
+
+# compile `f` and return an LLVM module
+m = compile(f, (Int,))
+
+# compile `f` and write to a shared library ("f.so" or "f.dll")
+generate_shlib(f, (Int,), "libf")
+# find a function pointer for this shared library 
+fptr = generate_shlib_fptr("libf", "f")
+ccall(fptr, Int, (Int,), 2)
+
+# do this in one step (this time with a temporary shared library)
+fptr = generate_shlib_fptr(f, (Int,))
+ccall(fptr, Int, (Int,), 2)
+
 ```
 
 ## Approach
