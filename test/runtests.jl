@@ -26,16 +26,16 @@ end
 end
 
 # Call binaries for testing
-# Need Mason's code
-# @testset "Generate binary" begin
-#     fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
-#     libname = tempname() * "." * Libdl.dlext
-#     generate_shlib(fib, (Int,), libname)
-#     ptr = Libdl.dlopen(libname, Libdl.RTLD_LOCAL)
-#     fptr = Libdl.dlsym(ptr, "julia_fib")
-#     @assert fptr != C_NULL
-#     @test_skip ccall(fptr, Int, (Int,), 10) == 55
-# end
+@testset "Generate binary" begin
+    fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
+    libname = tempname() 
+    generate_shlib(fib, (Int,), libname)
+    ptr = Libdl.dlopen(libname * "." * Libdl.dlext, Libdl.RTLD_LOCAL)
+    fptr = Libdl.dlsym(ptr, "julia_fib")
+    @assert fptr != C_NULL
+    # This works on REPL
+    @test_skip ccall(fptr, Int, (Int,), 10) == 55
+end
 
 @testset "Loops" begin
     function sum_first_N_int(N)
