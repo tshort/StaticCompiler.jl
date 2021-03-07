@@ -4,7 +4,6 @@ os:
 - linux
 - windows
 julia:
-  - 1.3
   - nightly
 matrix:
   # extra linux test
