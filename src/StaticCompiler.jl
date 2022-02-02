@@ -5,7 +5,7 @@ using LLVM: LLVM
 using Libdl: Libdl
 
 
-export generate_shlib, generate_shlib_fptr, compile, native_code_llvm, native_code_typed
+export generate_shlib, generate_shlib_fptr, compile, native_code_llvm, native_code_typed, native_llvm_module
 
 module TestRuntime
     # dummy methods
@@ -30,19 +30,6 @@ function native_job(@nospecialize(func), @nospecialize(types); kernel::Bool=fals
     GPUCompiler.CompilerJob(target, source, params), kwargs
 end
 
-function native_code_llvm(@nospecialize(func), @nospecialize(types); kwargs...)
-    job, kwargs = native_job(func, types; kwargs...)
-    GPUCompiler.code_llvm(stdout, job; kwargs...)
-end
-
-function native_code_typed(@nospecialize(func), @nospecialize(types); kwargs...)
-    job, kwargs = native_job(func, types; kwargs...)
-    GPUCompiler.code_typed(job; kwargs...)
-end
-
-
-# const linker = Sys.isunix() ? "ld.lld" : Sys.isapple() ? "ld64.lld" : "lld-link"
-
 function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)); kwargs...)
     open(path, "w") do io
         job, kwargs = native_job(f, tt; name, kwargs...)
@@ -50,7 +37,6 @@ function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.saf
         
         write(io, obj)
         flush(io)
-        # run(`$(Clang_jll.PATH[])/clang -shared -o $path.$(Libdl.dlext) $path`)
         run(`gcc -shared -o $path.$(Libdl.dlext) $path`)
         rm(path)
     end
@@ -75,8 +61,20 @@ function generate_shlib_fptr(path::String, name)
     fptr
 end
 
+
+
+function native_code_llvm(@nospecialize(func), @nospecialize(types); kwargs...)
+    job, kwargs = native_job(func, types; kwargs...)
+    GPUCompiler.code_llvm(stdout, job; kwargs...)
+end
+
+function native_code_typed(@nospecialize(func), @nospecialize(types); kwargs...)
+    job, kwargs = native_job(func, types; kwargs...)
+    GPUCompiler.code_typed(job; kwargs...)
+end
+
 # Return an LLVM module
-function compile(f, tt, name = GPUCompiler.safe_name(repr(f)); kwargs...)
+function native_llvm_module(f, tt, name = GPUCompiler.safe_name(repr(f)); kwargs...)
     job, kwargs = native_job(f, tt; name, kwargs...)
     m, _ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false)
     return m
