@@ -19,10 +19,12 @@ using LinearAlgebra
 
 end
 
+fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2) # for some reason, if this is defined in the testset, it segfaults
+
 @testset "Recursion" begin
-    fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
     # This works on the REPL but fails here
-    @test_skip ccall(generate_shlib_fptr(fib, (Int,)), Int, (Int,), 10) == 55
+    fib_ptr = generate_shlib_fptr(fib, (Int,))
+    @test @ccall( $fib_ptr(10::Int) :: Int ) == 55
 end
 
 # Call binaries for testing
@@ -80,8 +82,6 @@ end
 
 # Arrays with different input types Int32, Int64, Float32, Float64, Complex?
 @testset "Arrays" begin
-
-    arr = collect(1:10)
     function array_sum(n, A)
         s = zero(eltype(A))
         for i in 1:n
@@ -89,20 +89,30 @@ end
         end
         s
     end
+    
+    array_sum_ptr = generate_shlib_fptr(array_sum, Tuple{Int, Vector{Int}})
+    @test ( @ccall $array_sum_ptr(10::Int, collect(1:10)::Vector{Int})::Int ) == 55
 
-    #This segfaults, not sure if this is how you pass around arrays
-    @test_skip ccall(generate_shlib_fptr(array_sum, (Csize_t, Ptr{Float64})), Int, (Csize_t, Ptr{Float64}), length(arr), arr) == 55
+    # this will segfault on my machine if I use 64 bit complex numbers!
+    array_sum_complex_ptr = generate_shlib_fptr(array_sum, Tuple{Int, Vector{Complex{Float32}}})
+    @test ( @ccall $array_sum_complex_ptr(2::Int, [1f0+im, 1f0-im]::Vector{Complex{Float32}})::Complex{Float32} ) ≈ 2.0
 
+    #This will segfault 
+    array_sum_complex64_ptr = generate_shlib_fptr(array_sum, Tuple{Int, Vector{Complex{Float642}}})
+    @test_skip ( @ccall $array_sum_complex_ptr(2::Int, [1.0+im, 1.0-im]::Vector{Complex{Float64}})::Complex{Float64} ) ≈ 2.0 
 end
 
 # Just to call external libraries
 @testset "BLAS" begin
-    function mydot(N) 
-        a = Float64.(1:N)
+    function mydot(a::Vector{Float64})
+        N = length(a)
         BLAS.dot(N, a, 1, a, 1)
     end
-    @test_skip ccall(generate_shlib_fptr(mydot, (Int,)), Float64, (Int,), 2) == 5.
+    a = [1.0, 2.0]
+    mydot_ptr = generate_shlib_fptr(mydot, Tuple{Vector{Float64}})
+    @test @ccall( $mydot_ptr(a::Vector{Float64})::Float64 ) == 5.0
 end
+
 
 @testset "Hello World" begin
     function hello(N)

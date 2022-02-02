@@ -1,9 +1,9 @@
 module StaticCompiler
 
-import GPUCompiler
-import LLVM
-import LLVM_full_jll
-import Libdl
+using GPUCompiler: GPUCompiler
+using LLVM: LLVM
+using Libdl: Libdl
+
 
 export generate_shlib, generate_shlib_fptr, compile
 
@@ -23,18 +23,19 @@ end
 struct TestCompilerParams <: GPUCompiler.AbstractCompilerParams end
 GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:Any,TestCompilerParams}) = TestRuntime
 
-const linker = Sys.isunix() ? "ld.lld" : Sys.isapple() ? "ld64.lld" : "lld-link"
+# const linker = Sys.isunix() ? "ld.lld" : Sys.isapple() ? "ld64.lld" : "lld-link"
 
 function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)))
     open(path, "w") do io
-        target = GPUCompiler.NativeCompilerTarget(;reloc=LLVM.API.LLVMRelocPIC, extern=true)
+        target = GPUCompiler.NativeCompilerTarget(;always_inline=true)
         source = GPUCompiler.FunctionSpec(f, Base.to_tuple_type(tt), false, name)
         params = TestCompilerParams()
         job = GPUCompiler.CompilerJob(target, source, params)
         obj, _ = GPUCompiler.codegen(:obj, job; strip=true, only_entry=false, validate=false)
         write(io, obj)
         flush(io)
-        run(`$(StaticCompiler.LLVM_full_jll.PATH)/$linker -shared -o $path.$(Libdl.dlext) $path`)
+        # run(`$(Clang_jll.PATH[])/clang -shared -o $path.$(Libdl.dlext) $path`)
+        run(`gcc -shared -o $path.$(Libdl.dlext) $path`)
         rm(path)
     end
     path, name
