@@ -2,6 +2,7 @@ using StaticCompiler
 using Test
 using Libdl
 using LinearAlgebra
+using LoopVectorization
 
 @testset "Basics" begin
 
@@ -19,12 +20,20 @@ using LinearAlgebra
 
 end
 
-fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2) # for some reason, if this is defined in the testset, it segfaults
+
+fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2) # This needs to be defined globally due to https://github.com/JuliaLang/julia/issues/40990
 
 @testset "Recursion" begin
-    # This works on the REPL but fails here
     fib_ptr = generate_shlib_fptr(fib, (Int,))
     @test @ccall( $fib_ptr(10::Int) :: Int ) == 55
+
+    # Trick to work around #40990
+    _fib2(_fib2, n) = n <= 1 ? n : _fib2(_fib2, n-1) + _fib2(_fib2, n-2)
+    fib2(n) = _fib2(_fib2, n)
+
+    fib2_ptr = generate_shlib_fptr(fib2, (Int,))
+    @test @ccall( $fib2_ptr(20::Int) :: Int ) == 6765
+    
 end
 
 # Call binaries for testing
@@ -102,6 +111,25 @@ end
     @test_skip ( @ccall $array_sum_complex_ptr(2::Int, [1.0+im, 1.0-im]::Vector{Complex{Float64}})::Complex{Float64} ) ≈ 2.0 
 end
 
+
+# Julia wants to treat Tuple (and other things like it) as plain bits, but LLVM wants to treat it as something with a pointer.
+# We need to be careful to not send, nor receive an unwrapped Tuple to a compiled function
+@testset "Send and receive Tuple" begin
+    foo(u::Tuple) = 2 .* reverse(u) .- 1 # we can't just compile this as is. 
+
+    # Make a mutating function that places the output into a Ref for the caller to grab:
+    foo!(out::Ref{<:Tuple}, u::Tuple) = (out[] = foo(u); return nothing)
+
+    foo_ptr = generate_shlib_fptr(foo!, Tuple{Base.RefValue{NTuple{3, Int}}, NTuple{3, Int}})
+    out = Ref{NTuple{3, Int}}()
+    # we wrap u in a ref when we send it to the binary because LLVM expects that :(
+    u = Ref((1, 2, 3))
+    (@ccall $foo_ptr(out::Ref{NTuple{3, Int}}, u::Ref{NTuple{3, Int}}) :: Nothing)
+
+    @test out[] == foo(u[])
+end
+
+
 # Just to call external libraries
 @testset "BLAS" begin
     function mydot(a::Vector{Float64})
@@ -124,7 +152,27 @@ end
     @test_skip ccall(generate_shlib_fptr(hello, (Int,)), Int, (Int,), 1) == 1
 end
 
+@testset "LoopVectorization" begin
+    function mul!(C, A, B)
+        @turbo for n ∈ indices((C,B), 2), m ∈ indices((C,A), 1)
+            Cmn = zero(eltype(C))
+            for k ∈ indices((A,B), (2,1))
+                Cmn += A[m,k] * B[k,n]
+            end
+            C[m,n] = Cmn
+        end
+    end
+    mul_ptr! = generate_shlib_fptr(mul!, Tuple{Matrix{Float64}, Matrix{Float64}, Matrix{Float64}})
+    
+    C = Array{Float64}(undef, 10, 12)
+    A = rand(10, 11)
+    B = rand(11, 12)
+
+    @ccall $mul_ptr!(C::Matrix{Float64}, A::Matrix{Float64}, B::Matrix{Float64}) :: Nothing
+    @test C ≈ A*B
+end
+
+
+
 
 # data structures, dictionaries, tuples, named tuples
-# passing pointers?
-# @inbounds LoopVectorization
