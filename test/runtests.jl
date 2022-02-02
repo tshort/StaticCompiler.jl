@@ -3,6 +3,8 @@ using Test
 using Libdl
 using LinearAlgebra
 using LoopVectorization
+using ManualMemory
+using StrideArraysCore
 
 @testset "Basics" begin
 
@@ -152,8 +154,10 @@ end
     @test_skip ccall(generate_shlib_fptr(hello, (Int,)), Int, (Int,), 1) == 1
 end
 
+# I can't beleive this works.
 @testset "LoopVectorization" begin
     function mul!(C, A, B)
+        # note: @tturbo does NOT work
         @turbo for n ∈ indices((C,B), 2), m ∈ indices((C,A), 1)
             Cmn = zero(eltype(C))
             for k ∈ indices((A,B), (2,1))
@@ -172,7 +176,24 @@ end
     @test C ≈ A*B
 end
 
-
+# This is a trick to get stack allocated arrays inside a function body (so long as they don't escape).
+# This lets us have intermediate, mutable stack allocated arrays inside our 
+@testset "Alloca" begin
+    function f(N)
+        # this can hold at most 100 Int values, if you use it for more, you'll segfault
+        buf = ManualMemory.MemoryBuffer{100, Int}(undef)
+        GC.@preserve buf begin
+            # wrap the first N values in a PtrArray
+            arr = PtrArray(pointer(buf), (N,))
+            arr .= 1 # mutate the array to be all 1s
+            sum(arr) # compute the sum. It is very imporatant that no references to arr escape the function body
+        end
+    end
+    
+    fptr = generate_shlib_fptr(f, Tuple{Int})
+    @test (@ccall $fptr(20::Int) :: Int) == 20
+    
+end 
 
 
 # data structures, dictionaries, tuples, named tuples
