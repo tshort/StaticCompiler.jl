@@ -5,7 +5,7 @@ using LLVM: LLVM
 using Libdl: Libdl
 
 
-export generate_shlib, generate_shlib_fptr, compile
+export generate_shlib, generate_shlib_fptr, compile, native_code_llvm, native_code_typed
 
 module TestRuntime
     # dummy methods
