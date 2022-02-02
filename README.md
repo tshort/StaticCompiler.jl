@@ -43,4 +43,4 @@ This package uses the [GPUCompiler package](https://github.com/JuliaGPU/GPUCompi
 * No heap allocations (e.g. creating an array or a string) are allowed inside a statically compiled function body. If you try to run such a function, you will get a segfault.
 **  It's sometimes possible you won't get a segfault if you define and run the function in the same session, but trying to call the compiled function in a new julia session will definitely segfault. 
 * Lots of other limitations too. E.g. there's an example in tests/runtests.jl where summing a vector of `Complex{Float32}` is fine, but segfaults on `Complex{Float64}`.
-
+* Doesn't currently work on Windows
