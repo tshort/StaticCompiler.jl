@@ -98,7 +98,7 @@ end
     @test ( @ccall $array_sum_complex_ptr(2::Int, [1f0+im, 1f0-im]::Vector{Complex{Float32}})::Complex{Float32} ) ≈ 2.0
 
     #This will segfault 
-    array_sum_complex64_ptr = generate_shlib_fptr(array_sum, Tuple{Int, Vector{Complex{Float642}}})
+    array_sum_complex64_ptr = generate_shlib_fptr(array_sum, Tuple{Int, Vector{Complex{Float64}}})
     @test_skip ( @ccall $array_sum_complex_ptr(2::Int, [1.0+im, 1.0-im]::Vector{Complex{Float64}})::Complex{Float64} ) ≈ 2.0 
 end
 
