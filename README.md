@@ -44,7 +44,7 @@ julia> fib_compiled(10)
 ## Approach
 
 This package uses the [GPUCompiler package](https://github.com/JuliaGPU/GPUCompiler.jl) to generate code.
-do
+
 ## Limitations 
 
 * This package currently requires that you have `gcc` installed and in your system's `PATH`. This is probably pretty easy to fix, we only use `gcc` for linking. In theory Clang_jll or LLVM_full_jll should be able to do this, and be managed through Julia's package manager. 
