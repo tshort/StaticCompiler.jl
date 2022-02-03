@@ -182,8 +182,4 @@ function native_llvm_module(f, tt, name = GPUCompiler.safe_name(repr(f)); kwargs
 end
 
 
-
-
-
-
 end # module

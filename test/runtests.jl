@@ -25,7 +25,7 @@ fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2) # This needs to be defined globall
     # Trick to work around #40990
     _fib2(_fib2, n) = n <= 1 ? n : _fib2(_fib2, n-1) + _fib2(_fib2, n-2)
     fib2(n) = _fib2(_fib2, n)
-
+  
     @test compile(fib2, (Int,))[2](20) == fib(20)    
 end
 
