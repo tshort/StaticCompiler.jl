@@ -40,7 +40,7 @@ julia> path, fib_compiled = compile(fib, Tuple{Int}, "fib")
 julia> fib_compiled(10)
 55
 ```
-Now we can quite this session and load a new one where `fib` is not defined:
+Now we can quit this session and load a new one where `fib` is not defined:
 ```julia
 julia> using StaticCompiler
 
