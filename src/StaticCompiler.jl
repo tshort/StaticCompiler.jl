@@ -147,8 +147,13 @@ function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.saf
         
         write(io, obj)
         flush(io)
-        clang() do exe
-            run(`$exe -shared -o $lib_path $obj_path`)
+        try
+            clang() do exe
+                run(`$exe -shared -o $lib_path $obj_path`)
+            end
+        catch e;
+            # if Clang_jll fails, check if gcc is available
+            run(`gcc -shared -o $lib_path $obj_path`)
         end
     end
     path, name
