@@ -39,6 +39,7 @@ StaticCompiler.StaticCompiledFunction{Int64, Tuple{Int64}}(:fib, Ptr{Nothing} @0
 
 julia> fib_compiled(10)
 55
+```
 
 ## Approach
 
