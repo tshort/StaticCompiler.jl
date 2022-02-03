@@ -153,7 +153,7 @@ function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.saf
             end
         catch e;
             # if Clang_jll fails, check if gcc is available
-            run(`gcc -shared -o $lib_path $obj_path`)
+            run(`cc -shared -o $lib_path $obj_path`)
         end
     end
     path, name
@@ -195,6 +195,5 @@ function native_llvm_module(f, tt, name = GPUCompiler.safe_name(repr(f)); kwargs
     m, _ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false)
     return m
 end
-
 
 end # module
