@@ -21,8 +21,8 @@ julia> using StaticCompiler
 julia> fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
 fib (generic function with 1 method)
 
-julia> path, fib_compiled = compile(fib, Tuple{Int}, "fib")
-("fib.cjl", StaticCompiler.StaticCompiledFunction{Int64, Tuple{Int64}}(:fib, Ptr{Nothing} @0x00007fc4ec032130))
+julia> fib_compiled, path = compile(fib, Tuple{Int}, "fib")
+(f = fib(::Int64) :: Int64, path = "fib")
 
 julia> fib_compiled(10)
 55
@@ -34,10 +34,10 @@ julia> using StaticCompiler
 julia> fib
 ERROR: UndefVarError: fib not defined
 
-julia> fib_compiled = load_function("fib.cjl")
-StaticCompiler.StaticCompiledFunction{Int64, Tuple{Int64}}(:fib, Ptr{Nothing} @0x00007f9ee8050130)
+julia> fib_comiled = load_function("fib")
+fib(::Int64) :: Int64
 
-julia> fib_compiled(10)
+julia> fib_comiled(10)
 55
 ```
 
