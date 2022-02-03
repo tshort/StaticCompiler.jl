@@ -5,6 +5,7 @@ using LLVM: LLVM
 using Libdl: Libdl
 using Base: RefValue
 using Serialization: serialize, deserialize
+using Clang_jll: clang
 
 export compile, load_function
 export native_code_llvm, native_code_typed, native_llvm_module
@@ -82,7 +83,6 @@ load a `StaticCompiledFunction` from a given path. This object is callable.
 """
 load_function(path) = instantiate(deserialize(path) :: LazyStaticCompiledFunction)
 
-
 struct LazyStaticCompiledFunction{rt, tt}
     f::Symbol
     path::String
@@ -138,7 +138,9 @@ function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.saf
         
         write(io, obj)
         flush(io)
-        run(`gcc -shared -o $path.$(Libdl.dlext) $path`)
+        clang() do exe
+            run(`$exe -shared -o $path.$(Libdl.dlext) $path`)
+        end
         rm(path)
     end
     path, name
@@ -161,8 +163,6 @@ function generate_shlib_fptr(path::String, name)
     @assert fptr != C_NULL
     fptr
 end
-
-
 
 function native_code_llvm(@nospecialize(func), @nospecialize(types); kwargs...)
     job, kwargs = native_job(func, types; kwargs...)
