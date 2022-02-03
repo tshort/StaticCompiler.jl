@@ -149,7 +149,7 @@ function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.saf
         flush(io)
         try
             clang() do exe
-                run(`$exe -shared -o $lib_path $obj_path`)
+                run(pipeline(`$exe -shared -o $lib_path $obj_path`, stdout=devnull)) #get rid of devnull for debugging
             end
         catch e;
             # if Clang_jll fails, check if gcc is available
