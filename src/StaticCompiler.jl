@@ -162,7 +162,7 @@ end
 function generate_shlib_fptr(f, tt, path::String=tempname(), name = GPUCompiler.safe_name(repr(f)); temp::Bool=true, kwargs...)
     generate_shlib(f, tt, path, name; kwargs...)
     lib_path = joinpath(abspath(path), "obj.$(Libdl.dlext)")
-    ptr = Libdl.dlopen("$(abspath(path)).$(Libdl.dlext)", Libdl.RTLD_LOCAL)
+    ptr = Libdl.dlopen(lib_path, Libdl.RTLD_LOCAL)
     fptr = Libdl.dlsym(ptr, "julia_$name")
     @assert fptr != C_NULL
     if temp
