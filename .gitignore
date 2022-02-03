@@ -2,11 +2,8 @@
 *.jl.cov
 *.jl.mem
 .DS_Store
-Manifest.toml
-!helpers/Manifest.toml
 /dev/
 /test/standalone
-/test/Manifest.toml
 /test/test.*
 
 test.o
