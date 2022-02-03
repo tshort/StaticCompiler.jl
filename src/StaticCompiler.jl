@@ -73,7 +73,7 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
     lf = LazyStaticCompiledFunction{rt, tt}(Symbol(f), path, name)
     cjl_path = joinpath(path, "obj.cjl")
     serialize(cjl_path, lf)
-    (; f = instantiate(lf), path)
+    (; f = instantiate(lf), path=abspath(path))
 end
 
 
