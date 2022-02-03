@@ -11,31 +11,22 @@ using StrideArraysCore
     simple_sum(x) = x + one(typeof(x))
 
     # This probably needs a macro
-    @test ccall(generate_shlib_fptr(simple_sum, (Int,)), Int, (Int,), 1) == Int(2)
-    @test ccall(generate_shlib_fptr(simple_sum, (Float64,)), Float64, (Float64 ,), 1) == Float64(2)
-
-    @test ccall(generate_shlib_fptr(simple_sum, (Int32,)), Int32, (Int32,), 1) == Int32(2)
-    @test ccall(generate_shlib_fptr(simple_sum, (Float32,)), Float32, (Float32 ,), 1) == Float16(2)
-
-    @test ccall(generate_shlib_fptr(simple_sum, (Int16,)), Int16, (Int16,), 1) == Int16(2)
-    @test ccall(generate_shlib_fptr(simple_sum, (Float16,)), Float16, (Float16 ,), 1) == Float16(2)
-
+    for T ∈ (Int, Float64, Int32, Float32, Int16, Float16)
+        @test compile(simple_sum, (T,))[2]( T(1) ) == T(2)
+    end
 end
 
 
 fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2) # This needs to be defined globally due to https://github.com/JuliaLang/julia/issues/40990
 
 @testset "Recursion" begin
-    fib_ptr = generate_shlib_fptr(fib, (Int,))
-    @test @ccall( $fib_ptr(10::Int) :: Int ) == 55
+    @test compile(fib, (Int,))[2](10) == fib(10)
 
     # Trick to work around #40990
     _fib2(_fib2, n) = n <= 1 ? n : _fib2(_fib2, n-1) + _fib2(_fib2, n-2)
     fib2(n) = _fib2(_fib2, n)
 
-    fib2_ptr = generate_shlib_fptr(fib2, (Int,))
-    @test @ccall( $fib2_ptr(20::Int) :: Int ) == 6765
-    
+    @test compile(fib2, (Int,))[2](20) == fib(20)    
 end
 
 # Call binaries for testing
@@ -59,8 +50,8 @@ end
         end
         s
     end
-    @test ccall(generate_shlib_fptr(sum_first_N_int, (Int,)), Int, (Int,), 10) == 55
-
+    @test compile(sum_first_N_int, (Int,))[2](10) == 55
+    
     function sum_first_N_float64(N)
         s = Float64(0)
         for a in 1:N
@@ -68,7 +59,7 @@ end
         end
         s
     end
-    @test ccall(generate_shlib_fptr(sum_first_N_float64, (Int,)), Float64, (Int,), 10) == 55.
+    @test compile(sum_first_N_float64, (Int,))[2](10) == 55.
 
     function sum_first_N_int_inbounds(N)
         s = 0
@@ -77,8 +68,7 @@ end
         end
         s
     end
-    @test ccall(generate_shlib_fptr(sum_first_N_int_inbounds, (Int,)), Int, (Int,), 10) == 55
-
+    @test compile(sum_first_N_int_inbounds, (Int,))[2](10) == 55
 
     function sum_first_N_float64_inbounds(N)
         s = Float64(0)
@@ -87,7 +77,7 @@ end
         end
         s
     end
-    @test ccall(generate_shlib_fptr(sum_first_N_float64_inbounds, (Int,)), Float64, (Int,), 10) == 55.
+     @test compile(sum_first_N_float64_inbounds, (Int,))[2](10) == 55.
 
 end
 
@@ -100,35 +90,20 @@ end
         end
         s
     end
-    
-    array_sum_ptr = generate_shlib_fptr(array_sum, Tuple{Int, Vector{Int}})
-    @test ( @ccall $array_sum_ptr(10::Int, collect(1:10)::Vector{Int})::Int ) == 55
 
-    # this will segfault on my machine if I use 64 bit complex numbers!
-    array_sum_complex_ptr = generate_shlib_fptr(array_sum, Tuple{Int, Vector{Complex{Float32}}})
-    @test ( @ccall $array_sum_complex_ptr(2::Int, [1f0+im, 1f0-im]::Vector{Complex{Float32}})::Complex{Float32} ) ≈ 2.0
-
-    #This will segfault 
-    array_sum_complex64_ptr = generate_shlib_fptr(array_sum, Tuple{Int, Vector{Complex{Float64}}})
-    @test_skip ( @ccall $array_sum_complex_ptr(2::Int, [1.0+im, 1.0-im]::Vector{Complex{Float64}})::Complex{Float64} ) ≈ 2.0 
+    @test compile(array_sum, (Int, Vector{Int}))[2](10, Int.(1:10)) == 55
+    @test compile(array_sum, (Int, Vector{Complex{Float32}}))[2](10, Complex{Float32}.(1:10)) == 55f0 + 0f0im
+    @test compile(array_sum, (Int, Vector{Complex{Float64}}))[2](10, Complex{Float64}.(1:10)) == 55f0 + 0f0im
 end
 
 
 # Julia wants to treat Tuple (and other things like it) as plain bits, but LLVM wants to treat it as something with a pointer.
-# We need to be careful to not send, nor receive an unwrapped Tuple to a compiled function
+# We need to be careful to not send, nor receive an unwrapped Tuple to a compiled function.
+# The interface made in `compile` should handle this fine. 
 @testset "Send and receive Tuple" begin
     foo(u::Tuple) = 2 .* reverse(u) .- 1 # we can't just compile this as is. 
 
-    # Make a mutating function that places the output into a Ref for the caller to grab:
-    foo!(out::Ref{<:Tuple}, u::Tuple) = (out[] = foo(u); return nothing)
-
-    foo_ptr = generate_shlib_fptr(foo!, Tuple{Base.RefValue{NTuple{3, Int}}, NTuple{3, Int}})
-    out = Ref{NTuple{3, Int}}()
-    # we wrap u in a ref when we send it to the binary because LLVM expects that :(
-    u = Ref((1, 2, 3))
-    (@ccall $foo_ptr(out::Ref{NTuple{3, Int}}, u::Ref{NTuple{3, Int}}) :: Nothing)
-
-    @test out[] == foo(u[])
+    @test compile(foo, (NTuple{3, Int},))[2]((1, 2, 3)) == (5, 3, 1)
 end
 
 
@@ -139,8 +114,8 @@ end
         BLAS.dot(N, a, 1, a, 1)
     end
     a = [1.0, 2.0]
-    mydot_ptr = generate_shlib_fptr(mydot, Tuple{Vector{Float64}})
-    @test @ccall( $mydot_ptr(a::Vector{Float64})::Float64 ) == 5.0
+
+    @test compile(mydot, (Vector{Float64},))[2](a) == 5.0
 end
 
 
@@ -166,13 +141,12 @@ end
             C[m,n] = Cmn
         end
     end
-    mul_ptr! = generate_shlib_fptr(mul!, Tuple{Matrix{Float64}, Matrix{Float64}, Matrix{Float64}})
-    
+
     C = Array{Float64}(undef, 10, 12)
     A = rand(10, 11)
     B = rand(11, 12)
 
-    @ccall $mul_ptr!(C::Matrix{Float64}, A::Matrix{Float64}, B::Matrix{Float64}) :: Nothing
+    compile(mul!, (Matrix{Float64}, Matrix{Float64}, Matrix{Float64},))[2](C, A, B)
     @test C ≈ A*B
 end
 
@@ -189,10 +163,8 @@ end
             sum(arr) # compute the sum. It is very imporatant that no references to arr escape the function body
         end
     end
-    
-    fptr = generate_shlib_fptr(f, Tuple{Int})
-    @test (@ccall $fptr(20::Int) :: Int) == 20
-    
+
+    @test compile(f, (Int,))[2](20) == 20
 end 
 
 
