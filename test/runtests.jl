@@ -5,6 +5,12 @@ using LinearAlgebra
 using LoopVectorization
 using ManualMemory
 using StrideArraysCore
+using Distributed
+
+addprocs(1)
+@everywhere using StaticCompiler
+
+remote_load_call(path, args...) = fetch(@spawnat 2 load_function(path)(args...))
 
 @testset "Basics" begin
 
@@ -12,7 +18,8 @@ using StrideArraysCore
 
     # This probably needs a macro
     for T ∈ (Int, Float64, Int32, Float32, Int16, Float16)
-        @test compile(simple_sum, (T,))[1]( T(1) ) == T(2)
+        _, path, = compile(simple_sum, (T,))
+        @test remote_load_call(path, T(1)) == T(2)
     end
 end
 
@@ -20,13 +27,16 @@ end
 fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2) # This needs to be defined globally due to https://github.com/JuliaLang/julia/issues/40990
 
 @testset "Recursion" begin
-    @test compile(fib, (Int,))[1](10) == fib(10)
+    _, path = compile(fib, (Int,))
+    @test remote_load_call(path, 10) == fib(10)
 
     # Trick to work around #40990
     _fib2(_fib2, n) = n <= 1 ? n : _fib2(_fib2, n-1) + _fib2(_fib2, n-2)
     fib2(n) = _fib2(_fib2, n)
-  
-    @test compile(fib2, (Int,))[1](20) == fib(20)    
+    
+    _, path = compile(fib2, (Int,))
+    @test remote_load_call(path, 20) == fib(20)
+    #@test compile(fib2, (Int,))[1](20) == fib(20)    
 end
 
 # Call binaries for testing
@@ -50,7 +60,8 @@ end
         end
         s
     end
-    @test compile(sum_first_N_int, (Int,))[1](10) == 55
+    _, path = compile(sum_first_N_int, (Int,))
+    @test remote_load_call(path, 10) == 55
     
     function sum_first_N_float64(N)
         s = Float64(0)
@@ -59,7 +70,8 @@ end
         end
         s
     end
-    @test compile(sum_first_N_float64, (Int,))[1](10) == 55.
+    _, path = compile(sum_first_N_float64, (Int,))
+    @test remote_load_call(path, 10) == 55.
 
     function sum_first_N_int_inbounds(N)
         s = 0
@@ -68,7 +80,8 @@ end
         end
         s
     end
-    @test compile(sum_first_N_int_inbounds, (Int,))[1](10) == 55
+    _, path = compile(sum_first_N_int_inbounds, (Int,))
+    @test remote_load_call(path, 10) == 55
 
     function sum_first_N_float64_inbounds(N)
         s = Float64(0)
@@ -77,8 +90,8 @@ end
         end
         s
     end
-     @test compile(sum_first_N_float64_inbounds, (Int,))[1](10) == 55.
-
+    _, path = compile(sum_first_N_float64_inbounds, (Int,))
+    @test remote_load_call(path, 10) == 55.
 end
 
 # Arrays with different input types Int32, Int64, Float32, Float64, Complex?
@@ -90,10 +103,14 @@ end
         end
         s
     end
+    for T ∈ (Int, Complex{Float32}, Complex{Float64})
+        _, path = compile(array_sum, (Int, Vector{T}))
+        @test remote_load_call(path, 10, T.(1:10)) == T(55)
+    end
 
-    @test compile(array_sum, (Int, Vector{Int}))[1](10, Int.(1:10)) == 55
-    @test compile(array_sum, (Int, Vector{Complex{Float32}}))[1](10, Complex{Float32}.(1:10)) == 55f0 + 0f0im
-    @test compile(array_sum, (Int, Vector{Complex{Float64}}))[1](10, Complex{Float64}.(1:10)) == 55f0 + 0f0im
+    # @test (10, Int.(1:10)) == 55
+    # @test compile(array_sum, (Int, Vector{Complex{Float32}}))[1](10, Complex{Float32}.(1:10)) == 55f0 + 0f0im
+    # @test compile(array_sum, (Int, Vector{Complex{Float64}}))[1](10, Complex{Float64}.(1:10)) == 55f0 + 0f0im
 end
 
 
@@ -101,9 +118,10 @@ end
 # We need to be careful to not send, nor receive an unwrapped Tuple to a compiled function.
 # The interface made in `compile` should handle this fine. 
 @testset "Send and receive Tuple" begin
-    foo(u::Tuple) = 2 .* reverse(u) .- 1 # we can't just compile this as is. 
-
-    @test compile(foo, (NTuple{3, Int},))[1]((1, 2, 3)) == (5, 3, 1)
+    foo(u::Tuple) = 2 .* reverse(u) .- 1
+    
+    _, path = compile(foo, (NTuple{3, Int},))
+    @test remote_load_call(path, (1, 2, 3)) == (5, 3, 1)
 end
 
 
@@ -114,8 +132,9 @@ end
         BLAS.dot(N, a, 1, a, 1)
     end
     a = [1.0, 2.0]
-
-    @test compile(mydot, (Vector{Float64},))[1](a) == 5.0
+    mydot_compiled, path = compile(mydot, (Vector{Float64},))
+    @test_skip remote_load_call(path, a) == 5.0 # this needs a relocatable pointer to work
+    @test mydot_compiled(a) == 5.0
 end
 
 
@@ -146,7 +165,9 @@ end
     A = rand(10, 11)
     B = rand(11, 12)
 
-    compile(mul!, (Matrix{Float64}, Matrix{Float64}, Matrix{Float64},))[1](C, A, B)
+    _, path = compile(mul!, (Matrix{Float64}, Matrix{Float64}, Matrix{Float64},))
+    # remote_load_call(path, C, A, B) This won't work because @spawnat copies C
+    C .= fetch(@spawnat 2 (load_function(path)(C, A, B); C))
     @test C ≈ A*B
 end
 
@@ -163,8 +184,8 @@ end
             sum(arr) # compute the sum. It is very imporatant that no references to arr escape the function body
         end
     end
-
-    @test compile(f, (Int,))[1](20) == 20
+    _, path = compile(f, (Int,))
+    @test remote_load_call(path, 20) == 20
 end 
 
 
