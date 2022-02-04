@@ -190,12 +190,7 @@ function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.saf
         # Pick a Clang
         cc = Sys.isapple() ? `cc` : clang()
         # Compile!
-        try
-            run(`$cc -shared -o $lib_path $obj_path`)
-        catch
-            # If all Clangs fail, try system gcc
-            run(`gcc -shared -o $lib_path $obj_path`)
-        end
+        run(`$cc -shared -o $lib_path $obj_path`)
     end
     path, name
 end
