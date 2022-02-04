@@ -26,7 +26,7 @@ a julia session, it will be of type `StaticCompiledFunction` and may be called w
 `compile` will return an already instantiated `StaticCompiledFunction` object and `obj_path` which is the
 location of the directory containing the compilation artifacts.
 
-Example:
+### Examples:
 
 Define and compile a `fib` function:
 ```julia
@@ -137,6 +137,43 @@ function native_job(@nospecialize(func), @nospecialize(types); kernel::Bool=fals
     GPUCompiler.CompilerJob(target, source, params), kwargs
 end
 
+
+"""
+```julia
+generate_shlib(f, tt, path::String, name::String; kwargs...)
+```
+Low level interface for compiling a shared object / dynamically loaded library
+ (`.so` / `.dylib`) for function `f` given a tuple type `tt` characterizing
+the types of the arguments for which the function will be compiled.
+
+### Examples
+```julia
+julia> function test(n)
+           r = 0.0
+           for i=1:n
+               r += log(sqrt(i))
+           end
+           return r/n
+       end
+test (generic function with 1 method)
+
+julia> path, name = StaticCompiler.generate_shlib(test, Tuple{Int64}, "./test")
+("./test", "test")
+
+shell> tree \$path
+./test
+|-- obj.bc
+`-- obj.dylib
+
+0 directories, 2 files
+
+julia> test(100_000)
+5.256496109495593
+
+julia> ccall(StaticCompiler.generate_shlib_fptr(path, name), Float64, (Int64,), 100_000)
+5.256496109495593
+```
+"""
 function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)); kwargs...)
     mkpath(path)
     obj_path = joinpath(path, "obj.bc")
