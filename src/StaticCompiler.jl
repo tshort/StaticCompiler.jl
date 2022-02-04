@@ -17,16 +17,16 @@ export native_code_llvm, native_code_typed, native_llvm_module
 
 Statically compile the method of a function `f` specialized to arguments of the type given by `types`.
 
-This will create a directory at the specified path with a shared object file (i.e. a `.so` or `.dylib`),
-and will save a `LazyStaticCompiledFunction` object in the same directory with the extension `.cjl`. This
-`LazyStaticCompiledFunction` can be deserialized with `load_function(path)`. Once it is instantiated in
-a julia session, it will be of type `StaticCompiledFunction` and may be called with arguments of type
-`types` as if it were a function with a single method (the method determined by `types`).
+This will create a directory at the specified path (or in a temporary directory if you exclude that argument)
+that contains the files needed for your static compiled function. `compile` will return a
+`StaticCompiledFunction` object and `obj_path` which is the absolute path of the directory containing the 
+compilation artifacts. The `StaticCompiledFunction` can be treated as if it is a function with a single 
+method corresponding to the types you specified when it was compiled.
 
-`compile` will return an already instantiated `StaticCompiledFunction` object and `obj_path` which is the
-location of the directory containing the compilation artifacts.
+To deserialize and instantiate a previously compiled function, simply execute `load_function(path)`, which
+returns a callable `StaticCompiledFunction`.
 
-### Examples:
+### Example:
 
 Define and compile a `fib` function:
 ```julia
@@ -43,10 +43,10 @@ julia> fib_compiled(10)
 ```
 Now we can quit this session and load a new one where `fib` is not defined:
 ```julia
-julia> using StaticCompiler
-
 julia> fib
 ERROR: UndefVarError: fib not defined
+
+julia> using StaticCompiler
 
 julia> fib_compiled = load_function("fib.cjl")
 fib(::Int64) :: Int64
@@ -55,6 +55,27 @@ julia> fib_compiled(10)
 55
 ```
 Tada!
+
+### Details:
+
+Here is the structure of the directory created by `compile` in the above example:
+```julia
+shell> tree fib
+path
+├── obj.cjl
+├── obj.o
+└── obj.so
+
+0 directories, 3 files
+````
+* `obj.so` (or `.dylib` on MacOS) is a shared object file that can be linked to in order to execute your 
+compiled julia function. 
+* `obj.cjl` is a serialized `LazyStaticCompiledFunction` object which will be deserialized and instantiated
+with `load_function(path)`. `LazyStaticcompiledfunction`s contain the requisite information needed to link to the 
+`obj.so` inside a julia session. Once it is instantiated in a julia session (i.e. by 
+`instantiate(::LazyStaticCompiledFunction)`, this happens automatically in `load_function`), it will be of type 
+`StaticCompiledFunction` and may be called with arguments of type `types` as if it were a function with a 
+single method (the method determined by `types`).  
 """
 function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_name(repr(f)), kwargs...)
     tt = Base.to_tuple_type(_tt)
@@ -75,7 +96,6 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
     serialize(cjl_path, lf)
     (; f = instantiate(lf), path=abspath(path))
 end
-
 
 """
     load_function(path) --> compiled_f
@@ -164,8 +184,8 @@ julia> path, name = StaticCompiler.generate_shlib(test, Tuple{Int64}, "./test")
 
 shell> tree \$path
 ./test
-|-- obj.bc
-`-- obj.dylib
+|-- obj.o
+`-- obj.so
 
 0 directories, 2 files
 
