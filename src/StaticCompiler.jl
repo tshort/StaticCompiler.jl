@@ -186,13 +186,15 @@ function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.saf
 
         write(io, obj)
         flush(io)
+
+        # Pick a Clang
+        cc = Sys.isapple() ? `cc` : clang()
+        # Compile!
         try
-            clang() do exe
-                run(pipeline(`$exe -shared -o $lib_path $obj_path`, stderr=devnull)) #get rid of devnull when debugging
-            end
-        catch e;
-            # if Clang_jll fails, check if gcc is available
-            run(`cc -shared -o $lib_path $obj_path`)
+            run(`$cc -shared -o $lib_path $obj_path`)
+        catch
+            # If all Clangs fail, try system gcc
+            run(`gcc -shared -o $lib_path $obj_path`)
         end
     end
     path, name
