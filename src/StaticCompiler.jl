@@ -15,15 +15,15 @@ export native_code_llvm, native_code_typed, native_llvm_module
 
    !!! Warning: this will fail on programs that heap allocate any memory, or have dynamic dispatch !!!
 
-Statically compile the method of a function `f` specialized to arguments of the type given by `types`. 
+Statically compile the method of a function `f` specialized to arguments of the type given by `types`.
 
-This will create a directory at the specified path with a shared object file (i.e. a `.so` or `.dylib`), 
-and will save a `LazyStaticCompiledFunction` object in the same directory with the extension `.cjl`. This 
-`LazyStaticCompiledFunction` can be deserialized with `load_function(path)`. Once it is instantiated in 
-a julia session, it will be of type `StaticCompiledFunction` and may be called with arguments of type 
+This will create a directory at the specified path with a shared object file (i.e. a `.so` or `.dylib`),
+and will save a `LazyStaticCompiledFunction` object in the same directory with the extension `.cjl`. This
+`LazyStaticCompiledFunction` can be deserialized with `load_function(path)`. Once it is instantiated in
+a julia session, it will be of type `StaticCompiledFunction` and may be called with arguments of type
 `types` as if it were a function with a single method (the method determined by `types`).
 
-`compile` will return an already instantiated `StaticCompiledFunction` object and `obj_path` which is the 
+`compile` will return an already instantiated `StaticCompiledFunction` object and `obj_path` which is the
 location of the directory containing the compilation artifacts.
 
 Example:
@@ -67,7 +67,7 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
     # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
 
     f_wrap!(out::Ref, args::Ref{<:Tuple}) = (out[] = f(args[]...); nothing)
-    
+
     generate_shlib(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, path, name; kwargs...)
 
     lf = LazyStaticCompiledFunction{rt, tt}(Symbol(f), path, name)
@@ -139,12 +139,12 @@ end
 
 function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)); kwargs...)
     mkpath(path)
-    obj_path = joinpath(path, "obj")
+    obj_path = joinpath(path, "obj.bc")
     lib_path = joinpath(path, "obj.$(Libdl.dlext)")
     open(obj_path, "w") do io
         job, kwargs = native_job(f, tt; name, kwargs...)
         obj, _ = GPUCompiler.codegen(:obj, job; strip=true, only_entry=false, validate=false)
-        
+
         write(io, obj)
         flush(io)
         try
