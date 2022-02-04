@@ -15,18 +15,18 @@ export native_code_llvm, native_code_typed, native_llvm_module
 
    !!! Warning: this will fail on programs that heap allocate any memory, or have dynamic dispatch !!!
 
-Statically compile the method of a function `f` specialized to arguments of the type given by `types`. 
+Statically compile the method of a function `f` specialized to arguments of the type given by `types`.
 
-This will create a directory at the specified path with a shared object file (i.e. a `.so` or `.dylib`), 
-and will save a `LazyStaticCompiledFunction` object in the same directory with the extension `.cjl`. This 
-`LazyStaticCompiledFunction` can be deserialized with `load_function(path)`. Once it is instantiated in 
-a julia session, it will be of type `StaticCompiledFunction` and may be called with arguments of type 
+This will create a directory at the specified path with a shared object file (i.e. a `.so` or `.dylib`),
+and will save a `LazyStaticCompiledFunction` object in the same directory with the extension `.cjl`. This
+`LazyStaticCompiledFunction` can be deserialized with `load_function(path)`. Once it is instantiated in
+a julia session, it will be of type `StaticCompiledFunction` and may be called with arguments of type
 `types` as if it were a function with a single method (the method determined by `types`).
 
-`compile` will return an already instantiated `StaticCompiledFunction` object and `obj_path` which is the 
+`compile` will return an already instantiated `StaticCompiledFunction` object and `obj_path` which is the
 location of the directory containing the compilation artifacts.
 
-Example:
+### Examples:
 
 Define and compile a `fib` function:
 ```julia
@@ -67,7 +67,7 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
     # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
 
     f_wrap!(out::Ref, args::Ref{<:Tuple}) = (out[] = f(args[]...); nothing)
-    
+
     generate_shlib(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, path, name; kwargs...)
 
     lf = LazyStaticCompiledFunction{rt, tt}(Symbol(f), path, name)
@@ -137,27 +137,64 @@ function native_job(@nospecialize(func), @nospecialize(types); kernel::Bool=fals
     GPUCompiler.CompilerJob(target, source, params), kwargs
 end
 
+
+"""
+```julia
+generate_shlib(f, tt, path::String, name::String; kwargs...)
+```
+Low level interface for compiling a shared object / dynamically loaded library
+ (`.so` / `.dylib`) for function `f` given a tuple type `tt` characterizing
+the types of the arguments for which the function will be compiled.
+
+See also `StaticCompiler.generate_shlib_fptr`.
+
+### Examples
+```julia
+julia> function test(n)
+           r = 0.0
+           for i=1:n
+               r += log(sqrt(i))
+           end
+           return r/n
+       end
+test (generic function with 1 method)
+
+julia> path, name = StaticCompiler.generate_shlib(test, Tuple{Int64}, "./test")
+("./test", "test")
+
+shell> tree \$path
+./test
+|-- obj.bc
+`-- obj.dylib
+
+0 directories, 2 files
+
+julia> test(100_000)
+5.256496109495593
+
+julia> ccall(StaticCompiler.generate_shlib_fptr(path, name), Float64, (Int64,), 100_000)
+5.256496109495593
+```
+"""
 function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)); kwargs...)
     mkpath(path)
-    obj_path = joinpath(path, "obj")
+    obj_path = joinpath(path, "obj.bc")
     lib_path = joinpath(path, "obj.$(Libdl.dlext)")
     open(obj_path, "w") do io
         job, kwargs = native_job(f, tt; name, kwargs...)
         obj, _ = GPUCompiler.codegen(:obj, job; strip=true, only_entry=false, validate=false)
-        
+
         write(io, obj)
         flush(io)
-        try
-            clang() do exe
-                run(pipeline(`$exe -shared -o $lib_path $obj_path`, stderr=devnull)) #get rid of devnull when debugging
-            end
-        catch e;
-            # if Clang_jll fails, check if gcc is available
-            run(`cc -shared -o $lib_path $obj_path`)
-        end
+
+        # Pick a Clang
+        cc = Sys.isapple() ? `cc` : clang()
+        # Compile!
+        run(`$cc -shared -o $lib_path $obj_path`)
     end
     path, name
 end
+
 
 function generate_shlib_fptr(f, tt, path::String=tempname(), name = GPUCompiler.safe_name(repr(f)); temp::Bool=true, kwargs...)
     generate_shlib(f, tt, path, name; kwargs...)
@@ -171,6 +208,42 @@ function generate_shlib_fptr(f, tt, path::String=tempname(), name = GPUCompiler.
     fptr
 end
 
+"""
+```julia
+generate_shlib_fptr(path::String, name)
+```
+Low level interface for obtaining a function pointer by `dlopen`ing a shared
+library given the `path` and `name` of a `.so`/`.dylib` already compiled by
+`generate_shlib`.
+
+See also `StaticCompiler.enerate_shlib`.
+
+### Examples
+```julia
+julia> function test(n)
+           r = 0.0
+           for i=1:n
+               r += log(sqrt(i))
+           end
+           return r/n
+       end
+test (generic function with 1 method)
+
+julia> path, name = StaticCompiler.generate_shlib(test, Tuple{Int64}, "./test");
+
+julia> test_ptr = StaticCompiler.generate_shlib_fptr(path, name)
+Ptr{Nothing} @0x000000015209f600
+
+julia> ccall(test_ptr, Float64, (Int64,), 100_000)
+5.256496109495593
+
+julia> @ccall \$test_ptr(100_000::Int64)::Float64 # Equivalently
+5.256496109495593
+
+julia> test(100_000)
+5.256496109495593
+```
+"""
 function generate_shlib_fptr(path::String, name)
     lib_path = joinpath(abspath(path), "obj.$(Libdl.dlext)")
     ptr = Libdl.dlopen(lib_path, Libdl.RTLD_LOCAL)
