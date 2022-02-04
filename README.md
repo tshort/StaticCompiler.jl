@@ -34,10 +34,10 @@ julia> using StaticCompiler
 julia> fib
 ERROR: UndefVarError: fib not defined
 
-julia> fib_comiled = load_function("fib")
+julia> fib_compiled = load_function("fib")
 fib(::Int64) :: Int64
 
-julia> fib_comiled(10)
+julia> fib_compiled(10)
 55
 ```
 
