@@ -178,7 +178,7 @@ julia> ccall(StaticCompiler.generate_shlib_fptr(path, name), Float64, (Int64,), 
 """
 function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)); kwargs...)
     mkpath(path)
-    obj_path = joinpath(path, "obj.bc")
+    obj_path = joinpath(path, "obj.o")
     lib_path = joinpath(path, "obj.$(Libdl.dlext)")
     open(obj_path, "w") do io
         job, kwargs = native_job(f, tt; name, kwargs...)
