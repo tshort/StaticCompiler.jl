@@ -1,5 +1,6 @@
 # This file is machine-generated - editing it directly is not advised
 
+julia_version = "1.7.1"
 manifest_format = "2.0"
 
 [[deps.ArgTools]]
@@ -15,6 +16,12 @@ uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 git-tree-sha1 = "215a9aa4a1f23fbd05b92769fdd62559488d70e9"
 uuid = "fa961155-64e5-5f13-b03f-caf6b980ea82"
 version = "0.4.1"
+
+[[deps.Clang_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Zlib_jll", "libLLVM_jll"]
+git-tree-sha1 = "8cf7e67e264dedc5d321ec87e78525e958aea057"
+uuid = "0ee61d77-7f21-5576-8119-9fcc46b10100"
+version = "12.0.1+3"
 
 [[deps.Dates]]
 deps = ["Printf"]
@@ -148,6 +155,10 @@ uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
+
+[[deps.libLLVM_jll]]
+deps = ["Artifacts", "Libdl"]
+uuid = "8f36deef-c2a5-5394-99ed-8e07531fb29a"
 
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]

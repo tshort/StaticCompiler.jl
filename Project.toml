@@ -1,17 +1,19 @@
 name = "StaticCompiler"
 uuid = "81625895-6c0f-48fc-b932-11a18313743c"
 authors = ["Tom Short"]
-version = "0.2.0"
+version = "0.3.0"
 
 [deps]
+Clang_jll = "0ee61d77-7f21-5576-8119-9fcc46b10100"
 GPUCompiler = "61eb1bfa-7361-4325-ad38-22787b887f55"
 LLVM = "929cbde3-209d-540e-8aea-75f648917ca0"
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
+Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 
 [compat]
-julia = "1.7"
 GPUCompiler = "0.13"
 LLVM = "4"
+julia = "1.7"
 
 [extras]
 Formatting = "59287772-0a20-5a39-b81b-1366585eb4c0"
