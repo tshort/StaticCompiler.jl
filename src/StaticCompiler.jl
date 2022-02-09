@@ -7,7 +7,7 @@ using Base: RefValue
 using Serialization: serialize, deserialize
 using Clang_jll: clang
 
-export compile, load_function
+export compile, load_function, compile_executable
 export native_code_llvm, native_code_typed, native_llvm_module
 
 """
@@ -133,6 +133,59 @@ function (f::StaticCompiledFunction{rt, tt})(args...) where {rt, tt}
 end
 
 instantiate(f::StaticCompiledFunction) = f
+
+
+"""
+```julia
+compile_executable(f, tt::Tuple, path::String, name::String=repr(f); filename::String=name, kwargs...)
+```
+Attempt to compile a standalone executable that runs `f`.
+
+### Examples
+```julia
+julia> using StaticCompiler
+
+julia> using ManualMemory # A source of heap-allocated memory
+
+julia> function puts(s)
+            Base.llvmcall(("""
+            ; External declaration of the puts function
+            declare i32 @puts(i8* nocapture) nounwind
+
+            define i32 @main(i8*) {
+            entry:
+                %call = call i32 (i8*) @puts(i8* %0)
+                ret i32 0
+            }
+            """, "main"), Int32, Tuple{Ptr{UInt8}}, pointer(s))
+        end
+
+hello> function hello()
+            buf = ManualMemory.MemoryBuffer{19, UInt8}(undef)
+            buf.data = (0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x2c, 0x20, 0x77, 0x6f, 0x72, 0x6c, 0x64, 0x21, 0x20, 0xf0, 0x9f, 0x8e, 0x89, 0x00)
+            GC.@preserve buf puts(buf)
+        end
+
+julia> compile_executable(hello)
+"/Users/foo/code/StaticCompiler.jl/"
+```
+"""
+function compile_executable(f, _tt=(), path::String="./"  name=GPUCompiler.safe_name(repr(f)); filename=name, kwargs...)
+    tt = Base.to_tuple_type(_tt)
+    tt == Tuple{} || tt = Tuple{Int, Ptr{Ptr{UInt8}}} || error("input type signature $_tt must be either () or (Int, Ptr{Ptr{UInt8}})")
+
+    rt = only(native_code_typed(f, tt))[2]
+    # Warning instead of error because return values are probably going to be ignored anyways
+    isconcretetype(rt) || @warn "$f$_tt did not infer to a concrete type. Got $rt."
+
+    # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
+    # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
+
+    generate_executable(f!, tt, path, name, filename; kwargs...)
+
+    joinpath(abspath(path), filename)
+end
+
 
 module TestRuntime
     # dummy methods
@@ -274,7 +327,7 @@ end
 
 """
 ```julia
-generate_executable(f, tt, path::String, name, filenamebase=string(name); kwargs...)
+generate_executable(f, tt, path::String, name, filename=string(name); kwargs...)
 ```
 Attempt to compile a standalone executable that runs `f`.
 
