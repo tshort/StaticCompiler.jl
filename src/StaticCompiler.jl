@@ -13,14 +13,14 @@ export native_code_llvm, native_code_typed, native_llvm_module
 """
     compile(f, types, path::String = tempname()) --> (compiled_f, path)
 
-   !!! Warning: this will fail on programs that heap allocate any memory, or have dynamic dispatch !!!
+   !!! Warning: this will fail on programs that heap allocate any memory tracked by the GC, or have dynamic dispatch !!!
 
 Statically compile the method of a function `f` specialized to arguments of the type given by `types`.
 
 This will create a directory at the specified path (or in a temporary directory if you exclude that argument)
 that contains the files needed for your static compiled function. `compile` will return a
-`StaticCompiledFunction` object and `obj_path` which is the absolute path of the directory containing the 
-compilation artifacts. The `StaticCompiledFunction` can be treated as if it is a function with a single 
+`StaticCompiledFunction` object and `obj_path` which is the absolute path of the directory containing the
+compilation artifacts. The `StaticCompiledFunction` can be treated as if it is a function with a single
 method corresponding to the types you specified when it was compiled.
 
 To deserialize and instantiate a previously compiled function, simply execute `load_function(path)`, which
@@ -68,14 +68,14 @@ path
 
 0 directories, 3 files
 ````
-* `obj.so` (or `.dylib` on MacOS) is a shared object file that can be linked to in order to execute your 
-compiled julia function. 
+* `obj.so` (or `.dylib` on MacOS) is a shared object file that can be linked to in order to execute your
+compiled julia function.
 * `obj.cjl` is a serialized `LazyStaticCompiledFunction` object which will be deserialized and instantiated
-with `load_function(path)`. `LazyStaticcompiledfunction`s contain the requisite information needed to link to the 
-`obj.so` inside a julia session. Once it is instantiated in a julia session (i.e. by 
-`instantiate(::LazyStaticCompiledFunction)`, this happens automatically in `load_function`), it will be of type 
-`StaticCompiledFunction` and may be called with arguments of type `types` as if it were a function with a 
-single method (the method determined by `types`).  
+with `load_function(path)`. `LazyStaticcompiledfunction`s contain the requisite information needed to link to the
+`obj.so` inside a julia session. Once it is instantiated in a julia session (i.e. by
+`instantiate(::LazyStaticCompiledFunction)`, this happens automatically in `load_function`), it will be of type
+`StaticCompiledFunction` and may be called with arguments of type `types` as if it were a function with a
+single method (the method determined by `types`).
 """
 function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_name(repr(f)), kwargs...)
     tt = Base.to_tuple_type(_tt)
@@ -160,7 +160,7 @@ end
 
 """
 ```julia
-generate_shlib(f, tt, path::String, name::String; kwargs...)
+generate_shlib(f, tt, path::String, name::String, filenamebase::String="obj"; kwargs...)
 ```
 Low level interface for compiling a shared object / dynamically loaded library
  (`.so` / `.dylib`) for function `f` given a tuple type `tt` characterizing
@@ -196,10 +196,10 @@ julia> ccall(StaticCompiler.generate_shlib_fptr(path, name), Float64, (Int64,), 
 5.256496109495593
 ```
 """
-function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)); kwargs...)
+function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj"; kwargs...)
     mkpath(path)
-    obj_path = joinpath(path, "obj.o")
-    lib_path = joinpath(path, "obj.$(Libdl.dlext)")
+    obj_path = joinpath(path, "$filenamebase.o")
+    lib_path = joinpath(path, "$filenamebase.$(Libdl.dlext)")
     open(obj_path, "w") do io
         job, kwargs = native_job(f, tt; name, kwargs...)
         obj, _ = GPUCompiler.codegen(:obj, job; strip=true, only_entry=false, validate=false)
@@ -216,9 +216,9 @@ function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.saf
 end
 
 
-function generate_shlib_fptr(f, tt, path::String=tempname(), name = GPUCompiler.safe_name(repr(f)); temp::Bool=true, kwargs...)
+function generate_shlib_fptr(f, tt, path::String=tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj"; temp::Bool=true, kwargs...)
     generate_shlib(f, tt, path, name; kwargs...)
-    lib_path = joinpath(abspath(path), "obj.$(Libdl.dlext)")
+    lib_path = joinpath(abspath(path), "$filenamebase.$(Libdl.dlext)")
     ptr = Libdl.dlopen(lib_path, Libdl.RTLD_LOCAL)
     fptr = Libdl.dlsym(ptr, "julia_$name")
     @assert fptr != C_NULL
@@ -264,8 +264,8 @@ julia> test(100_000)
 5.256496109495593
 ```
 """
-function generate_shlib_fptr(path::String, name)
-    lib_path = joinpath(abspath(path), "obj.$(Libdl.dlext)")
+function generate_shlib_fptr(path::String, name, filenamebase::String="obj")
+    lib_path = joinpath(abspath(path), "$filenamebase.$(Libdl.dlext)")
     ptr = Libdl.dlopen(lib_path, Libdl.RTLD_LOCAL)
     fptr = Libdl.dlsym(ptr, "julia_$name")
     @assert fptr != C_NULL
