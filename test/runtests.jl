@@ -190,7 +190,7 @@ end
 
 @testset "Standalone Executables" begin
     if VERSION>v"1.7" # The llvmcall here only works on 1.8+
-        function puts(s::Ptr{UInt8}) # Can't use Base.println because it allocates
+        Base.@ccallable function puts(s::Ptr{UInt8}) # Can't use Base.println because it allocates
             Base.llvmcall(("""
             ; External declaration of the puts function
             declare i32 @puts(i8* nocapture) nounwind
@@ -203,7 +203,7 @@ end
             """, "main"), Int32, Tuple{Ptr{UInt8}}, s)
         end
 
-        function print_args(argc::Int, argv::Ptr{Ptr{UInt8}})
+        Base.@ccallable function print_args(argc::Int, argv::Ptr{Ptr{UInt8}})
             for i=1:argc
                 # Get pointer
                 p = unsafe_load(argv, i)
