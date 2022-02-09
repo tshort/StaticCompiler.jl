@@ -137,9 +137,9 @@ instantiate(f::StaticCompiledFunction) = f
 
 """
 ```julia
-compile_executable(f, tt::Tuple, path::String, name::String=repr(f); filename::String=name, kwargs...)
+compile_executable(f, types::Tuple, path::String, name::String=repr(f); filename::String=name, kwargs...)
 ```
-Attempt to compile a standalone executable that runs function `f` with a type signature given by the tuple of types `tt`.
+Attempt to compile a standalone executable that runs function `f` with a type signature given by the tuple of `types`.
 
 ### Examples
 ```julia
@@ -379,8 +379,8 @@ function generate_executable(f, tt, path::String = tempname(), name = GPUCompile
         write(io, obj)
         flush(io)
 
-        # Pick a Clang
-        cc = Sys.isapple() ? `cc` : clang()
+        # Pick a compiler
+        cc = Sys.isapple() ? `cc` : `gcc`
         # Compile!
         run(`$cc -e $entry -o $exec_path $obj_path`)
     end
