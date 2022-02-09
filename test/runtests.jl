@@ -189,33 +189,35 @@ end
 end
 
 @testset "Standalone Executables" begin
-    function puts(s::Ptr{UInt8}) # Can't use Base.println because it allocates
-        Base.llvmcall(("""
-        ; External declaration of the puts function
-        declare i32 @puts(i8* nocapture) nounwind
+    if VERSION>v"1.7" # The llvmcall here only works on 1.8+
+        function puts(s::Ptr{UInt8}) # Can't use Base.println because it allocates
+            Base.llvmcall(("""
+            ; External declaration of the puts function
+            declare i32 @puts(i8* nocapture) nounwind
 
-        define i32 @main(i8*) {
-        entry:
-           %call = call i32 (i8*) @puts(i8* %0)
-           ret i32 0
-        }
-        """, "main"), Int32, Tuple{Ptr{UInt8}}, s)
-    end
-
-    function print_args(argc::Int, argv::Ptr{Ptr{UInt8}})
-        for i=1:argc
-            # Get pointer
-            p = unsafe_load(argv, i)
-            # Print string at pointer location (which fortunately already exists isn't tracked by the GC)
-            puts(p)
+            define i32 @main(i8*) {
+            entry:
+               %call = call i32 (i8*) @puts(i8* %0)
+               ret i32 0
+            }
+            """, "main"), Int32, Tuple{Ptr{UInt8}}, s)
         end
-        return 0
+
+        function print_args(argc::Int, argv::Ptr{Ptr{UInt8}})
+            for i=1:argc
+                # Get pointer
+                p = unsafe_load(argv, i)
+                # Print string at pointer location (which fortunately already exists isn't tracked by the GC)
+                puts(p)
+            end
+            return 0
+        end
+
+        filepath = compile_executable(print_args, (Int, Ptr{Ptr{UInt8}}), tempdir())
+
+        r = run(`$filepath Hello, world!`);
+        @test isa(r, Base.Process)
+        @test r.exitcode == 0
     end
-
-    filepath = compile_executable(print_args, (Int, Ptr{Ptr{UInt8}}), tempdir())
-
-    r = run(`$filepath Hello, world!`);
-    @test isa(r, Base.Process)
-    @test r.exitcode == 0
 end
 # data structures, dictionaries, tuples, named tuples
