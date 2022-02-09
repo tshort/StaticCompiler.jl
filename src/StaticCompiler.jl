@@ -145,34 +145,56 @@ Attempt to compile a standalone executable that runs `f`.
 ```julia
 julia> using StaticCompiler
 
-julia> using ManualMemory # A source of heap-allocated memory
+julia> function puts(s::Ptr{UInt8}) # Can't use Base.println because it allocates
+           Base.llvmcall((\"""
+           ; External declaration of the puts function
+           declare i32 @puts(i8* nocapture) nounwind
 
-julia> function puts(s)
-            Base.llvmcall(("""
-            ; External declaration of the puts function
-            declare i32 @puts(i8* nocapture) nounwind
+           define i32 @main(i8*) {
+           entry:
+               %call = call i32 (i8*) @puts(i8* %0)
+               ret i32 0
+           }
+           \""", "main"), Int32, Tuple{Ptr{UInt8}}, s)
+       end
+puts (generic function with 1 method)
 
-            define i32 @main(i8*) {
-            entry:
-                %call = call i32 (i8*) @puts(i8* %0)
-                ret i32 0
-            }
-            """, "main"), Int32, Tuple{Ptr{UInt8}}, pointer(s))
-        end
+julia> function print_args(argc::Int, argv::Ptr{Ptr{UInt8}})
+           for i=1:argc
+               # Get pointer
+               p = unsafe_load(argv, i)
+               # Print string at pointer location (which fortunately already exists isn't tracked by the GC)
+               puts(p)
+           end
+           return 0
+       end
 
-hello> function hello()
-            buf = ManualMemory.MemoryBuffer{19, UInt8}(undef)
-            buf.data = (0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x2c, 0x20, 0x77, 0x6f, 0x72, 0x6c, 0x64, 0x21, 0x20, 0xf0, 0x9f, 0x8e, 0x89, 0x00)
-            GC.@preserve buf puts(buf)
-        end
+julia> compile_executable(print_args, (Int, Ptr{Ptr{UInt8}}))
+"/Users/foo/code/StaticCompiler.jl/print_args"
+
+shell> ./print_args 1 2 3 4 Five
+./print_args
+1
+2
+3
+4
+Five
+```
+```julia
+julia> using StaticTools # So you don't have to define `puts` and friends every time
+
+julia> hello() = println(c"Hello, world!") # c"..." makes a stack-allocated StaticString
 
 julia> compile_executable(hello)
-"/Users/foo/code/StaticCompiler.jl/"
+"/Users/foo/code/StaticCompiler.jl/hello"
+
+shell> ./hello
+Hello, world!
 ```
 """
-function compile_executable(f, _tt=(), path::String="./"  name=GPUCompiler.safe_name(repr(f)); filename=name, kwargs...)
+function compile_executable(f, _tt=(), path::String="./", name=GPUCompiler.safe_name(repr(f)); filename=name, kwargs...)
     tt = Base.to_tuple_type(_tt)
-    tt == Tuple{} || tt = Tuple{Int, Ptr{Ptr{UInt8}}} || error("input type signature $_tt must be either () or (Int, Ptr{Ptr{UInt8}})")
+    tt == Tuple{} || tt == Tuple{Int, Ptr{Ptr{UInt8}}} || error("input type signature $_tt must be either () or (Int, Ptr{Ptr{UInt8}})")
 
     rt = only(native_code_typed(f, tt))[2]
     # Warning instead of error because return values are probably going to be ignored anyways
@@ -181,7 +203,7 @@ function compile_executable(f, _tt=(), path::String="./"  name=GPUCompiler.safe_
     # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
     # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
 
-    generate_executable(f!, tt, path, name, filename; kwargs...)
+    generate_executable(f, tt, path, name, filename; kwargs...)
 
     joinpath(abspath(path), filename)
 end
@@ -289,7 +311,7 @@ Low level interface for obtaining a function pointer by `dlopen`ing a shared
 library given the `path` and `name` of a `.so`/`.dylib` already compiled by
 `generate_shlib`.
 
-See also `StaticCompiler.enerate_shlib`.
+See also `StaticCompiler.generate_shlib`.
 
 ### Examples
 ```julia
