@@ -139,7 +139,7 @@ instantiate(f::StaticCompiledFunction) = f
 ```julia
 compile_executable(f, tt::Tuple, path::String, name::String=repr(f); filename::String=name, kwargs...)
 ```
-Attempt to compile a standalone executable that runs `f`.
+Attempt to compile a standalone executable that runs function `f` with a type signature given by the tuple of types `tt`.
 
 ### Examples
 ```julia
