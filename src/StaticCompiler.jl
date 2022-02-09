@@ -272,6 +272,46 @@ function generate_shlib_fptr(path::String, name, filenamebase::String="obj")
     fptr
 end
 
+"""
+```julia
+generate_executable(f, tt, path::String, name, filenamebase=string(name); kwargs...)
+```
+Attempt to compile a standalone executable that runs `f`.
+
+### Examples
+```julia
+julia> function test(n)
+           r = 0.0
+           for i=1:n
+               r += log(sqrt(i))
+           end
+           return r/n
+       end
+test (generic function with 1 method)
+
+julia> path, name = StaticCompiler.generate_executable(test, Tuple{Int64}, "./scratch")
+```
+"""
+function generate_executable(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filename::String=string(name); kwargs...)
+    mkpath(path)
+    obj_path = joinpath(path, "$filename.o")
+    exec_path = joinpath(path, filename)
+    open(obj_path, "w") do io
+        job, kwargs = native_job(f, tt; name, kwargs...)
+        obj, _ = GPUCompiler.codegen(:obj, job; strip=true, only_entry=false, validate=false)
+        entry = "_julia_$name"
+
+        write(io, obj)
+        flush(io)
+
+        # Pick a Clang
+        cc = Sys.isapple() ? `cc` : clang()
+        # Compile!
+        run(`$cc -e $entry -o $exec_path $obj_path`)
+    end
+    path, name
+end
+
 function native_code_llvm(@nospecialize(func), @nospecialize(types); kwargs...)
     job, kwargs = native_job(func, types; kwargs...)
     GPUCompiler.code_llvm(stdout, job; kwargs...)
