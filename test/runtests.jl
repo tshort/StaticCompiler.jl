@@ -113,6 +113,17 @@ end
     # @test compile(array_sum, (Int, Vector{Complex{Float64}}))[1](10, Complex{Float64}.(1:10)) == 55f0 + 0f0im
 end
 
+@testset "Array allocations" begin
+    function f(N)
+        v = Vector{Float64}(undef, N)
+        for i ∈ eachindex(v)
+            v[i] = i*i
+        end
+        v
+    end
+    _, path = compile(f, (Int,))
+    @test remote_load_call(path, 5) == [1.0, 4.0, 9.0, 16.0, 25.0]
+end
 
 # Julia wants to treat Tuple (and other things like it) as plain bits, but LLVM wants to treat it as something with a pointer.
 # We need to be careful to not send, nor receive an unwrapped Tuple to a compiled function.
@@ -125,17 +136,17 @@ end
 end
 
 
-# Just to call external libraries
-@testset "BLAS" begin
-    function mydot(a::Vector{Float64})
-        N = length(a)
-        BLAS.dot(N, a, 1, a, 1)
-    end
-    a = [1.0, 2.0]
-    mydot_compiled, path = compile(mydot, (Vector{Float64},))
-    @test_skip remote_load_call(path, a) == 5.0 # this needs a relocatable pointer to work
-    @test mydot_compiled(a) == 5.0
-end
+# # Just to call external libraries
+# @testset "BLAS" begin
+#     function mydot(a::Vector{Float64})
+#         N = length(a)
+#         BLAS.dot(N, a, 1, a, 1)
+#     end
+#     a = [1.0, 2.0]
+#     mydot_compiled, path = compile(mydot, (Vector{Float64},))
+#     @test_skip remote_load_call(path, a) == 5.0 # this needs a relocatable pointer to work
+#     @test mydot_compiled(a) == 5.0
+# end
 
 
 @testset "Hello World" begin
@@ -186,7 +197,10 @@ end
     end
     _, path = compile(f, (Int,))
     @test remote_load_call(path, 20) == 20
-end 
+end
+
+
+
 
 
 # data structures, dictionaries, tuples, named tuples

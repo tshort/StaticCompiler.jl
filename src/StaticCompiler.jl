@@ -6,9 +6,14 @@ using Libdl: Libdl
 using Base: RefValue
 using Serialization: serialize, deserialize
 using Clang_jll: clang
+using JLD2: JLD2
 
 export compile, load_function
-export native_code_llvm, native_code_typed, native_llvm_module
+export native_code_llvm, native_code_typed, native_llvm_module, native_code_native
+
+
+
+include("pointer_patching.jl")
 
 """
     compile(f, types, path::String = tempname()) --> (compiled_f, path)
@@ -83,17 +88,17 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
 
     rt = only(native_code_typed(f, tt))[2]
     isconcretetype(rt) || error("$f on $_tt did not infer to a concrete type. Got $rt")
-
-    # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
-    # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
-
+    
     f_wrap!(out::Ref, args::Ref{<:Tuple}) = (out[] = f(args[]...); nothing)
 
-    generate_shlib(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, path, name; kwargs...)
+    _, _, table = generate_shlib(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, path, name; kwargs...)
 
-    lf = LazyStaticCompiledFunction{rt, tt}(Symbol(f), path, name)
+    lf = LazyStaticCompiledFunction{rt, tt}(Symbol(f), path, name, table)
     cjl_path = joinpath(path, "obj.cjl")
-    serialize(cjl_path, lf)
+    JLD2.jldopen(cjl_path, "w") do file
+        file["f"] = lf
+    end
+
     (; f = instantiate(lf), path=abspath(path))
 end
 
@@ -102,21 +107,51 @@ end
 
 load a `StaticCompiledFunction` from a given path. This object is callable.
 """
-load_function(path) = instantiate(deserialize(joinpath(path, "obj.cjl")) :: LazyStaticCompiledFunction)
+function load_function(path)
+    lf = JLD2.jldopen(file -> file["f"], joinpath(path, "obj.cjl"), "r") :: LazyStaticCompiledFunction
+    instantiate(lf)
+end
 
 struct LazyStaticCompiledFunction{rt, tt}
     f::Symbol
     path::String
     name::String
+    reloc::Dict{String,Any}
 end
 
 function instantiate(p::LazyStaticCompiledFunction{rt, tt}) where {rt, tt}
-    StaticCompiledFunction{rt, tt}(p.f, generate_shlib_fptr(p.path::String, p.name))
+    # LLVM.load_library_permantly(dirname(Libdl.dlpath(Libdl.dlopen("libjulia"))))
+    lljit = LLVM.LLJIT(;tm=GPUCompiler.llvm_machine(NativeCompilerTarget()))
+    jd = LLVM.JITDylib(lljit)
+    flags = LLVM.API.LLVMJITSymbolFlags(LLVM.API.LLVMJITSymbolGenericFlagsExported, 0)
+    ofile = LLVM.MemoryBufferFile(joinpath(p.path, "obj.o")) #$(Libdl.dlext)
+
+    
+    # Set all the unitinitialize global variables to point to julia values from the relocation table
+    for (name, val) ∈ p.reloc
+        address = LLVM.API.LLVMOrcJITTargetAddress(reinterpret(UInt, pointer_from_objref(val)))
+        symbol = LLVM.API.LLVMJITEvaluatedSymbol(address, flags)
+        gv = LLVM.API.LLVMJITCSymbolMapPair(LLVM.mangle(lljit, name), symbol)
+        mu = absolute_symbols(Ref(gv))
+        LLVM.define(jd, mu)
+    end
+
+    # Link to libjulia
+    prefix = LLVM.get_prefix(lljit)
+    dg = LLVM.CreateDynamicLibrarySearchGeneratorForProcess(prefix)
+    LLVM.add!(jd, dg)
+    
+    LLVM.add!(lljit, jd, ofile)
+    fptr = pointer(LLVM.lookup(lljit, "julia_" * p.name))
+    
+    StaticCompiledFunction{rt, tt}(p.f, fptr, lljit, p.reloc)
 end
 
 struct StaticCompiledFunction{rt, tt}
     f::Symbol
     ptr::Ptr{Nothing}
+    jit::LLVM.LLJIT
+    reloc::Dict{String, Any}
 end
 
 function Base.show(io::IO, f::StaticCompiledFunction{rt, tt}) where {rt, tt}
@@ -128,11 +163,35 @@ function (f::StaticCompiledFunction{rt, tt})(args...) where {rt, tt}
     Tuple{typeof.(args)...} == tt || error("Input types don't match compiled target $((tt.parameters...,)). Got arguments of type $(typeof.(args))")
     out = RefValue{rt}()
     refargs = Ref(args)
-    ccall(f.ptr, Nothing, (Ref{rt}, Ref{tt}), out, refargs)
+    ccall(f.ptr, Nothing, (Ptr{rt}, Ref{tt}), pointer_from_objref(out), refargs)
     out[]
 end
 
 instantiate(f::StaticCompiledFunction) = f
+
+
+
+Base.@kwdef struct NativeCompilerTarget <: GPUCompiler.AbstractCompilerTarget
+    cpu::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUName())
+    features::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUFeatures())
+    always_inline::Bool=false # will mark the job function as always inline
+end
+
+GPUCompiler.llvm_triple(::NativeCompilerTarget) = Sys.MACHINE
+
+function GPUCompiler.llvm_machine(target::NativeCompilerTarget)
+    triple = GPUCompiler.llvm_triple(target)
+
+    t = LLVM.Target(triple=triple)
+
+    tm = LLVM.TargetMachine(t, triple, target.cpu, target.features, reloc=LLVM.API.LLVMRelocPIC)
+    GPUCompiler.asm_verbosity!(tm, true)
+
+    return tm
+end
+
+GPUCompiler.runtime_slug(job::GPUCompiler.CompilerJob{NativeCompilerTarget}) = "native_$(job.target.cpu)-$(hash(job.target.features))"
+
 
 module TestRuntime
     # dummy methods
@@ -152,7 +211,7 @@ GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:Any,TestCompilerParams}) 
 
 function native_job(@nospecialize(func), @nospecialize(types); kernel::Bool=false, name=GPUCompiler.safe_name(repr(func)), kwargs...)
     source = GPUCompiler.FunctionSpec(func, Base.to_tuple_type(types), kernel, name)
-    target = GPUCompiler.NativeCompilerTarget(always_inline=true)
+    target = NativeCompilerTarget()
     params = TestCompilerParams()
     GPUCompiler.CompilerJob(target, source, params), kwargs
 end
@@ -200,19 +259,18 @@ function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.saf
     mkpath(path)
     obj_path = joinpath(path, "obj.o")
     lib_path = joinpath(path, "obj.$(Libdl.dlext)")
+
+    job, kwargs = native_job(f, tt; name, kwargs...)
+    mod, meta = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false)
+
+    table = relocation_table!(mod)
+
+    obj, _ = GPUCompiler.emit_asm(job, mod; strip=true, validate=false, format=LLVM.API.LLVMObjectFile)
+    
     open(obj_path, "w") do io
-        job, kwargs = native_job(f, tt; name, kwargs...)
-        obj, _ = GPUCompiler.codegen(:obj, job; strip=true, only_entry=false, validate=false)
-
         write(io, obj)
-        flush(io)
-
-        # Pick a Clang
-        cc = Sys.isapple() ? `cc` : clang()
-        # Compile!
-        run(`$cc -shared -o $lib_path $obj_path`)
     end
-    path, name
+    path, name, table
 end
 
 
@@ -288,5 +346,15 @@ function native_llvm_module(f, tt, name = GPUCompiler.safe_name(repr(f)); kwargs
     m, _ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false)
     return m
 end
+
+function native_code_native(@nospecialize(f), @nospecialize(tt), name = GPUCompiler.safe_name(repr(f)); kwargs...)
+    job, kwargs = native_job(f, tt; name, kwargs...)
+    GPUCompiler.code_native(stdout, job; kwargs...)
+end
+
+
+
+
+
 
 end # module
