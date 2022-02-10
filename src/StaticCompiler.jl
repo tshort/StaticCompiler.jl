@@ -198,8 +198,7 @@ function compile_executable(f, _tt=(), path::String="./", name=GPUCompiler.safe_
     tt == Tuple{} || tt == Tuple{Int, Ptr{Ptr{UInt8}}} || error("input type signature $_tt must be either () or (Int, Ptr{Ptr{UInt8}})")
 
     rt = only(native_code_typed(f, tt))[2]
-    # Warning instead of error because return values are probably going to be ignored anyways
-    isconcretetype(rt) || @warn "$f$_tt did not infer to a concrete type. Got $rt."
+    isconcretetype(rt) || error("$f$_tt did not infer to a concrete type. Got $rt")
 
     # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
     # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this

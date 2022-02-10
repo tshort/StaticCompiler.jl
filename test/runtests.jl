@@ -205,7 +205,7 @@ end
     @test isa(r, Base.Process)
     @test r.exitcode == 0
 
-    if VERSION>v"1.8.0-DEV" # The llvmcall here only works on 1.8+
+    @static if VERSION>v"1.8.0-DEV" # The llvmcall here only works on 1.8+
         @inline function puts(s::Ptr{UInt8}) # Can't use Base.println because it allocates
             Base.llvmcall(("""
             ; External declaration of the puts function
