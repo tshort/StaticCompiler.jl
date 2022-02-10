@@ -202,8 +202,8 @@ module TestRuntime
     report_exception_frame(idx, func, file, line) = return
 end
 
-struct TestCompilerParams <: GPUCompiler.AbstractCompilerParams end
-GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:Any,TestCompilerParams}) = TestRuntime
+struct StaticCompilerParams <: GPUCompiler.AbstractCompilerParams end
+GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:Any,StaticCompilerParams}) = StaticRuntime
 
 
 function native_job(@nospecialize(func), @nospecialize(types); kernel::Bool=false, name=GPUCompiler.safe_name(repr(func)), kwargs...)
