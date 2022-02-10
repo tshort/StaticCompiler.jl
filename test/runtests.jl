@@ -136,17 +136,17 @@ end
 end
 
 
-# # Just to call external libraries
-# @testset "BLAS" begin
-#     function mydot(a::Vector{Float64})
-#         N = length(a)
-#         BLAS.dot(N, a, 1, a, 1)
-#     end
-#     a = [1.0, 2.0]
-#     mydot_compiled, path = compile(mydot, (Vector{Float64},))
-#     @test_skip remote_load_call(path, a) == 5.0 # this needs a relocatable pointer to work
-#     @test mydot_compiled(a) == 5.0
-# end
+# Just to call external libraries
+@testset "BLAS" begin
+    function mydot(a::Vector{Float64})
+        N = length(a)
+        BLAS.dot(N, a, 1, a, 1)
+    end
+    a = [1.0, 2.0]
+    mydot_compiled, path = compile(mydot, (Vector{Float64},))
+    @test_skip remote_load_call(path, a) == 5.0 # Not sure why this isn't working yet
+    @test mydot_compiled(a) == 5.0
+end
 
 
 @testset "Hello World" begin
