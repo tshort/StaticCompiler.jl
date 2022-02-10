@@ -80,7 +80,10 @@ with `load_function(path)`. `LazyStaticcompiledfunction`s contain the requisite 
 `StaticCompiledFunction` and may be called with arguments of type `types` as if it were a function with a
 single method (the method determined by `types`).
 """
-function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_name(repr(f)), filename="obj", kwargs...)
+function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_name(repr(f)), filename="obj",
+                 strip_llvm = false,
+                 strip_asm  = true,
+                 kwargs...)
     tt = Base.to_tuple_type(_tt)
     isconcretetype(tt) || error("input type signature $_tt is not concrete")
 
@@ -89,7 +92,7 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
     
     f_wrap!(out::Ref, args::Ref{<:Tuple}) = (out[] = f(args[]...); nothing)
 
-    _, _, table = generate_shlib(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, path, name; filename, kwargs...)
+    _, _, table = generate_shlib(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, path, name; strip_llvm, strip_asm, filename, kwargs...)
 
     lf = LazyStaticCompiledFunction{rt, tt}(Symbol(f), path, name, filename, table)
     cjl_path = joinpath(path, "$filename.cjl")
@@ -210,17 +213,20 @@ julia> ccall(StaticCompiler.generate_shlib_fptr(path, name), Float64, (Int64,), 
 5.256496109495593
 ```
 """
-function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj"; kwargs...)
+function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj";
+                        strip_llvm = false,
+                        strip_asm  = true,
+                        kwargs...)
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
     lib_path = joinpath(path, "$filenamebase.$(Libdl.dlext)")
 
     job, kwargs = native_job(f, tt; name, kwargs...)
-    mod, meta = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false)
+    mod, meta = GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false)
 
     table = relocation_table!(mod)
 
-    obj, _ = GPUCompiler.emit_asm(job, mod; strip=true, validate=false, format=LLVM.API.LLVMObjectFile)
+    obj, _ = GPUCompiler.emit_asm(job, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
     
     open(obj_path, "w") do io
         write(io, obj)
