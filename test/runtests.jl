@@ -33,16 +33,16 @@ fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2) # This needs to be defined globall
     # Trick to work around #40990
     _fib2(_fib2, n) = n <= 1 ? n : _fib2(_fib2, n-1) + _fib2(_fib2, n-2)
     fib2(n) = _fib2(_fib2, n)
-    
+
     _, path = compile(fib2, (Int,))
     @test remote_load_call(path, 20) == fib(20)
-    #@test compile(fib2, (Int,))[1](20) == fib(20)    
+    #@test compile(fib2, (Int,))[1](20) == fib(20)
 end
 
 # Call binaries for testing
 # @testset "Generate binary" begin
 #     fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
-#     libname = tempname() 
+#     libname = tempname()
 #     generate_shlib(fib, (Int,), libname)
 #     ptr = Libdl.dlopen(libname * "." * Libdl.dlext, Libdl.RTLD_LOCAL)
 #     fptr = Libdl.dlsym(ptr, "julia_fib")
@@ -62,7 +62,7 @@ end
     end
     _, path = compile(sum_first_N_int, (Int,))
     @test remote_load_call(path, 10) == 55
-    
+
     function sum_first_N_float64(N)
         s = Float64(0)
         for a in 1:N
@@ -116,10 +116,10 @@ end
 
 # Julia wants to treat Tuple (and other things like it) as plain bits, but LLVM wants to treat it as something with a pointer.
 # We need to be careful to not send, nor receive an unwrapped Tuple to a compiled function.
-# The interface made in `compile` should handle this fine. 
+# The interface made in `compile` should handle this fine.
 @testset "Send and receive Tuple" begin
     foo(u::Tuple) = 2 .* reverse(u) .- 1
-    
+
     _, path = compile(foo, (NTuple{3, Int},))
     @test remote_load_call(path, (1, 2, 3)) == (5, 3, 1)
 end
@@ -172,7 +172,7 @@ end
 end
 
 # This is a trick to get stack allocated arrays inside a function body (so long as they don't escape).
-# This lets us have intermediate, mutable stack allocated arrays inside our 
+# This lets us have intermediate, mutable stack allocated arrays inside our
 @testset "Alloca" begin
     function f(N)
         # this can hold at most 100 Int values, if you use it for more, you'll segfault
@@ -186,7 +186,54 @@ end
     end
     _, path = compile(f, (Int,))
     @test remote_load_call(path, 20) == 20
-end 
+end
 
+@testset "Standalone Executables" begin
+    # Minimal test with no `llvmcall`
+    @inline function foo()
+        v = 0.0
+        n = 1000
+        for i=1:n
+            v += sqrt(n)
+        end
+        return 0
+    end
 
+    filepath = compile_executable(foo, (), tempdir())
+
+    r = run(`$filepath`);
+    @test isa(r, Base.Process)
+    @test r.exitcode == 0
+
+    @static if VERSION>v"1.8.0-DEV" # The llvmcall here only works on 1.8+
+        @inline function puts(s::Ptr{UInt8}) # Can't use Base.println because it allocates
+            Base.llvmcall(("""
+            ; External declaration of the puts function
+            declare i32 @puts(i8* nocapture) nounwind
+
+            define i32 @main(i8*) {
+            entry:
+               %call = call i32 (i8*) @puts(i8* %0)
+               ret i32 0
+            }
+            """, "main"), Int32, Tuple{Ptr{UInt8}}, s)
+        end
+
+        @inline function print_args(argc::Int, argv::Ptr{Ptr{UInt8}})
+            for i=1:argc
+                # Get pointer
+                p = unsafe_load(argv, i)
+                # Print string at pointer location (which fortunately already exists isn't tracked by the GC)
+                puts(p)
+            end
+            return 0
+        end
+
+        filepath = compile_executable(print_args, (Int, Ptr{Ptr{UInt8}}), tempdir())
+
+        r = run(`$filepath Hello, world!`);
+        @test isa(r, Base.Process)
+        @test r.exitcode == 0
+    end
+end
 # data structures, dictionaries, tuples, named tuples
