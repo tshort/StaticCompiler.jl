@@ -68,21 +68,19 @@ Here is the structure of the directory created by `compile` in the above example
 shell> tree fib
 path
 ├── obj.cjl
-├── obj.o
-└── obj.so
+└── obj.o
 
 0 directories, 3 files
 ````
-* `obj.so` (or `.dylib` on MacOS) is a shared object file that can be linked to in order to execute your
-compiled julia function.
+* `obj.o` contains statically compiled code in the form of an LLVM generated object file.
 * `obj.cjl` is a serialized `LazyStaticCompiledFunction` object which will be deserialized and instantiated
 with `load_function(path)`. `LazyStaticcompiledfunction`s contain the requisite information needed to link to the
-`obj.so` inside a julia session. Once it is instantiated in a julia session (i.e. by
+`obj.o` inside a julia session. Once it is instantiated in a julia session (i.e. by
 `instantiate(::LazyStaticCompiledFunction)`, this happens automatically in `load_function`), it will be of type
 `StaticCompiledFunction` and may be called with arguments of type `types` as if it were a function with a
 single method (the method determined by `types`).
 """
-function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_name(repr(f)), kwargs...)
+function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_name(repr(f)), filename="obj", kwargs...)
     tt = Base.to_tuple_type(_tt)
     isconcretetype(tt) || error("input type signature $_tt is not concrete")
 
@@ -91,10 +89,10 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
     
     f_wrap!(out::Ref, args::Ref{<:Tuple}) = (out[] = f(args[]...); nothing)
 
-    _, _, table = generate_shlib(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, path, name; kwargs...)
+    _, _, table = generate_shlib(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, path, name; filename, kwargs...)
 
-    lf = LazyStaticCompiledFunction{rt, tt}(Symbol(f), path, name, table)
-    cjl_path = joinpath(path, "obj.cjl")
+    lf = LazyStaticCompiledFunction{rt, tt}(Symbol(f), path, name, filename, table)
+    cjl_path = joinpath(path, "$filename.cjl")
     JLD2.jldopen(cjl_path, "w") do file
         file["f"] = lf
     end
@@ -107,8 +105,8 @@ end
 
 load a `StaticCompiledFunction` from a given path. This object is callable.
 """
-function load_function(path)
-    lf = JLD2.jldopen(file -> file["f"], joinpath(path, "obj.cjl"), "r") :: LazyStaticCompiledFunction
+function load_function(path; filename="obj")
+    lf = JLD2.jldopen(file -> file["f"], joinpath(path, "$filename.cjl"), "r") :: LazyStaticCompiledFunction
     instantiate(lf)
 end
 
@@ -116,6 +114,7 @@ struct LazyStaticCompiledFunction{rt, tt}
     f::Symbol
     path::String
     name::String
+    filename::String
     reloc::Dict{String,Any}
 end
 
@@ -124,7 +123,7 @@ function instantiate(p::LazyStaticCompiledFunction{rt, tt}) where {rt, tt}
     lljit = LLVM.LLJIT(;tm=GPUCompiler.llvm_machine(NativeCompilerTarget()))
     jd = LLVM.JITDylib(lljit)
     flags = LLVM.API.LLVMJITSymbolFlags(LLVM.API.LLVMJITSymbolGenericFlagsExported, 0)
-    ofile = LLVM.MemoryBufferFile(joinpath(p.path, "obj.o")) #$(Libdl.dlext)
+    ofile = LLVM.MemoryBufferFile(joinpath(p.path, "$(p.filename).o")) #$(Libdl.dlext)
 
     
     # Set all the unitinitialize global variables to point to julia values from the relocation table

@@ -47,7 +47,8 @@ This package uses the [GPUCompiler package](https://github.com/JuliaGPU/GPUCompi
 
 ## Limitations 
 
-* No heap allocations (e.g. creating an array or a string) are allowed inside a statically compiled function body. If you try to run such a function, you will get a segfault.
-**  It's sometimes possible you won't get a segfault if you define and run the function in the same session, but trying to call the compiled function in a new julia session will definitely segfault if you allocate memory.
-* Doesn't currently work on Windows
+* GC-tracked allocations and global variables do work with `compile`, but the way they are implemented is brittle and can be dangerous. Allocate with care.
+* GC-tracked allocations and global varaibles do *not* work with `compile_executable` (yet).
+* Type unstable code is not yet supported.
+* Doesn't currently work on Windows yes
 * If you find any other limitations, let us know. There's probably lots.
