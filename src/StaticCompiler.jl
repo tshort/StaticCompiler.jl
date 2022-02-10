@@ -374,7 +374,6 @@ function generate_executable(f, tt, path::String = tempname(), name = GPUCompile
     open(obj_path, "w") do io
         job, kwargs = native_job(f, tt; name, kwargs...)
         obj, _ = GPUCompiler.codegen(:obj, job; strip=true, only_entry=false, validate=false)
-        entry = "_julia_$name"
 
         write(io, obj)
         flush(io)
@@ -382,7 +381,24 @@ function generate_executable(f, tt, path::String = tempname(), name = GPUCompile
         # Pick a compiler
         cc = Sys.isapple() ? `cc` : `gcc`
         # Compile!
-        run(`$cc -e $entry -o $exec_path $obj_path`)
+        if Sys.isapple()
+            # Apple no longer uses _start, so we can just specify a custom entry
+            entry = "_julia_$name"
+            run(`$cc -e $entry $obj_path -o $exec_path`)
+        else
+            # Write a minimal wrapper to avoid having to specify a custom entry
+            wrapper_path = joinpath(path, "wrapper.c")
+            f = open(wrapper_path, "w")
+            print(f, """int main(int argc, char** argv)
+            {
+                julia_$name(argc, argv);
+                return 0;
+            }""")
+            close(f)
+            run(`$cc $wrapper_path $obj_path -o $exec_path`)
+            # Clean up
+            run(`rm $wrapper_path`)
+        end
     end
     path, name
 end
