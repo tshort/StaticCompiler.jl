@@ -15,7 +15,7 @@ function relocation_table!(mod)
         if isa(inst, LLVM.LoadInst) && occursin("inttoptr", string(inst)) 
             op = LLVM.Value(LLVM.API.LLVMGetOperand(inst, 0))
             if isa(op, LLVM.ConstantExpr)
-                @show inst op
+                #@show inst op
                 op1 = LLVM.Value(LLVM.API.LLVMGetOperand(op, 0))
                 ptr = Ptr{Cvoid}(convert(Int, op1))
                 val = unsafe_pointer_to_objref(ptr) 
