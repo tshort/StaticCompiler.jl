@@ -190,7 +190,7 @@ end
 
 GPUCompiler.runtime_slug(job::GPUCompiler.CompilerJob{NativeCompilerTarget}) = "native_$(job.target.cpu)-$(hash(job.target.features))"
 
-module TestRuntime
+module StaticRuntime
     # dummy methods
     signal_exception() = return
     # HACK: if malloc returns 0 or traps, all calling functions (like jl_box_*)
