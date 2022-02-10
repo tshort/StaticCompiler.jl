@@ -4,7 +4,7 @@ using GPUCompiler: GPUCompiler
 using LLVM: LLVM
 using Libdl: Libdl
 using Base: RefValue
-using Serialization: serialize, deserialize
+using Serialization: serialize,  deserialize
 using Clang_jll: clang
 
 export compile, load_function
