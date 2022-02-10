@@ -11,9 +11,9 @@ using Serialization: serialize, deserialize
 export compile, load_function, compile_executable
 export native_code_llvm, native_code_typed, native_llvm_module, native_code_native
 
-
-
+include("target.jl")
 include("pointer_patching.jl")
+include("code_loading.jl")
 
 """
     compile(f, types, path::String = tempname()) --> (compiled_f, path)
@@ -97,124 +97,7 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
 
     (; f = instantiate(lf), path=abspath(path))
 end
-
-"""
-    load_function(path) --> compiled_f
-
-load a `StaticCompiledFunction` from a given path. This object is callable.
-"""
-function load_function(path; filename="obj")
-    instantiate(deserialize(joinpath(path, "$filename.cjl")))
-end
-
-struct LazyStaticCompiledFunction{rt, tt}
-    f::Symbol
-    path::String
-    name::String
-    filename::String
-    reloc::Dict{String,Any}
-end
-
-function instantiate(p::LazyStaticCompiledFunction{rt, tt}) where {rt, tt}
-    # LLVM.load_library_permantly(dirname(Libdl.dlpath(Libdl.dlopen("libjulia"))))
-    lljit = LLVM.LLJIT(;tm=LLVM.JITTargetMachine())
-    jd = LLVM.JITDylib(lljit)
-    flags = LLVM.API.LLVMJITSymbolFlags(LLVM.API.LLVMJITSymbolGenericFlagsExported, 0)
-    ofile = LLVM.MemoryBufferFile(joinpath(p.path, "$(p.filename).o")) #$(Libdl.dlext)
-
     
-    # Set all the uninitialized global variables to point to julia values from the relocation table
-    for (name, val) ∈ p.reloc
-        address = LLVM.API.LLVMOrcJITTargetAddress(reinterpret(UInt, pointer_from_objref(val)))
-        symbol = LLVM.API.LLVMJITEvaluatedSymbol(address, flags)
-        gv = LLVM.API.LLVMJITCSymbolMapPair(LLVM.mangle(lljit, name), symbol)
-        mu = absolute_symbols(Ref(gv)) 
-        LLVM.define(jd, mu)       
-    end
-    # consider switching to one mu for all gvs instead of one per gv.
-    # I tried that already, but I got an error saying 
-    # JIT session error: Symbols not found: [ __Type_Vector_Float64___274 ]
-
-
-    # Link to libjulia
-    prefix = LLVM.get_prefix(lljit)
-    dg = LLVM.CreateDynamicLibrarySearchGeneratorForProcess(prefix)
-    LLVM.add!(jd, dg)
-    
-    LLVM.add!(lljit, jd, ofile)
-    fptr = pointer(LLVM.lookup(lljit, "julia_" * p.name))
-    
-    StaticCompiledFunction{rt, tt}(p.f, fptr, lljit, p.reloc)
-end
-
-struct StaticCompiledFunction{rt, tt}
-    f::Symbol
-    ptr::Ptr{Nothing}
-    jit::LLVM.LLJIT
-    reloc::Dict{String, Any}
-end
-
-function Base.show(io::IO, f::StaticCompiledFunction{rt, tt}) where {rt, tt}
-    types = [tt.parameters...]
-    print(io, String(f.f), "(", join(("::$T" for T ∈ tt.parameters), ',')  ,") :: $rt")
-end
-
-function (f::StaticCompiledFunction{rt, tt})(args...) where {rt, tt}
-    Tuple{typeof.(args)...} == tt || error("Input types don't match compiled target $((tt.parameters...,)). Got arguments of type $(typeof.(args))")
-    out = RefValue{rt}()
-    refargs = Ref(args)
-    ccall(f.ptr, Nothing, (Ptr{rt}, Ref{tt}), pointer_from_objref(out), refargs)
-    out[]
-end
-
-instantiate(f::StaticCompiledFunction) = f
-
-    
-
-Base.@kwdef struct NativeCompilerTarget <: GPUCompiler.AbstractCompilerTarget
-    cpu::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUName())
-    features::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUFeatures())
-end
-
-GPUCompiler.llvm_triple(::NativeCompilerTarget) = Sys.MACHINE
-
-function GPUCompiler.llvm_machine(target::NativeCompilerTarget)
-    triple = GPUCompiler.llvm_triple(target)
-
-    t = LLVM.Target(triple=triple)
-
-    tm = LLVM.TargetMachine(t, triple, target.cpu, target.features, reloc=LLVM.API.LLVMRelocPIC)
-    GPUCompiler.asm_verbosity!(tm, true)
-
-    return tm
-end
-
-GPUCompiler.runtime_slug(job::GPUCompiler.CompilerJob{NativeCompilerTarget}) = "native_$(job.target.cpu)-$(hash(job.target.features))"
-
-module StaticRuntime
-    # dummy methods
-    signal_exception() = return
-    # HACK: if malloc returns 0 or traps, all calling functions (like jl_box_*)
-    #       get reduced to a trap, which really messes with our test suite.
-    malloc(sz) = Ptr{Cvoid}(Int(0xDEADBEEF))
-    report_oom(sz) = return
-    report_exception(ex) = return
-    report_exception_name(ex) = return
-    report_exception_frame(idx, func, file, line) = return
-end
-
-struct StaticCompilerParams <: GPUCompiler.AbstractCompilerParams end
-GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:Any,StaticCompilerParams}) = StaticRuntime
-
-
-function native_job(@nospecialize(func), @nospecialize(types); kernel::Bool=false, name=GPUCompiler.safe_name(repr(func)), kwargs...)
-    source = GPUCompiler.FunctionSpec(func, Base.to_tuple_type(types), kernel, name)
-    target = NativeCompilerTarget()
-    params = StaticCompilerParams()
-    GPUCompiler.CompilerJob(target, source, params), kwargs
-end
-
-
 
 """
 ```julia
