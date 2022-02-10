@@ -18,7 +18,7 @@ include("code_loading.jl")
 """
     compile(f, types, path::String = tempname()) --> (compiled_f, path)
 
-   !!! Warning: this will fail on programs that heap allocate any memory tracked by the GC, or have dynamic dispatch !!!
+   !!! Warning: this will fail on programs that have dynamic dispatch !!!
 
 Statically compile the method of a function `f` specialized to arguments of the type given by `types`.
 
