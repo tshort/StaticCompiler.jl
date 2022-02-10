@@ -15,7 +15,7 @@ function relocation_table!(mod)
         if isa(inst, LLVM.LoadInst) && occursin("inttoptr", string(inst)) 
             op = LLVM.Value(LLVM.API.LLVMGetOperand(inst, 0))
             if isa(op, LLVM.ConstantExpr)
-                #@show inst op
+                @debug "Relocating LoadInst inttoptr" inst op
                 op1 = LLVM.Value(LLVM.API.LLVMGetOperand(op, 0))
                 ptr = Ptr{Cvoid}(convert(Int, op1))
                 val = unsafe_pointer_to_objref(ptr) 
@@ -30,7 +30,7 @@ function relocation_table!(mod)
                 
             end
         elseif isa(inst, LLVM.StoreInst) && occursin("inttoptr", string(inst)) 
-            # @showln inst
+            @debug "Relocating StoreInst" inst
             op = LLVM.Value(LLVM.API.LLVMGetOperand(inst, 1))
             arg = first(LLVM.operands(op))
             
@@ -49,7 +49,7 @@ function relocation_table!(mod)
             end
             
         elseif isa(inst, LLVM.CallInst)
-            #@showln inst LLVM.operands(inst)
+            @debug "Relocating CallInst" inst LLVM.operands(inst)
             op = LLVM.Value(LLVM.API.LLVMGetOperand(inst, 1))
             arg = first(LLVM.operands(inst))
             if isa(arg, LLVM.ConstantExpr)
@@ -72,7 +72,7 @@ function relocation_table!(mod)
             dest = LLVM.called_value(inst)
 
             if occursin("inttoptr", string(dest)) && length(LLVM.operands(dest)) > 0
-                #@showln dest LLVM.operands(dest) LLVM.operands(inst)
+                @debug "Relocating CallInst inttoptr" dest LLVM.operands(dest) LLVM.operands(inst)
                 ptr_arg = first(LLVM.operands(dest))
                 ptr_val = convert(Int, ptr_arg)
                 ptr = Ptr{Cvoid}(ptr_val)
@@ -171,7 +171,6 @@ function relocation_table!(mod)
             
         end
     end
-    mod
     d
 end
 
