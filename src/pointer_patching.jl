@@ -4,43 +4,13 @@ function relocation_table!(mod)
     d = Dict{String, Any}()
     
     for func ∈ LLVM.functions(mod), bb ∈ LLVM.blocks(func), inst ∈ LLVM.instructions(bb)
-        #@showln inst typeof(inst)
         if isa(inst, LLVM.LoadInst) && occursin("inttoptr", string(inst)) 
-            op = LLVM.Value(LLVM.API.LLVMGetOperand(inst, 0))
-             for (i, arg) ∈ enumerate(LLVM.operands(inst))
-                if occursin("inttoptr", string(arg)) && arg isa LLVM.ConstantExpr
-                    op1 = LLVM.Value(LLVM.API.LLVMGetOperand(arg, 0))
-                    ptr = Ptr{Cvoid}(convert(Int, op1))
-                    
-                    val = unsafe_pointer_to_objref(ptr) 
-                    gv_name = GPUCompiler.safe_name(String(gensym(repr(Core.Typeof(val)))))
-                    
-                    gv = LLVM.GlobalVariable(mod, jl_t, gv_name)
-                    LLVM.extinit!(gv, true)
-                    LLVM.API.LLVMSetOperand(inst, i-1, gv)
-
-                    d[gv_name] = val
-                end
-            end
+            get_pointers!(d, mod, inst)
         elseif isa(inst, LLVM.StoreInst) && occursin("inttoptr", string(inst)) 
             @debug "Relocating StoreInst" inst
-            for (i, arg) ∈ enumerate(LLVM.operands(inst))
-                if occursin("inttoptr", string(arg)) && arg isa LLVM.ConstantExpr
-                    op1 = LLVM.Value(LLVM.API.LLVMGetOperand(arg, 0))
-                    ptr = Ptr{Cvoid}(convert(Int, op1))
-                    
-                    val = unsafe_pointer_to_objref(ptr) 
-                    gv_name = GPUCompiler.safe_name(String(gensym(repr(Core.Typeof(val)))))
-                    
-                    gv = LLVM.GlobalVariable(mod, jl_t, gv_name)
-                    LLVM.extinit!(gv, true)
-                    LLVM.API.LLVMSetOperand(inst, i-1, gv)
-
-                    d[gv_name] = val
-                end
-            end
+            get_pointers!(d, mod, inst)
         elseif inst isa LLVM.RetInst && occursin("inttoptr", string(inst))
-           op = LLVM.Value(LLVM.API.LLVMGetOperand(inst, 0))
+            op = LLVM.Value(LLVM.API.LLVMGetOperand(inst, 0))
             if isa(op, LLVM.ConstantExpr)
                 @debug "Relocating RetInst inttoptr" inst op
                 op1 = LLVM.Value(LLVM.API.LLVMGetOperand(op, 0))
@@ -55,11 +25,12 @@ function relocation_table!(mod)
 
                 d[gv_name] = val
             end
-            
+        elseif isa(inst, LLVM.BitCastInst) && occursin("inttoptr", string(inst)) 
+            op = LLVM.Value(LLVM.API.LLVMGetOperand(inst, 0))
+            get_pointers!(d, mod, inst)
         elseif isa(inst, LLVM.CallInst)
             @debug "Relocating CallInst" inst LLVM.operands(inst)
             dest = LLVM.called_value(inst)
-
             if occursin("inttoptr", string(dest)) && length(LLVM.operands(dest)) > 0
                 @debug "Relocating CallInst inttoptr" dest LLVM.operands(dest) LLVM.operands(inst)
                 ptr_arg = first(LLVM.operands(dest))
@@ -143,6 +114,7 @@ function relocation_table!(mod)
                         fn = "jl_symbol_n"
                     end
                 end
+
                 if length(fn) > 1 && fromC                    
                     mod = LLVM.parent(LLVM.parent(LLVM.parent(inst)))
                     lfn = LLVM.API.LLVMGetNamedFunction(mod, fn)
@@ -155,26 +127,40 @@ function relocation_table!(mod)
                     LLVM.API.LLVMSetOperand(inst, LLVM.API.LLVMGetNumOperands(inst)-1, lfn)
                 end
             end
-            for (i, arg) ∈ enumerate(LLVM.operands(inst))
-                if occursin("inttoptr", string(arg)) && arg isa LLVM.ConstantExpr
-                    op1 = LLVM.Value(LLVM.API.LLVMGetOperand(arg, 0))
-                    ptr = Ptr{Cvoid}(convert(Int, op1))
-
-                    val = unsafe_pointer_to_objref(ptr) 
-                    gv_name = GPUCompiler.safe_name(String(gensym(repr(Core.Typeof(val)))))
-                    
-                    gv = LLVM.GlobalVariable(mod, jl_t, gv_name)
-                    LLVM.extinit!(gv, true)
-                    LLVM.API.LLVMSetOperand(inst, i-1, gv)
-
-                    d[gv_name] = val
-                    
-                end
-            end
+            get_pointers!(d, mod, inst)
         end
     end
     d
 end
+
+function get_pointers!(d, mod, inst)
+    jl_t = LLVM.PointerType(LLVM.StructType(LLVM.LLVMType[]; ctx=LLVM.context(mod)))
+    for (i, arg) ∈ enumerate(LLVM.operands(inst))
+        if occursin("inttoptr", string(arg)) && arg isa LLVM.ConstantExpr
+            op1 = LLVM.Value(LLVM.API.LLVMGetOperand(arg, 0))
+            ptr = Ptr{Cvoid}(convert(Int, op1))
+
+            frames = ccall(:jl_lookup_code_address, Any, (Ptr{Cvoid}, Cint,), ptr, 0)
+            if length(frames) >= 1
+                fn, file, line, linfo, fromC, inlined = last(frames)
+                if isempty(String(fn)) || fn == :jl_system_image_data
+                    val = unsafe_pointer_to_objref(ptr) 
+                    gv_name = GPUCompiler.safe_name(String(gensym(repr(Core.Typeof(val)))))
+            
+                    gv = LLVM.GlobalVariable(mod, jl_t, gv_name)
+                    LLVM.extinit!(gv, true)
+                    LLVM.API.LLVMSetOperand(inst, i-1, gv)
+                
+                    d[gv_name] = val
+                else
+                    @warn "Found data we don't know how to relocate" frames
+                end
+            end
+        end
+    end
+end
+
+
 
 function absolute_symbols(symbols)
     ref = LLVM.API.LLVMOrcAbsoluteSymbols(symbols, length(symbols))
@@ -195,3 +181,5 @@ function pointer_patching_diff(mod::LLVM.Module, path1=tempname(), path2=tempnam
 
     run(`diff $p1 $p2`)
 end
+
+
