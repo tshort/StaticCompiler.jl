@@ -128,9 +128,13 @@ function instantiate(p::LazyStaticCompiledFunction{rt, tt}) where {rt, tt}
         address = LLVM.API.LLVMOrcJITTargetAddress(reinterpret(UInt, pointer_from_objref(val)))
         symbol = LLVM.API.LLVMJITEvaluatedSymbol(address, flags)
         gv = LLVM.API.LLVMJITCSymbolMapPair(LLVM.mangle(lljit, name), symbol)
-        mu = absolute_symbols(Ref(gv))
-        LLVM.define(jd, mu)
+        mu = absolute_symbols(gv) 
+        LLVM.define(jd, mu)       
     end
+    # consider switching to one mu for all gvs instead of one per gv.
+    # I tried that already, but I got an error saying 
+    # JIT session error: Symbols not found: [ __Type_Vector_Float64___274 ]
+
 
     # Link to libjulia
     prefix = LLVM.get_prefix(lljit)
