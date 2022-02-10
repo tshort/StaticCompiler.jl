@@ -117,7 +117,7 @@ end
 
 function instantiate(p::LazyStaticCompiledFunction{rt, tt}) where {rt, tt}
     # LLVM.load_library_permantly(dirname(Libdl.dlpath(Libdl.dlopen("libjulia"))))
-    lljit = LLVM.LLJIT(;tm=GPUCompiler.llvm_machine(NativeCompilerTarget()))
+    lljit = LLVM.LLJIT(;tm=LLVM.JITTargetMachine())
     jd = LLVM.JITDylib(lljit)
     flags = LLVM.API.LLVMJITSymbolFlags(LLVM.API.LLVMJITSymbolGenericFlagsExported, 0)
     ofile = LLVM.MemoryBufferFile(joinpath(p.path, "$(p.filename).o")) #$(Libdl.dlext)
@@ -128,7 +128,7 @@ function instantiate(p::LazyStaticCompiledFunction{rt, tt}) where {rt, tt}
         address = LLVM.API.LLVMOrcJITTargetAddress(reinterpret(UInt, pointer_from_objref(val)))
         symbol = LLVM.API.LLVMJITEvaluatedSymbol(address, flags)
         gv = LLVM.API.LLVMJITCSymbolMapPair(LLVM.mangle(lljit, name), symbol)
-        mu = absolute_symbols(gv) 
+        mu = absolute_symbols(Ref(gv)) 
         LLVM.define(jd, mu)       
     end
     # consider switching to one mu for all gvs instead of one per gv.
