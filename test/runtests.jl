@@ -107,10 +107,6 @@ end
         _, path = compile(array_sum, (Int, Vector{T}))
         @test remote_load_call(path, 10, T.(1:10)) == T(55)
     end
-
-    # @test (10, Int.(1:10)) == 55
-    # @test compile(array_sum, (Int, Vector{Complex{Float32}}))[1](10, Complex{Float32}.(1:10)) == 55f0 + 0f0im
-    # @test compile(array_sum, (Int, Vector{Complex{Float64}}))[1](10, Complex{Float64}.(1:10)) == 55f0 + 0f0im
 end
 
 @testset "Array allocations" begin
