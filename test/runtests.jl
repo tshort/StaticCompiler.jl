@@ -189,7 +189,23 @@ end
 end
 
 @testset "Standalone Executables" begin
-    if VERSION>v"1.7" # The llvmcall here only works on 1.8+
+    # Minimal test with no `llvmcall`
+    @inline function foo()
+        v = 0.0
+        n = 1000
+        for i=1:n
+            v += sqrt(n)
+        end
+        return 0
+    end
+
+    filepath = compile_executable(foo, (), tempdir())
+
+    r = run(`$filepath`);
+    @test isa(r, Base.Process)
+    @test r.exitcode == 0
+
+    if VERSION>v"1.8.0-DEV" # The llvmcall here only works on 1.8+
         @inline function puts(s::Ptr{UInt8}) # Can't use Base.println because it allocates
             Base.llvmcall(("""
             ; External declaration of the puts function
@@ -212,7 +228,7 @@ end
             end
             return 0
         end
-        
+
         filepath = compile_executable(print_args, (Int, Ptr{Ptr{UInt8}}), tempdir())
 
         r = run(`$filepath Hello, world!`);

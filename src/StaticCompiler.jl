@@ -145,7 +145,8 @@ Attempt to compile a standalone executable that runs function `f` with a type si
 ```julia
 julia> using StaticCompiler
 
-julia> function puts(s::Ptr{UInt8}) # Can't use Base.println because it allocates
+julia> function puts(s::Ptr{UInt8}) # Can't use Base.println because it allocates.
+           # Note, this `llvmcall` requires Julia 1.8+
            Base.llvmcall((\"""
            ; External declaration of the puts function
            declare i32 @puts(i8* nocapture) nounwind
