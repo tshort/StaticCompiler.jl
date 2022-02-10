@@ -203,7 +203,7 @@ end
             """, "main"), Int32, Tuple{Ptr{UInt8}}, s)
         end
 
-        @inline Base.@ccallable Int function print_args(argc::Int, argv::Ptr{Ptr{UInt8}})
+        @inline function print_args(argc::Int, argv::Ptr{Ptr{UInt8}})
             for i=1:argc
                 # Get pointer
                 p = unsafe_load(argv, i)
@@ -212,7 +212,7 @@ end
             end
             return 0
         end
-
+        
         filepath = compile_executable(print_args, (Int, Ptr{Ptr{UInt8}}), tempdir())
 
         r = run(`$filepath Hello, world!`);
