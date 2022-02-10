@@ -171,3 +171,18 @@ function absolute_symbols(symbols)
     ref = LLVM.API.LLVMOrcAbsoluteSymbols(symbols, length(symbols))
     LLVM.MaterializationUnit(ref)
 end
+
+function pointer_patching_diff(mod::LLVM.Module, path1=tempname(), path2=tempname(); show_reloc_table=false)
+    s1 = string(mod)
+    write(path1, s1)
+    
+    d = StaticCompiler.relocation_table!(mod)
+    if show_reloc_table
+        @show d
+    end
+    
+    s2 = string(mod)
+    write(path2, s2)
+
+    run(`diff $p1 $p2`)
+end
