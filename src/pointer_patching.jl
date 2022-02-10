@@ -1,10 +1,3 @@
-macro showln(args...)
-    quote
-        $Base.@show($(args...))
-        $println()
-    end |> esc
-end
-
 function relocation_table!(mod)
     i64 = LLVM.IntType(64; ctx=LLVM.context(mod))
     jl_t = LLVM.PointerType(LLVM.StructType(LLVM.LLVMType[]; ctx=LLVM.context(mod)))
