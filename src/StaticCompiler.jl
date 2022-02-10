@@ -379,7 +379,7 @@ function generate_executable(f, tt, path::String = tempname(), name = GPUCompile
         flush(io)
 
         # Pick a compiler
-        cc = Sys.isapple() ? `cc` : `gcc`
+        cc = Sys.isapple() ? `cc` : clang()
         # Compile!
         if Sys.isapple()
             # Apple no longer uses _start, so we can just specify a custom entry
