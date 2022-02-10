@@ -173,7 +173,6 @@ instantiate(f::StaticCompiledFunction) = f
 Base.@kwdef struct NativeCompilerTarget <: GPUCompiler.AbstractCompilerTarget
     cpu::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUName())
     features::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUFeatures())
-    always_inline::Bool=false # will mark the job function as always inline
 end
 
 GPUCompiler.llvm_triple(::NativeCompilerTarget) = Sys.MACHINE
