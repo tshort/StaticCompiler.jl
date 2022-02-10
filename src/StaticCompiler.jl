@@ -126,7 +126,7 @@ function instantiate(p::LazyStaticCompiledFunction{rt, tt}) where {rt, tt}
     ofile = LLVM.MemoryBufferFile(joinpath(p.path, "$(p.filename).o")) #$(Libdl.dlext)
 
     
-    # Set all the unitinitialize global variables to point to julia values from the relocation table
+    # Set all the uninitialized global variables to point to julia values from the relocation table
     for (name, val) ∈ p.reloc
         address = LLVM.API.LLVMOrcJITTargetAddress(reinterpret(UInt, pointer_from_objref(val)))
         symbol = LLVM.API.LLVMJITEvaluatedSymbol(address, flags)
