@@ -6,7 +6,7 @@ using Libdl: Libdl
 using Base: RefValue
 using Serialization: serialize, deserialize
 using Clang_jll: clang
-using JLD2: JLD2
+using Serialization: serialize, deserialize
 
 export compile, load_function, compile_executable
 export native_code_llvm, native_code_typed, native_llvm_module, native_code_native
@@ -93,9 +93,7 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
 
     lf = LazyStaticCompiledFunction{rt, tt}(Symbol(f), path, name, filename, table)
     cjl_path = joinpath(path, "$filename.cjl")
-    JLD2.jldopen(cjl_path, "w") do file
-        file["f"] = lf
-    end
+    serialize(cjl_path, lf)
 
     (; f = instantiate(lf), path=abspath(path))
 end
@@ -106,8 +104,7 @@ end
 load a `StaticCompiledFunction` from a given path. This object is callable.
 """
 function load_function(path; filename="obj")
-    lf = JLD2.jldopen(file -> file["f"], joinpath(path, "$filename.cjl"), "r") :: LazyStaticCompiledFunction
-    instantiate(lf)
+    instantiate(deserialize(joinpath(path, "$filename.cjl")))
 end
 
 struct LazyStaticCompiledFunction{rt, tt}
