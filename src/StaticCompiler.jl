@@ -6,7 +6,6 @@ using Libdl: Libdl
 using Base: RefValue
 using Serialization: serialize, deserialize
 using Clang_jll: clang
-using Serialization: serialize, deserialize
 
 export compile, load_function, compile_executable
 export native_code_llvm, native_code_typed, native_llvm_module, native_code_native

@@ -25,7 +25,13 @@ function instantiate(p::LazyStaticCompiledFunction{rt, tt}) where {rt, tt}
     
     # Set all the uninitialized global variables to point to julia values from the relocation table
     for (name, val) ∈ p.reloc
-        address = LLVM.API.LLVMOrcJITTargetAddress(reinterpret(UInt, pointer_from_objref(val)))
+        if !ismutable(val)
+            # Sometimes Julia embeds functions like `Base.string` into code, and this doesn't have a pointer
+            # so we need to give it one manually, and make sure it doesn't expire.
+            p.reloc[name] = Ref(val)
+        end
+        address = LLVM.API.LLVMOrcJITTargetAddress(reinterpret(UInt, pointer_from_objref(p.reloc[name])))
+
         symbol = LLVM.API.LLVMJITEvaluatedSymbol(address, flags)
         gv = LLVM.API.LLVMJITCSymbolMapPair(LLVM.mangle(lljit, name), symbol)
         mu = absolute_symbols(Ref(gv)) 
@@ -34,7 +40,6 @@ function instantiate(p::LazyStaticCompiledFunction{rt, tt}) where {rt, tt}
     # consider switching to one mu for all gvs instead of one per gv.
     # I tried that already, but I got an error saying 
     # JIT session error: Symbols not found: [ __Type_Vector_Float64___274 ]
-
 
     # Link to libjulia
     prefix = LLVM.get_prefix(lljit)

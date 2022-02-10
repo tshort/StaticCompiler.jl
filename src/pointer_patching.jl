@@ -7,8 +7,42 @@ function relocation_table!(mod)
         #@showln inst typeof(inst)
         if isa(inst, LLVM.LoadInst) && occursin("inttoptr", string(inst)) 
             op = LLVM.Value(LLVM.API.LLVMGetOperand(inst, 0))
+             for (i, arg) ∈ enumerate(LLVM.operands(inst))
+                if occursin("inttoptr", string(arg)) && arg isa LLVM.ConstantExpr
+                    op1 = LLVM.Value(LLVM.API.LLVMGetOperand(arg, 0))
+                    ptr = Ptr{Cvoid}(convert(Int, op1))
+                    
+                    val = unsafe_pointer_to_objref(ptr) 
+                    gv_name = GPUCompiler.safe_name(String(gensym(repr(Core.Typeof(val)))))
+                    
+                    gv = LLVM.GlobalVariable(mod, jl_t, gv_name)
+                    LLVM.extinit!(gv, true)
+                    LLVM.API.LLVMSetOperand(inst, i-1, gv)
+
+                    d[gv_name] = val
+                end
+            end
+        elseif isa(inst, LLVM.StoreInst) && occursin("inttoptr", string(inst)) 
+            @debug "Relocating StoreInst" inst
+            for (i, arg) ∈ enumerate(LLVM.operands(inst))
+                if occursin("inttoptr", string(arg)) && arg isa LLVM.ConstantExpr
+                    op1 = LLVM.Value(LLVM.API.LLVMGetOperand(arg, 0))
+                    ptr = Ptr{Cvoid}(convert(Int, op1))
+                    
+                    val = unsafe_pointer_to_objref(ptr) 
+                    gv_name = GPUCompiler.safe_name(String(gensym(repr(Core.Typeof(val)))))
+                    
+                    gv = LLVM.GlobalVariable(mod, jl_t, gv_name)
+                    LLVM.extinit!(gv, true)
+                    LLVM.API.LLVMSetOperand(inst, i-1, gv)
+
+                    d[gv_name] = val
+                end
+            end
+        elseif inst isa LLVM.RetInst && occursin("inttoptr", string(inst))
+           op = LLVM.Value(LLVM.API.LLVMGetOperand(inst, 0))
             if isa(op, LLVM.ConstantExpr)
-                @debug "Relocating LoadInst inttoptr" inst op
+                @debug "Relocating RetInst inttoptr" inst op
                 op1 = LLVM.Value(LLVM.API.LLVMGetOperand(op, 0))
                 ptr = Ptr{Cvoid}(convert(Int, op1))
                 val = unsafe_pointer_to_objref(ptr) 
@@ -20,48 +54,10 @@ function relocation_table!(mod)
                 LLVM.API.LLVMSetOperand(inst, 0, gv)
 
                 d[gv_name] = val
-                
-            end
-        elseif isa(inst, LLVM.StoreInst) && occursin("inttoptr", string(inst)) 
-            @debug "Relocating StoreInst" inst
-            op = LLVM.Value(LLVM.API.LLVMGetOperand(inst, 1))
-            arg = first(LLVM.operands(op))
-            
-            if arg isa LLVM.ConstantInt
-                ptr_val = convert(Int, arg)
-                ptr = Ptr{Cvoid}(ptr_val)
-                val = unsafe_pointer_to_objref(ptr) 
-
-                gv_name = GPUCompiler.safe_name(String(gensym(repr(Core.Typeof(val)))))
-                
-                gv = LLVM.GlobalVariable(mod, jl_t, gv_name)
-                LLVM.extinit!(gv, true)
-                LLVM.API.LLVMSetOperand(inst, 1, gv)
-
-                d[gv_name] = val
             end
             
         elseif isa(inst, LLVM.CallInst)
             @debug "Relocating CallInst" inst LLVM.operands(inst)
-            op = LLVM.Value(LLVM.API.LLVMGetOperand(inst, 1))
-            arg = first(LLVM.operands(inst))
-            if isa(arg, LLVM.ConstantExpr)
-                op1 = LLVM.Value(LLVM.API.LLVMGetOperand(arg, 0))
-                ptr = Ptr{Cvoid}(convert(Int, op1))
-
-                
-                val = unsafe_pointer_to_objref(ptr) 
-
-                gv_name = GPUCompiler.safe_name(String(gensym(repr(Core.Typeof(val)))))
-                
-                gv = LLVM.GlobalVariable(mod, jl_t, gv_name)
-                LLVM.extinit!(gv, true)
-                LLVM.API.LLVMSetOperand(inst, 0, gv)
-
-                d[gv_name] = val
-                
-            end
-            
             dest = LLVM.called_value(inst)
 
             if occursin("inttoptr", string(dest)) && length(LLVM.operands(dest)) > 0
@@ -147,7 +143,7 @@ function relocation_table!(mod)
                         fn = "jl_symbol_n"
                     end
                 end
-                if length(fn) > 1 && fromC
+                if length(fn) > 1 && fromC                    
                     mod = LLVM.parent(LLVM.parent(LLVM.parent(inst)))
                     lfn = LLVM.API.LLVMGetNamedFunction(mod, fn)
 
@@ -157,11 +153,24 @@ function relocation_table!(mod)
                         lfn = LLVM.API.LLVMConstBitCast(lfn, LLVM.PointerType(LLVM.FunctionType(LLVM.API.LLVMGetCalledFunctionType(inst))))
                     end
                     LLVM.API.LLVMSetOperand(inst, LLVM.API.LLVMGetNumOperands(inst)-1, lfn)
+                end
+            end
+            for (i, arg) ∈ enumerate(LLVM.operands(inst))
+                if occursin("inttoptr", string(arg)) && arg isa LLVM.ConstantExpr
+                    op1 = LLVM.Value(LLVM.API.LLVMGetOperand(arg, 0))
+                    ptr = Ptr{Cvoid}(convert(Int, op1))
 
+                    val = unsafe_pointer_to_objref(ptr) 
+                    gv_name = GPUCompiler.safe_name(String(gensym(repr(Core.Typeof(val)))))
+                    
+                    gv = LLVM.GlobalVariable(mod, jl_t, gv_name)
+                    LLVM.extinit!(gv, true)
+                    LLVM.API.LLVMSetOperand(inst, i-1, gv)
+
+                    d[gv_name] = val
                     
                 end
             end
-            
         end
     end
     d
