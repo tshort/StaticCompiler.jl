@@ -209,7 +209,7 @@ GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:Any,StaticCompilerParams}
 function native_job(@nospecialize(func), @nospecialize(types); kernel::Bool=false, name=GPUCompiler.safe_name(repr(func)), kwargs...)
     source = GPUCompiler.FunctionSpec(func, Base.to_tuple_type(types), kernel, name)
     target = NativeCompilerTarget()
-    params = TestCompilerParams()
+    params = StaticCompilerParams()
     GPUCompiler.CompilerJob(target, source, params), kwargs
 end
 
