@@ -12,6 +12,7 @@ addprocs(1)
 
 remote_load_call(path, args...) = fetch(@spawnat 2 load_function(path)(args...))
 
+
 @testset "Basics" begin
 
     simple_sum(x) = x + one(typeof(x))
@@ -121,6 +122,31 @@ end
     @test remote_load_call(path, 5) == [1.0, 4.0, 9.0, 16.0, 25.0]
 end
 
+# This is also a good test of loading and storing from the same object
+@testset "Load & Store Same object" begin
+    global const x = Ref(0)
+    counter() = x[] += 1
+    _, path = compile(counter, ())
+    @spawnat 2 global counter = load_function(path)
+    @test fetch(@spawnat 2 counter()) == 1
+    @test fetch(@spawnat 2 counter()) == 2
+end
+
+# This is also a good test of loading and storing from the same object
+counter = let x = Ref(0)
+    () -> x[] += 1
+end
+@testset "Closures" begin
+    #this currently segfaults during compilation
+    @test_skip begin
+        _, path = compile(counter, ())
+        @spawnat 2 global counter_comp = load_function(path)
+        @test fetch(@spawnat 2 counter_comp()) == 1
+        @test fetch(@spawnat 2 counter_comp()) == 2
+    end
+end
+
+
 # Julia wants to treat Tuple (and other things like it) as plain bits, but LLVM wants to treat it as something with a pointer.
 # We need to be careful to not send, nor receive an unwrapped Tuple to a compiled function.
 # The interface made in `compile` should handle this fine.
@@ -157,9 +183,6 @@ end
     hello_compiled, path = compile(hello, (String,))
     @test remote_load_call(path, "world") == "Hello, world!"
 end
-
-
-
 
 @testset "Hello World" begin
     function hello(N)
