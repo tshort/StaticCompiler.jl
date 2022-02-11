@@ -223,7 +223,7 @@ function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.saf
     mod, meta = GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false)
 
     table = relocation_table!(mod)
-    
+    LLVM.verify(mod)
     obj, _ = GPUCompiler.emit_asm(job, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
     
     open(obj_path, "w") do io

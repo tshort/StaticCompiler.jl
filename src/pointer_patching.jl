@@ -1,6 +1,6 @@
 function relocation_table!(mod)
     i64 = LLVM.IntType(64; ctx=LLVM.context(mod))
-    jl_t = LLVM.PointerType(LLVM.StructType(LLVM.LLVMType[]; ctx=LLVM.context(mod)))
+    # jl_t = LLVM.PointerType(LLVM.PointerType(LLVM.StructType(LLVM.LLVMType[]; ctx=LLVM.context(mod))))
     d = IdDict{Any, Tuple{String, LLVM.GlobalVariable}}()
     
     for func ∈ LLVM.functions(mod), bb ∈ LLVM.blocks(func), inst ∈ LLVM.instructions(bb)
@@ -121,10 +121,12 @@ function relocation_table!(mod)
 end
 
 function get_pointers!(d, mod, inst)
-    jl_t = LLVM.PointerType(LLVM.StructType(LLVM.LLVMType[]; ctx=LLVM.context(mod)))
+    jl_t = LLVM.StructType(LLVM.LLVMType[]; ctx=LLVM.context(mod))
     for (i, arg) ∈ enumerate(LLVM.operands(inst))
         if occursin("inttoptr", string(arg)) && arg isa LLVM.ConstantExpr
+           
             op1 = LLVM.Value(LLVM.API.LLVMGetOperand(arg, 0))
+            
             ptr = Ptr{Cvoid}(convert(Int, op1))
 
             frames = ccall(:jl_lookup_code_address, Any, (Ptr{Cvoid}, Cint,), ptr, 0)
@@ -137,7 +139,7 @@ function get_pointers!(d, mod, inst)
                         LLVM.API.LLVMSetOperand(inst, i-1, gv)
                     else
                         gv_name = GPUCompiler.safe_name(String(gensym(repr(Core.Typeof(val)))))
-                        gv = LLVM.GlobalVariable(mod, jl_t, gv_name)
+                        gv = LLVM.GlobalVariable(mod, llvmeltype(arg), gv_name)
                         LLVM.extinit!(gv, true)
                         LLVM.API.LLVMSetOperand(inst, i-1, gv)
 
@@ -150,6 +152,7 @@ function get_pointers!(d, mod, inst)
         end
     end
 end
+llvmeltype(x::LLVM.Value) = LLVM.LLVMType(LLVM.API.LLVMGetElementType(LLVM.llvmtype(x)))
 
 function absolute_symbols(symbols)
     ref = LLVM.API.LLVMOrcAbsoluteSymbols(symbols, length(symbols))
@@ -167,8 +170,12 @@ function pointer_patching_diff(mod::LLVM.Module, path1=tempname(), path2=tempnam
     
     s2 = string(mod)
     write(path2, s2)
-
-    run(`diff $p1 $p2`)
+    try
+        # this always ends in an error for me for some reason
+        run(`diff $path1 $path2`)
+    catch e;
+        nothing
+    end
 end
 
 
