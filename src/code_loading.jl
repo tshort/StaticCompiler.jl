@@ -12,7 +12,7 @@ struct LazyStaticCompiledFunction{rt, tt}
     path::String
     name::String
     filename::String
-    reloc::Dict{String,Any}
+    reloc::IdDict{Any,String}
 end
 
 function instantiate(p::LazyStaticCompiledFunction{rt, tt}) where {rt, tt}
@@ -24,13 +24,15 @@ function instantiate(p::LazyStaticCompiledFunction{rt, tt}) where {rt, tt}
 
     
     # Set all the uninitialized global variables to point to julia values from the relocation table
-    for (name, val) ∈ p.reloc
+    for (val, name) ∈ p.reloc
         if !ismutable(val)
             # Sometimes Julia embeds functions like `Base.string` into code, and this doesn't have a pointer
-            # so we need to give it one manually, and make sure it doesn't expire.
-            p.reloc[name] = Ref(val)
+            # so we need to give it one manually, and put the ref in the dict to make sure it doesn't expire.
+            delete!(p.reloc, val)
+            val = Ref(val)
+            p.reloc[val] = name
         end
-        address = LLVM.API.LLVMOrcJITTargetAddress(reinterpret(UInt, pointer_from_objref(p.reloc[name])))
+        address = LLVM.API.LLVMOrcJITTargetAddress(reinterpret(UInt, pointer_from_objref(val)))
 
         symbol = LLVM.API.LLVMJITEvaluatedSymbol(address, flags)
         gv = LLVM.API.LLVMJITCSymbolMapPair(LLVM.mangle(lljit, name), symbol)
@@ -56,7 +58,7 @@ struct StaticCompiledFunction{rt, tt}
     f::Symbol
     ptr::Ptr{Nothing}
     jit::LLVM.LLJIT
-    reloc::Dict{String, Any}
+    reloc::IdDict{Any, String}
 end
 
 function Base.show(io::IO, f::StaticCompiledFunction{rt, tt}) where {rt, tt}
@@ -69,7 +71,7 @@ function (f::StaticCompiledFunction{rt, tt})(args...) where {rt, tt}
     out = RefValue{rt}()
     refargs = Ref(args)
     ccall(f.ptr, Nothing, (Ptr{rt}, Ref{tt}), pointer_from_objref(out), refargs)
-    out[]
+    out[]    
 end
 
 instantiate(f::StaticCompiledFunction) = f
