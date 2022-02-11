@@ -31,8 +31,9 @@ module StaticRuntime
 end
 
 struct StaticCompilerParams <: GPUCompiler.AbstractCompilerParams end
-GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:Any,StaticCompilerParams}) = StaticRuntime
 
+GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:Any,StaticCompilerParams}) = StaticRuntime
+GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{NativeCompilerTarget}) = true
 
 function native_job(@nospecialize(func), @nospecialize(types); kernel::Bool=false, name=GPUCompiler.safe_name(repr(func)), kwargs...)
     source = GPUCompiler.FunctionSpec(func, Base.to_tuple_type(types), kernel, name)

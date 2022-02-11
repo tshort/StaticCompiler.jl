@@ -1,7 +1,7 @@
 function relocation_table!(mod)
     i64 = LLVM.IntType(64; ctx=LLVM.context(mod))
     jl_t = LLVM.PointerType(LLVM.StructType(LLVM.LLVMType[]; ctx=LLVM.context(mod)))
-    d = IdDict{Any, String}()
+    d = IdDict{Any, Tuple{String, LLVM.GlobalVariable}}()
     
     for func ∈ LLVM.functions(mod), bb ∈ LLVM.blocks(func), inst ∈ LLVM.instructions(bb)
         if isa(inst, LLVM.LoadInst) && occursin("inttoptr", string(inst)) 
@@ -117,7 +117,7 @@ function relocation_table!(mod)
             get_pointers!(d, mod, inst)
         end
     end
-    d
+    IdDict{Any, String}(val => name for (val, (name, _)) ∈ d)
 end
 
 function get_pointers!(d, mod, inst)
@@ -133,17 +133,15 @@ function get_pointers!(d, mod, inst)
                 if isempty(String(fn)) || fn == :jl_system_image_data
                     val = unsafe_pointer_to_objref(ptr)                    
                     if val ∈ keys(d)
-                        gv_name = d[val]
-
-                        gv = LLVM.GlobalVariable(mod, jl_t, gv_name)
+                        _, gv = d[val]
                         LLVM.API.LLVMSetOperand(inst, i-1, gv)
                     else
                         gv_name = GPUCompiler.safe_name(String(gensym(repr(Core.Typeof(val)))))
                         gv = LLVM.GlobalVariable(mod, jl_t, gv_name)
                         LLVM.extinit!(gv, true)
                         LLVM.API.LLVMSetOperand(inst, i-1, gv)
-                        
-                        d[val] = gv_name
+
+                        d[val] = (gv_name, gv)
                     end
                 else
                     @warn "Found data we don't know how to relocate." frames
