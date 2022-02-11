@@ -146,6 +146,14 @@ end
     end
 end
 
+@testset "Error handing" begin
+    # Doesn't work yet. Probably need the slow ABI :(
+    @test_skip begin
+        _, sqrt_path = compile(sqrt, (Int,))
+        @test_throws DomainError remote_load_call(sqrt_path, -1)
+    end
+end
+
 
 # Julia wants to treat Tuple (and other things like it) as plain bits, but LLVM wants to treat it as something with a pointer.
 # We need to be careful to not send, nor receive an unwrapped Tuple to a compiled function.
