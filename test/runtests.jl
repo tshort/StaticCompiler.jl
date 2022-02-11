@@ -6,9 +6,10 @@ using LoopVectorization
 using ManualMemory
 using StrideArraysCore
 using Distributed
+using ErrorTypes
 
 addprocs(1)
-@everywhere using StaticCompiler
+@everywhere using StaticCompiler, ErrorTypes
 
 remote_load_call(path, args...) = fetch(@spawnat 2 load_function(path)(args...))
 
@@ -146,12 +147,25 @@ end
     end
 end
 
-@testset "Error handing" begin
+@testset "Error handling" begin
     # Doesn't work yet. Probably need the slow ABI :(
     @test_skip begin
         _, sqrt_path = compile(sqrt, (Int,))
         @test_throws DomainError remote_load_call(sqrt_path, -1)
     end
+end
+
+
+@testset "ErrorTypes handling" begin
+    function try_sqrt(x) :: Result{Float64, Nothing}
+        if x >= 0.0
+            Ok(sqrt(x))
+        else
+            Err(nothing)
+        end
+    end
+    _, sqrt_path = compile(try_sqrt, (Int,))
+    @test remote_load_call(sqrt_path, -1) == none(Float64)
 end
 
 
