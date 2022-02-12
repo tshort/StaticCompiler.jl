@@ -223,11 +223,22 @@ function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.saf
 
     job, kwargs = native_job(f, tt; name, kwargs...)
     mod, meta = GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false)
-    table = relocation_table!(mod)
 
+
+    
     triple = GPUCompiler.llvm_triple(job.target)
     tm = GPUCompiler.llvm_machine(job.target)
-    opt_level = 2
+    opt_level = 3
+    ModulePassManager() do pm
+        addTargetPasses!(pm, tm, triple)
+        ccall(:jl_add_optimization_passes, Cvoid,
+              (LLVM.API.LLVMPassManagerRef, Cint, Cint),
+              pm, opt_level, #=lower_intrinsics=# 0)
+        run!(pm, mod)
+    end
+    
+    table = relocation_table!(mod)
+
     ModulePassManager() do pm
         addTargetPasses!(pm, tm, triple)
         ccall(:jl_add_optimization_passes, Cvoid,
@@ -235,7 +246,7 @@ function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.saf
               pm, opt_level, #=lower_intrinsics=# 1)
         run!(pm, mod)
     end
-    
+
     LLVM.verify(mod)
     obj, _ = GPUCompiler.emit_asm(job, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
     

@@ -5,12 +5,11 @@ using LinearAlgebra
 using LoopVectorization
 using ManualMemory
 using Distributed
-
+using StrideArraysCore
 addprocs(1)
-@everywhere using StaticCompiler, ManualMemory, StrideArraysCore
+@everywhere using StaticCompiler, StrideArraysCore
 
 remote_load_call(path, args...) = fetch(@spawnat 2 load_function(path)(args...))
-
 
 @testset "Basics" begin
 
@@ -205,6 +204,23 @@ end
     @test_skip ccall(generate_shlib_fptr(hello, (Int,)), Int, (Int,), 1) == 1
 end
 
+# This is a trick to get stack allocated arrays inside a function body (so long as they don't escape).
+# This lets us have intermediate, mutable stack allocated arrays inside our
+@testset "Alloca" begin
+    function f(N)
+        # this can hold at most 100 Int values, if you use it for more, you'll segfault
+        buf = ManualMemory.MemoryBuffer{100, Int}(undef)
+        GC.@preserve buf begin
+            # wrap the first N values in a PtrArray
+            arr = PtrArray(pointer(buf), (N,))
+            arr .= 1 # mutate the array to be all 1s
+            sum(arr) # compute the sum. It is very imporatant that no references to arr escape the function body
+        end
+    end
+    _, path = compile(f, (Int,))
+    @test remote_load_call(path, 20) == 20
+end
+
 # I can't beleive this works.
 @testset "LoopVectorization" begin
     function mul!(C, A, B)
@@ -229,23 +245,6 @@ end
 end
 
 
-
-# This is a trick to get stack allocated arrays inside a function body (so long as they don't escape).
-# This lets us have intermediate, mutable stack allocated arrays inside our
-@testset "Alloca" begin
-    function f(N)
-        # this can hold at most 100 Int values, if you use it for more, you'll segfault
-        buf = ManualMemory.MemoryBuffer{100, Int}(undef)
-        GC.@preserve buf begin
-            # wrap the first N values in a PtrArray
-            arr = PtrArray(pointer(buf), (N,))
-            arr .= 1 # mutate the array to be all 1s
-            sum(arr) # compute the sum. It is very imporatant that no references to arr escape the function body
-        end
-    end
-    _, path = compile(f, (Int,))
-    @test remote_load_call(path, 20) == 20
-end
 
 @testset "Standalone Executables" begin
     # Minimal test with no `llvmcall`
