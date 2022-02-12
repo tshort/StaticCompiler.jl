@@ -17,6 +17,7 @@ end
 
 """
     unsafe_pointer_from_objref(x)
+
 Sometimes Julia embeds immutables like `Base.string` into code, and julia
 will error if you call `pointer_from_objref(string)`, claiming that it
 doesn't have a pointer even though that's a lie.
