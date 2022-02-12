@@ -131,14 +131,12 @@ function get_pointers!(d, mod, inst)
             frames = ccall(:jl_lookup_code_address, Any, (Ptr{Cvoid}, Cint,), ptr, 0)
             if length(frames) >= 1
                 fn, file, line, linfo, fromC, inlined = last(frames)
-                if isempty(String(fn)) || fn == :jl_system_image_data
+                if (isempty(String(fn)) && isempty(String(file))) || fn == :jl_system_image_data
                     val = unsafe_pointer_to_objref(ptr)
-                    
                     if val ∈ keys(d)
                         _, gv = d[val]
                         LLVM.API.LLVMSetOperand(inst, i-1, gv)
                     else
-                        
                         gv_name = GPUCompiler.safe_name(String(gensym(repr(Core.Typeof(val)))))
                         gv = LLVM.GlobalVariable(mod, llvmeltype(arg), gv_name, LLVM.addrspace(llvmtype(arg)))
                        
