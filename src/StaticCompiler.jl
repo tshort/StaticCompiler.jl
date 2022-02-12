@@ -102,80 +102,6 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
     (; f = instantiate(lf), path=abspath(path))
 end
 
-
-"""
-```julia
-compile_executable(f, types::Tuple, path::String, name::String=repr(f); filename::String=name, kwargs...)
-```
-Attempt to compile a standalone executable that runs function `f` with a type signature given by the tuple of `types`.
-
-### Examples
-```julia
-julia> using StaticCompiler
-
-julia> function puts(s::Ptr{UInt8}) # Can't use Base.println because it allocates.
-           # Note, this `llvmcall` requires Julia 1.8+
-           Base.llvmcall((\"""
-           ; External declaration of the puts function
-           declare i32 @puts(i8* nocapture) nounwind
-
-           define i32 @main(i8*) {
-           entry:
-               %call = call i32 (i8*) @puts(i8* %0)
-               ret i32 0
-           }
-           \""", "main"), Int32, Tuple{Ptr{UInt8}}, s)
-       end
-puts (generic function with 1 method)
-
-julia> function print_args(argc::Int, argv::Ptr{Ptr{UInt8}})
-           for i=1:argc
-               # Get pointer
-               p = unsafe_load(argv, i)
-               # Print string at pointer location (which fortunately already exists isn't tracked by the GC)
-               puts(p)
-           end
-           return 0
-       end
-
-julia> compile_executable(print_args, (Int, Ptr{Ptr{UInt8}}))
-"/Users/foo/code/StaticCompiler.jl/print_args"
-
-shell> ./print_args 1 2 3 4 Five
-./print_args
-1
-2
-3
-4
-Five
-```
-```julia
-julia> using StaticTools # So you don't have to define `puts` and friends every time
-
-julia> hello() = println(c"Hello, world!") # c"..." makes a stack-allocated StaticString
-
-julia> compile_executable(hello)
-"/Users/foo/code/StaticCompiler.jl/hello"
-
-shell> ./hello
-Hello, world!
-```
-"""
-function compile_executable(f, _tt=(), path::String="./", name=GPUCompiler.safe_name(repr(f)); filename=name, kwargs...)
-    tt = Base.to_tuple_type(_tt)
-    tt == Tuple{} || tt == Tuple{Int, Ptr{Ptr{UInt8}}} || error("input type signature $_tt must be either () or (Int, Ptr{Ptr{UInt8}})")
-
-    rt = only(native_code_typed(f, tt))[2]
-    isconcretetype(rt) || error("$f$_tt did not infer to a concrete type. Got $rt")
-
-    # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
-    # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
-
-    generate_executable(f, tt, path, name, filename; kwargs...)
-
-    joinpath(abspath(path), filename)
-end
-
 """
 ```julia
 generate_shlib(f, tt, path::String, name::String, filenamebase::String="obj"; kwargs...)
@@ -262,6 +188,80 @@ function julia_opt_passes(mod, job; opt_level, lower_intrinsics)
         end
     end
 end
+
+"""
+```julia
+compile_executable(f, types::Tuple, path::String, name::String=repr(f); filename::String=name, kwargs...)
+```
+Attempt to compile a standalone executable that runs function `f` with a type signature given by the tuple of `types`.
+
+### Examples
+```julia
+julia> using StaticCompiler
+
+julia> function puts(s::Ptr{UInt8}) # Can't use Base.println because it allocates.
+           # Note, this `llvmcall` requires Julia 1.8+
+           Base.llvmcall((\"""
+           ; External declaration of the puts function
+           declare i32 @puts(i8* nocapture) nounwind
+
+           define i32 @main(i8*) {
+           entry:
+               %call = call i32 (i8*) @puts(i8* %0)
+               ret i32 0
+           }
+           \""", "main"), Int32, Tuple{Ptr{UInt8}}, s)
+       end
+puts (generic function with 1 method)
+
+julia> function print_args(argc::Int, argv::Ptr{Ptr{UInt8}})
+           for i=1:argc
+               # Get pointer
+               p = unsafe_load(argv, i)
+               # Print string at pointer location (which fortunately already exists isn't tracked by the GC)
+               puts(p)
+           end
+           return 0
+       end
+
+julia> compile_executable(print_args, (Int, Ptr{Ptr{UInt8}}))
+"/Users/foo/code/StaticCompiler.jl/print_args"
+
+shell> ./print_args 1 2 3 4 Five
+./print_args
+1
+2
+3
+4
+Five
+```
+```julia
+julia> using StaticTools # So you don't have to define `puts` and friends every time
+
+julia> hello() = println(c"Hello, world!") # c"..." makes a stack-allocated StaticString
+
+julia> compile_executable(hello)
+"/Users/foo/code/StaticCompiler.jl/hello"
+
+shell> ./hello
+Hello, world!
+```
+"""
+function compile_executable(f, _tt=(), path::String="./", name=GPUCompiler.safe_name(repr(f)); filename=name, kwargs...)
+    tt = Base.to_tuple_type(_tt)
+    tt == Tuple{} || tt == Tuple{Int, Ptr{Ptr{UInt8}}} || error("input type signature $_tt must be either () or (Int, Ptr{Ptr{UInt8}})")
+
+    rt = only(native_code_typed(f, tt))[2]
+    isconcretetype(rt) || error("$f$_tt did not infer to a concrete type. Got $rt")
+
+    # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
+    # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
+
+    generate_executable(f, tt, path, name, filename; kwargs...)
+
+    joinpath(abspath(path), filename)
+end
+
 
 
 function generate_shlib_fptr(f, tt, path::String=tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj"; temp::Bool=true, kwargs...)
