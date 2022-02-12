@@ -1,8 +1,10 @@
 module StaticCompiler
 
 using GPUCompiler: GPUCompiler
-using LLVM: LLVM
-using Libdl: Libdl
+using LLVM
+using LLVM.Interop
+using LLVM: API
+using Libdl: Libdl, dlsym, dlopen
 using Base: RefValue
 using Serialization: serialize, deserialize
 using Clang_jll: clang
@@ -82,6 +84,7 @@ single method (the method determined by `types`).
 function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_name(repr(f)), filename="obj",
                  strip_llvm = false,
                  strip_asm  = true,
+                 opt_level=3,
                  kwargs...)
     tt = Base.to_tuple_type(_tt)
     isconcretetype(tt) || error("input type signature $_tt is not concrete")
@@ -90,7 +93,7 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
     isconcretetype(rt) || error("$f on $_tt did not infer to a concrete type. Got $rt")
     
     f_wrap!(out::Ref, args::Ref{<:Tuple}) = (out[] = f(args[]...); nothing)
-    _, _, table = generate_shlib(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, path, name; strip_llvm, strip_asm, filename, kwargs...)
+    _, _, table = generate_shlib(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, path, name; opt_level, strip_llvm, strip_asm, filename, kwargs...)
     
     lf = LazyStaticCompiledFunction{rt, tt}(Symbol(f), path, name, filename, table)
     cjl_path = joinpath(path, "$filename.cjl")
@@ -99,6 +102,92 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
     (; f = instantiate(lf), path=abspath(path))
 end
 
+"""
+```julia
+generate_shlib(f, tt, path::String, name::String, filenamebase::String="obj"; kwargs...)
+```
+Low level interface for compiling a shared object / dynamically loaded library
+ (`.so` / `.dylib`) for function `f` given a tuple type `tt` characterizing
+the types of the arguments for which the function will be compiled.
+
+See also `StaticCompiler.generate_shlib_fptr`.
+
+### Examples
+```julia
+julia> function test(n)
+           r = 0.0
+           for i=1:n
+               r += log(sqrt(i))
+           end
+           return r/n
+       end
+test (generic function with 1 method)
+
+julia> path, name = StaticCompiler.generate_shlib(test, Tuple{Int64}, "./test")
+("./test", "test")
+
+shell> tree \$path
+./test
+|-- obj.o
+`-- obj.so
+
+0 directories, 2 files
+
+julia> test(100_000)
+5.256496109495593
+
+julia> ccall(StaticCompiler.generate_shlib_fptr(path, name), Float64, (Int64,), 100_000)
+5.256496109495593
+```
+"""
+function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj";
+                        strip_llvm = false,
+                        strip_asm  = true,
+                        opt_level=3,
+                        kwargs...)
+    mkpath(path)
+    obj_path = joinpath(path, "$filenamebase.o")
+    lib_path = joinpath(path, "$filenamebase.$(Libdl.dlext)")
+
+    job, kwargs = native_job(f, tt; name, kwargs...)
+    #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
+    mod, meta = GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false)
+    #use Julia's optimization pass on the LLVM code, but leave intrinsics alone
+    julia_opt_passes(mod, job; opt_level, lower_intrinsics=0)
+    # Scoop up all the pointers in the optimized module, and replace them with unitialized global variables.
+    # table is a dictionary where the keys are julia objects that are needed by the function, and the values
+    # of the dictionary are the names of their associated LLVM GlobalVariable names.
+    table = relocation_table!(mod)
+    # Now that we've removed all the pointers from the code, we can (hopefully) safely lower all the instrinsics
+    julia_opt_passes(mod, job; opt_level, lower_intrinsics=1)
+    # Make sure we didn't make any glaring errors
+    LLVM.verify(mod)
+    # Compile the LLVM module to native code and save it to disk
+    obj, _ = GPUCompiler.emit_asm(job, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
+    open(obj_path, "w") do io
+        write(io, obj)
+    end
+    path, name, table
+end
+
+function julia_opt_passes(mod, job; opt_level, lower_intrinsics)
+    triple = GPUCompiler.llvm_triple(job.target)
+    tm = GPUCompiler.llvm_machine(job.target)
+
+    lib_path = VERSION > v"1.8.0-DEV" ? "libjulia-codegen" :  "libjulia"
+    
+    dlopen(lib_path) do lib
+        opt_func = dlsym(lib, "jl_add_optimization_passes")
+        ModulePassManager() do pm
+            add_library_info!(pm, triple)
+            add_transform_info!(pm, tm)
+            ccall(opt_func, Cvoid,
+                  (LLVM.API.LLVMPassManagerRef, Cint, Cint),
+                  pm, opt_level, lower_intrinsics)
+            run!(pm, mod)
+        end
+    end
+end
 
 """
 ```julia
@@ -173,64 +262,6 @@ function compile_executable(f, _tt=(), path::String="./", name=GPUCompiler.safe_
     joinpath(abspath(path), filename)
 end
 
-"""
-```julia
-generate_shlib(f, tt, path::String, name::String, filenamebase::String="obj"; kwargs...)
-```
-Low level interface for compiling a shared object / dynamically loaded library
- (`.so` / `.dylib`) for function `f` given a tuple type `tt` characterizing
-the types of the arguments for which the function will be compiled.
-
-See also `StaticCompiler.generate_shlib_fptr`.
-
-### Examples
-```julia
-julia> function test(n)
-           r = 0.0
-           for i=1:n
-               r += log(sqrt(i))
-           end
-           return r/n
-       end
-test (generic function with 1 method)
-
-julia> path, name = StaticCompiler.generate_shlib(test, Tuple{Int64}, "./test")
-("./test", "test")
-
-shell> tree \$path
-./test
-|-- obj.o
-`-- obj.so
-
-0 directories, 2 files
-
-julia> test(100_000)
-5.256496109495593
-
-julia> ccall(StaticCompiler.generate_shlib_fptr(path, name), Float64, (Int64,), 100_000)
-5.256496109495593
-```
-"""
-function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj";
-                        strip_llvm = false,
-                        strip_asm  = true,
-                        kwargs...)
-    mkpath(path)
-    obj_path = joinpath(path, "$filenamebase.o")
-    lib_path = joinpath(path, "$filenamebase.$(Libdl.dlext)")
-
-    job, kwargs = native_job(f, tt; name, kwargs...)
-    mod, meta = GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false)
-
-    table = relocation_table!(mod)
-    
-    obj, _ = GPUCompiler.emit_asm(job, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
-    
-    open(obj_path, "w") do io
-        write(io, obj)
-    end
-    path, name, table
-end
 
 
 function generate_shlib_fptr(f, tt, path::String=tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj"; temp::Bool=true, kwargs...)

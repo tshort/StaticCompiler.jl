@@ -15,6 +15,15 @@ struct LazyStaticCompiledFunction{rt, tt}
     reloc::IdDict{Any,String}
 end
 
+"""
+    unsafe_pointer_from_objref(x)
+
+Sometimes Julia embeds immutables like `Base.string` into code, and julia
+will error if you call `pointer_from_objref(string)`, claiming that it
+doesn't have a pointer even though that's a lie.
+"""
+unsafe_pointer_from_objref(x) = ccall(:jl_value_ptr, Ptr{Cvoid}, (Any,), x)
+
 function instantiate(p::LazyStaticCompiledFunction{rt, tt}) where {rt, tt}
     # LLVM.load_library_permantly(dirname(Libdl.dlpath(Libdl.dlopen("libjulia"))))
     lljit = LLVM.LLJIT(;tm=LLVM.JITTargetMachine())
@@ -25,14 +34,7 @@ function instantiate(p::LazyStaticCompiledFunction{rt, tt}) where {rt, tt}
     
     # Set all the uninitialized global variables to point to julia values from the relocation table
     for (val, name) ∈ p.reloc
-        if !ismutable(val)
-            # Sometimes Julia embeds functions like `Base.string` into code, and this doesn't have a pointer
-            # so we need to give it one manually, and put the ref in the dict to make sure it doesn't expire.
-            delete!(p.reloc, val)
-            val = Ref(val)
-            p.reloc[val] = name
-        end
-        address = LLVM.API.LLVMOrcJITTargetAddress(reinterpret(UInt, pointer_from_objref(val)))
+        address = LLVM.API.LLVMOrcJITTargetAddress(reinterpret(UInt, unsafe_pointer_from_objref(val)))
 
         symbol = LLVM.API.LLVMJITEvaluatedSymbol(address, flags)
         gv = LLVM.API.LLVMJITCSymbolMapPair(LLVM.mangle(lljit, name), symbol)
@@ -53,6 +55,12 @@ function instantiate(p::LazyStaticCompiledFunction{rt, tt}) where {rt, tt}
     
     StaticCompiledFunction{rt, tt}(p.f, fptr, lljit, p.reloc)
 end
+
+function absolute_symbols(symbols)
+    ref = LLVM.API.LLVMOrcAbsoluteSymbols(symbols, length(symbols))
+    LLVM.MaterializationUnit(ref)
+end
+
 
 struct StaticCompiledFunction{rt, tt}
     f::Symbol
