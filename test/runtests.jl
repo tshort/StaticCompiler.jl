@@ -4,11 +4,10 @@ using Libdl
 using LinearAlgebra
 using LoopVectorization
 using ManualMemory
-using StrideArraysCore
 using Distributed
 
 addprocs(1)
-@everywhere using StaticCompiler
+@everywhere using StaticCompiler, ManualMemory, StrideArraysCore
 
 remote_load_call(path, args...) = fetch(@spawnat 2 load_function(path)(args...))
 
