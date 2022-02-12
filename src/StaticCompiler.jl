@@ -224,17 +224,20 @@ function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.saf
     lib_path = joinpath(path, "$filenamebase.$(Libdl.dlext)")
 
     job, kwargs = native_job(f, tt; name, kwargs...)
+    #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
     mod, meta = GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false)
-
+    #use Julia's optimization pass on the LLVM code, but leave intrinsics alone
     julia_opt_passes(mod, job; opt_level, lower_intrinsics=0)
-    
+    # Scoop up all the pointers in the optimized module, and replace them with unitialized global variables.
+    # table is a dictionary where the keys are julia objects that are needed by the function, and the values
+    # of the dictionary are the names of their associated LLVM GlobalVariable names.
     table = relocation_table!(mod)
-
+    # Now that we've removed all the pointers from the code, we can (hopefully) safely lower all the instrinsics
     julia_opt_passes(mod, job; opt_level, lower_intrinsics=1)
-
+    # Make sure we didn't make any glaring errors
     LLVM.verify(mod)
+    # Compile the LLVM module to native code and save it to disk
     obj, _ = GPUCompiler.emit_asm(job, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
-    
     open(obj_path, "w") do io
         write(io, obj)
     end
