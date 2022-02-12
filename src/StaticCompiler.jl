@@ -246,23 +246,18 @@ function julia_opt_passes(mod, job; opt_level, lower_intrinsics)
     tm = GPUCompiler.llvm_machine(job.target)
 
     lib_path = VERSION > v"1.8.0-DEV" ? "libjulia-codegen" :  "libjulia"
- 
+    
     dlopen(lib_path) do lib
         opt_func = dlsym(lib, "jl_add_optimization_passes")
         ModulePassManager() do pm
-            addTargetPasses!(pm, tm, triple)
+            add_library_info!(pm, triple)
+            add_transform_info!(pm, tm)
             ccall(opt_func, Cvoid,
                   (LLVM.API.LLVMPassManagerRef, Cint, Cint),
                   pm, opt_level, lower_intrinsics)
             run!(pm, mod)
         end
     end
-end
-
-
-function addTargetPasses!(pm, tm, triple)
-    add_library_info!(pm, triple)
-    add_transform_info!(pm, tm)
 end
 
 
