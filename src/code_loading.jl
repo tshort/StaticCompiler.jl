@@ -55,6 +55,12 @@ function instantiate(p::LazyStaticCompiledFunction{rt, tt}) where {rt, tt}
     StaticCompiledFunction{rt, tt}(p.f, fptr, lljit, p.reloc)
 end
 
+function absolute_symbols(symbols)
+    ref = LLVM.API.LLVMOrcAbsoluteSymbols(symbols, length(symbols))
+    LLVM.MaterializationUnit(ref)
+end
+
+
 struct StaticCompiledFunction{rt, tt}
     f::Symbol
     ptr::Ptr{Nothing}

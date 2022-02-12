@@ -19,11 +19,9 @@ end
 GPUCompiler.runtime_slug(job::GPUCompiler.CompilerJob{NativeCompilerTarget}) = "native_$(job.target.cpu)-$(hash(job.target.features))"
 
 module StaticRuntime
-    # dummy methods
+    # the runtime library
     signal_exception() = return
-    # HACK: if malloc returns 0 or traps, all calling functions (like jl_box_*)
-    #       get reduced to a trap, which really messes with our test suite.
-    malloc(sz) = Ptr{Cvoid}(Int(0xDEADBEEF))
+    malloc(sz) = ccall("extern malloc", llvmcall, Csize_t, (Csize_t,), sz)
     report_oom(sz) = return
     report_exception(ex) = return
     report_exception_name(ex) = return
@@ -33,6 +31,11 @@ end
 struct StaticCompilerParams <: GPUCompiler.AbstractCompilerParams end
 
 GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:Any,StaticCompilerParams}) = StaticRuntime
+GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{NativeCompilerTarget}) = StaticRuntime
+GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{NativeCompilerTarget, StaticCompilerParams}) = StaticRuntime
+
+GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:Any,StaticCompilerParams}) = true
+GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{NativeCompilerTarget, StaticCompilerParams}) = true
 GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{NativeCompilerTarget}) = true
 
 function native_job(@nospecialize(func), @nospecialize(types); kernel::Bool=false, name=GPUCompiler.safe_name(repr(func)), kwargs...)

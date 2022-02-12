@@ -6,10 +6,9 @@ using LoopVectorization
 using ManualMemory
 using StrideArraysCore
 using Distributed
-using ErrorTypes
 
 addprocs(1)
-@everywhere using StaticCompiler, ErrorTypes
+@everywhere using StaticCompiler
 
 remote_load_call(path, args...) = fetch(@spawnat 2 load_function(path)(args...))
 
@@ -147,27 +146,18 @@ end
     end
 end
 
+
 @testset "Error handling" begin
-    # Doesn't work yet. Probably need the slow ABI :(
-    @test_skip begin
-        _, sqrt_path = compile(sqrt, (Int,))
-        @test_throws DomainError remote_load_call(sqrt_path, -1)
-    end
-end
-
-
-@testset "ErrorTypes handling" begin
-    function try_sqrt(x) :: Result{Float64, Nothing}
-        if x >= 0.0
-            Ok(sqrt(x))
-        else
-            Err(nothing)
+    _, path = compile(sqrt, (Int,))
+    tsk = @spawnat 2 begin
+        try
+            load_function(path)(-1)
+        catch e;
+            e
         end
     end
-    _, sqrt_path = compile(try_sqrt, (Int,))
-    @test remote_load_call(sqrt_path, -1) == none(Float64)
+    @test fetch(tsk) isa DomainError 
 end
-
 
 # Julia wants to treat Tuple (and other things like it) as plain bits, but LLVM wants to treat it as something with a pointer.
 # We need to be careful to not send, nor receive an unwrapped Tuple to a compiled function.
