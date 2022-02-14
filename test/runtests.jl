@@ -176,12 +176,16 @@ end
     end
     a = [1.0, 2.0]
     
-    # This used to work within a session, but now that I'm doing pointer relocation a bit better,
-    # it's chocking on the `BLAS` pointer call. I'm not sure yet how to relocate this properly.
+    mydot_compiled, path = compile(mydot, (Vector{Float64},))
+    # Works locally for me, but not on CI. Need some improvements to pointer relocation to be robust.
+    @test_skip remote_load_call(path, a) == 5.0
+    @test mydot_compiled(a) ≈ 5.0
+
+    # This will need some more work apparently
     @test_skip begin
-        mydot_compiled, path = compile(mydot, (Vector{Float64},))
-        @test remote_load_call(path, a) == 5.0
-        @test mydot_compiled(a) == 5.0
+        _, path = compile((*), (Matrix{Float64}, Matrix{Float64}))
+        A, B = rand(10, 11), rand(11, 12)
+        @test remote_load_call(path, A, B) ≈ A * B
     end
 end
 
@@ -199,9 +203,11 @@ end
         println("Hello World $N")
         N
     end
-    # How do I test this?
-    # Also ... this segfaults
-    @test_skip ccall(generate_shlib_fptr(hello, (Int,)), Int, (Int,), 1) == 1
+    # We'll need to be able to relocate a bunch of UV stuff for this, and deal with dynamic dispatch.
+    @test_skip begin
+        hello_compiled, path = compile(hello, (Int,))
+        @test_skip remote_load_call(path, 1) == 1
+    end
 end
 
 # This is a trick to get stack allocated arrays inside a function body (so long as they don't escape).
