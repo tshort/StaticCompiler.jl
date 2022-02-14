@@ -178,7 +178,13 @@ end
     
     mydot_compiled, path = compile(mydot, (Vector{Float64},))
     @test remote_load_call(path, a) == 5.0
-    @test mydot_compiled(a) == 5.0
+
+    # This will need some more work apparently
+    @test_skip begin
+        _, path = compile((*), (Matrix{Float64}, Matrix{Float64}))
+        A, B = rand(10, 11), rand(11, 12)
+        @test remote_load_call(path, A, B) ≈ A * B
+    end
 end
 
 
