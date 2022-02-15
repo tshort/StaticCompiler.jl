@@ -93,10 +93,10 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
 
     rt = only(native_code_typed(f, tt))[2]
     isconcretetype(rt) || error("$f on $_tt did not infer to a concrete type. Got $rt")
-    
+
     f_wrap!(out::Ref, args::Ref{<:Tuple}) = (out[] = f(args[]...); nothing)
     _, _, table = generate_shlib(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, path, name; opt_level, strip_llvm, strip_asm, filename, kwargs...)
-    
+
     lf = LazyStaticCompiledFunction{rt, tt}(Symbol(f), path, name, filename, table)
     cjl_path = joinpath(path, "$filename.cjl")
     serialize(cjl_path, lf)
@@ -154,23 +154,23 @@ function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.saf
     job, kwargs = native_job(f, tt; name, kwargs...)
     #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
     mod, meta = GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false)
-    
+
     # Use Enzyme's annotation and optimization pipeline
     annotate!(mod)
     optimize!(mod, tm)
-    
+
     # Scoop up all the pointers in the optimized module, and replace them with unitialized global variables.
     # `table` is a dictionary where the keys are julia objects that are needed by the function, and the values
     # of the dictionary are the names of their associated LLVM GlobalVariable names.
     table = relocation_table!(mod)
-    
+
     # Now that we've removed all the pointers from the code, we can (hopefully) safely lower all the instrinsics
     # (again, using Enzyme's pipeline)
     post_optimize!(mod, tm)
-    
+
     # Make sure we didn't make any glaring errors
     LLVM.verify(mod)
-    
+
     # Compile the LLVM module to native code and save it to disk
     obj, _ = GPUCompiler.emit_asm(job, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
     open(obj_path, "w") do io
@@ -334,35 +334,36 @@ function generate_executable(f, tt, path::String = tempname(), name = GPUCompile
     mkpath(path)
     obj_path = joinpath(path, "$filename.o")
     exec_path = joinpath(path, filename)
+    job, kwargs = native_job(f, tt; name, kwargs...)
+    obj, _ = GPUCompiler.codegen(:obj, job; strip=true, only_entry=false, validate=false)
+
+    # Write to file
     open(obj_path, "w") do io
-        job, kwargs = native_job(f, tt; name, kwargs...)
-        obj, _ = GPUCompiler.codegen(:obj, job; strip=true, only_entry=false, validate=false)
-
         write(io, obj)
-        flush(io)
-
-        # Pick a compiler
-        cc = Sys.isapple() ? `cc` : clang()
-        # Compile!
-        if Sys.isapple()
-            # Apple no longer uses _start, so we can just specify a custom entry
-            entry = "_julia_$name"
-            run(`$cc -e $entry $obj_path -o $exec_path`)
-        else
-            # Write a minimal wrapper to avoid having to specify a custom entry
-            wrapper_path = joinpath(path, "wrapper.c")
-            f = open(wrapper_path, "w")
-            print(f, """int main(int argc, char** argv)
-            {
-                julia_$name(argc, argv);
-                return 0;
-            }""")
-            close(f)
-            run(`$cc $wrapper_path $obj_path -o $exec_path`)
-            # Clean up
-            run(`rm $wrapper_path`)
-        end
     end
+
+    # Pick a compiler
+    cc = Sys.isapple() ? `cc` : clang()
+    # Compile!
+    if Sys.isapple()
+        # Apple no longer uses _start, so we can just specify a custom entry
+        entry = "_julia_$name"
+        run(`$cc -e $entry $obj_path -o $exec_path`)
+    else
+        # Write a minimal wrapper to avoid having to specify a custom entry
+        wrapper_path = joinpath(path, "wrapper.c")
+        f = open(wrapper_path, "w")
+        print(f, """int main(int argc, char** argv)
+        {
+            julia_$name(argc, argv);
+            return 0;
+        }""")
+        close(f)
+        run(`$cc $wrapper_path $obj_path -o $exec_path`)
+        # Clean up
+        run(`rm $wrapper_path`)
+    end
+
     path, name
 end
 
