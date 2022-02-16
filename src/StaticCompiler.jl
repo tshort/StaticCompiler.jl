@@ -95,7 +95,7 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
     isconcretetype(rt) || error("$f on $_tt did not infer to a concrete type. Got $rt")
 
     f_wrap!(out::Ref, args::Ref{<:Tuple}) = (out[] = f(args[]...); nothing)
-    _, _, table = generate_shlib(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, path, name; opt_level, strip_llvm, strip_asm, filename, kwargs...)
+    _, _, table = generate_obj(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, path, name; opt_level, strip_llvm, strip_asm, filename, kwargs...)
 
     lf = LazyStaticCompiledFunction{rt, tt}(Symbol(f), path, name, filename, table)
     cjl_path = joinpath(path, "$filename.cjl")
@@ -106,43 +106,32 @@ end
 
 """
 ```julia
-generate_shlib(f, tt, path::String, name::String, filenamebase::String="obj"; kwargs...)
+generate_obj(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj";
+            \tstrip_llvm = false,
+            \tstrip_asm  = true,
+            \topt_level=3,
+            \tkwargs...)
 ```
-Low level interface for compiling a shared object / dynamically loaded library
- (`.so` / `.dylib`) for function `f` given a tuple type `tt` characterizing
-the types of the arguments for which the function will be compiled.
-
-See also `StaticCompiler.generate_shlib_fptr`.
+Low level interface for compiling object code (`.o`) for for function `f` given
+a tuple type `tt` characterizing the types of the arguments for which the
+function will be compiled.
 
 ### Examples
 ```julia
-julia> function test(n)
-           r = 0.0
-           for i=1:n
-               r += log(sqrt(i))
-           end
-           return r/n
-       end
-test (generic function with 1 method)
+julia> fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
+fib (generic function with 1 method)
 
-julia> path, name = StaticCompiler.generate_shlib(test, Tuple{Int64}, "./test")
-("./test", "test")
+julia> path, name, table = StaticCompiler.generate_obj(fib, Tuple{Int64}, "./test")
+("./test", "fib", IdDict{Any, String}())
 
-shell> tree \$path
+shell> tree $path
 ./test
-|-- obj.o
-`-- obj.so
+└── obj.o
 
-0 directories, 2 files
-
-julia> test(100_000)
-5.256496109495593
-
-julia> ccall(StaticCompiler.generate_shlib_fptr(path, name), Float64, (Int64,), 100_000)
-5.256496109495593
+0 directories, 1 file
 ```
 """
-function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj";
+function generate_obj(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj";
                         strip_llvm = false,
                         strip_asm  = true,
                         opt_level=3,
