@@ -238,17 +238,15 @@ end
     @test C ≈ A*B
 end
 
-# Call binaries for testing
-# @testset "Standalone Dylibs" begin
-#     fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
-#     libname = tempname()
-#     generate_dylib(fib, (Int,), libname)
-#     ptr = Libdl.dlopen(libname * "." * Libdl.dlext, Libdl.RTLD_LOCAL)
-#     fptr = Libdl.dlsym(ptr, "julia_fib")
-#     @assert fptr != C_NULL
-#     # This works on REPL
-#     @test_skip ccall(fptr, Int, (Int,), 10) == 55
-# end
+@testset "Standalone Dylibs" begin
+    fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
+    path, name = StaticCompiler.generate_dylib(fib, (Int,), "./")
+    ptr = Libdl.dlopen(name * "." * Libdl.dlext, Libdl.RTLD_LOCAL)
+    fptr = Libdl.dlsym(ptr, "julia_$name")
+    @assert fptr != C_NULL
+    # This works on REPL
+    @test ccall(fptr, Int, (Int,), 10) == 55
+end
 
 
 @testset "Standalone Executables" begin
