@@ -9,7 +9,7 @@ using Base: RefValue
 using Serialization: serialize, deserialize
 using Clang_jll: clang
 
-export compile, load_function, compile_executable
+export compile, load_function, compile_dylib, compile_executable
 export native_code_llvm, native_code_typed, native_llvm_module, native_code_native
 
 include("target.jl")
@@ -225,15 +225,15 @@ shell> ./hello
 Hello, world!
 ```
 """
-function compile_executable(f, _tt=(), path::String="./", name=GPUCompiler.safe_name(repr(f));
+function compile_executable(f, types=(), path::String="./", name=GPUCompiler.safe_name(repr(f));
                             filename=name,
                             kwargs...)
 
-    tt = Base.to_tuple_type(_tt)
-    tt == Tuple{} || tt == Tuple{Int, Ptr{Ptr{UInt8}}} || error("input type signature $_tt must be either () or (Int, Ptr{Ptr{UInt8}})")
+    tt = Base.to_tuple_type(types)
+    tt == Tuple{} || tt == Tuple{Int, Ptr{Ptr{UInt8}}} || error("input type signature $types must be either () or (Int, Ptr{Ptr{UInt8}})")
 
     rt = only(native_code_typed(f, tt))[2]
-    isconcretetype(rt) || error("$f$_tt did not infer to a concrete type. Got $rt")
+    isconcretetype(rt) || error("$f$types did not infer to a concrete type. Got $rt")
 
     # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
     # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
@@ -244,6 +244,29 @@ function compile_executable(f, _tt=(), path::String="./", name=GPUCompiler.safe_
 end
 
 
+"""
+```julia
+compile_dylib(f, types::Tuple, path::String, name::String=repr(f); filename::String=name, kwargs...)
+```
+As `compile_executable`, but compiling to a standalone `.dylib`/`.so` shared library.
+"""
+function compile_dylib(f, types=(), path::String="./", name=GPUCompiler.safe_name(repr(f));
+                        filename=name,
+                        kwargs...)
+
+    tt = Base.to_tuple_type(types)
+    isconcretetype(tt) || error("input type signature $types is not concrete")
+
+    rt = only(native_code_typed(f, tt))[2]
+    isconcretetype(rt) || error("$f$types did not infer to a concrete type. Got $rt")
+
+    # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
+    # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
+
+    generate_dylib(f, tt, path, name, filename; kwargs...)
+
+    joinpath(abspath(path), filename * "." * Libdl.dlext)
+end
 
 function generate_dylib_fptr(f, tt, path::String=tempname(), name = GPUCompiler.safe_name(repr(f)), filename::String=name;
                             temp::Bool=true,

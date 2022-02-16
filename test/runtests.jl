@@ -239,12 +239,19 @@ end
 end
 
 @testset "Standalone Dylibs" begin
-    fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
-    path, name = StaticCompiler.generate_dylib(fib, (Int,), "./")
-    ptr = Libdl.dlopen(name * "." * Libdl.dlext, Libdl.RTLD_LOCAL)
+    # Test function
+    # (already defined)
+    # fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
+
+    #Compile dylib
+    name = repr(fib)
+    filepath = compile_dylib(fib, (Int,), "./", name)
+    @test occursin("fib.$(Libdl.dlext)", filepath)
+
+    # Open dylib
+    ptr = Libdl.dlopen(filepath, Libdl.RTLD_LOCAL)
     fptr = Libdl.dlsym(ptr, "julia_$name")
-    @assert fptr != C_NULL
-    # This works on REPL
+    @test fptr != C_NULL
     @test ccall(fptr, Int, (Int,), 10) == 55
 end
 
