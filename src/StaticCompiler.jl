@@ -149,7 +149,6 @@ function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.saf
                         kwargs...)
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
-    lib_path = joinpath(path, "$filenamebase.$(Libdl.dlext)")
     tm = GPUCompiler.llvm_machine(NativeCompilerTarget())
     job, kwargs = native_job(f, tt; name, kwargs...)
     #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
