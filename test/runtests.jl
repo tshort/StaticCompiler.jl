@@ -245,7 +245,7 @@ end
 
     #Compile dylib
     name = repr(fib)
-    filepath = compile_dylib(fib, (Int,), "./", name)
+    filepath = compile_shlib(fib, (Int,), "./", name)
     @test occursin("fib.$(Libdl.dlext)", filepath)
 
     # Open dylib

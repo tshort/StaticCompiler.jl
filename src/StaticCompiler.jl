@@ -9,7 +9,7 @@ using Base: RefValue
 using Serialization: serialize, deserialize
 using Clang_jll: clang
 
-export compile, load_function, compile_dylib, compile_executable
+export compile, load_function, compile_shlib, compile_executable
 export native_code_llvm, native_code_typed, native_llvm_module, native_code_native
 
 include("target.jl")
@@ -246,11 +246,11 @@ end
 
 """
 ```julia
-compile_dylib(f, types::Tuple, path::String, name::String=repr(f); filename::String=name, kwargs...)
+compile_shlib(f, types::Tuple, path::String, name::String=repr(f); filename::String=name, kwargs...)
 ```
 As `compile_executable`, but compiling to a standalone `.dylib`/`.so` shared library.
 """
-function compile_dylib(f, types=(), path::String="./", name=GPUCompiler.safe_name(repr(f));
+function compile_shlib(f, types=(), path::String="./", name=GPUCompiler.safe_name(repr(f));
                         filename=name,
                         kwargs...)
 
@@ -263,16 +263,16 @@ function compile_dylib(f, types=(), path::String="./", name=GPUCompiler.safe_nam
     # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
     # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
 
-    generate_dylib(f, tt, path, name, filename; kwargs...)
+    generate_shlib(f, tt, path, name, filename; kwargs...)
 
     joinpath(abspath(path), filename * "." * Libdl.dlext)
 end
 
-function generate_dylib_fptr(f, tt, path::String=tempname(), name = GPUCompiler.safe_name(repr(f)), filename::String=name;
+function generate_shlib_fptr(f, tt, path::String=tempname(), name = GPUCompiler.safe_name(repr(f)), filename::String=name;
                             temp::Bool=true,
                             kwargs...)
 
-    generate_dylib(f, tt, path, name; kwargs...)
+    generate_shlib(f, tt, path, name; kwargs...)
     lib_path = joinpath(abspath(path), "$filename.$(Libdl.dlext)")
     ptr = Libdl.dlopen(lib_path, Libdl.RTLD_LOCAL)
     fptr = Libdl.dlsym(ptr, "julia_$name")
@@ -285,13 +285,13 @@ end
 
 """
 ```julia
-generate_dylib_fptr(path::String, name)
+generate_shlib_fptr(path::String, name)
 ```
 Low level interface for obtaining a function pointer by `dlopen`ing a shared
 library given the `path` and `name` of a `.so`/`.dylib` already compiled by
-`generate_dylib`.
+`generate_shlib`.
 
-See also `StaticCompiler.generate_dylib`.
+See also `StaticCompiler.generate_shlib`.
 
 ### Examples
 ```julia
@@ -304,9 +304,9 @@ julia> function test(n)
        end
 test (generic function with 1 method)
 
-julia> path, name = StaticCompiler.generate_dylib(test, Tuple{Int64}, "./test");
+julia> path, name = StaticCompiler.generate_shlib(test, Tuple{Int64}, "./test");
 
-julia> test_ptr = StaticCompiler.generate_dylib_fptr(path, name)
+julia> test_ptr = StaticCompiler.generate_shlib_fptr(path, name)
 Ptr{Nothing} @0x000000015209f600
 
 julia> ccall(test_ptr, Float64, (Int64,), 100_000)
@@ -319,7 +319,7 @@ julia> test(100_000)
 5.256496109495593
 ```
 """
-function generate_dylib_fptr(path::String, name, filename::String=name)
+function generate_shlib_fptr(path::String, name, filename::String=name)
     lib_path = joinpath(abspath(path), "$filename.$(Libdl.dlext)")
     ptr = Libdl.dlopen(lib_path, Libdl.RTLD_LOCAL)
     fptr = Libdl.dlsym(ptr, "julia_$name")
@@ -386,12 +386,12 @@ end
 
 """
 ```julia
-generate_dylib(f, tt, path::String, name::String, filenamebase::String="obj"; kwargs...)
+generate_shlib(f, tt, path::String, name::String, filenamebase::String="obj"; kwargs...)
 ```
 Low level interface for compiling a shared object / dynamically loaded library
  (`.so` / `.dylib`) for function `f` given a tuple type `tt` characterizing
 the types of the arguments for which the function will be compiled.
-See also `StaticCompiler.generate_dylib_fptr`.
+See also `StaticCompiler.generate_shlib_fptr`.
 ### Examples
 ```julia
 julia> function test(n)
@@ -402,7 +402,7 @@ julia> function test(n)
            return r/n
        end
 test (generic function with 1 method)
-julia> path, name = StaticCompiler.generate_dylib(test, Tuple{Int64}, "./test")
+julia> path, name = StaticCompiler.generate_shlib(test, Tuple{Int64}, "./test")
 ("./test", "test")
 shell> tree \$path
 ./test
@@ -411,11 +411,11 @@ shell> tree \$path
 0 directories, 2 files
 julia> test(100_000)
 5.256496109495593
-julia> ccall(StaticCompiler.generate_dylib_fptr(path, name), Float64, (Int64,), 100_000)
+julia> ccall(StaticCompiler.generate_shlib_fptr(path, name), Float64, (Int64,), 100_000)
 5.256496109495593
 ```
 """
-function generate_dylib(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filename::String=name; kwargs...)
+function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filename::String=name; kwargs...)
     mkpath(path)
     obj_path = joinpath(path, "$filename.o")
     lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
