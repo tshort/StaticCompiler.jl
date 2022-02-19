@@ -38,18 +38,6 @@ fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2) # This needs to be defined globall
     #@test compile(fib2, (Int,))[1](20) == fib(20)
 end
 
-# Call binaries for testing
-# @testset "Generate binary" begin
-#     fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
-#     libname = tempname()
-#     generate_shlib(fib, (Int,), libname)
-#     ptr = Libdl.dlopen(libname * "." * Libdl.dlext, Libdl.RTLD_LOCAL)
-#     fptr = Libdl.dlsym(ptr, "julia_fib")
-#     @assert fptr != C_NULL
-#     # This works on REPL
-#     @test_skip ccall(fptr, Int, (Int,), 10) == 55
-# end
-
 
 @testset "Loops" begin
     function sum_first_N_int(N)
@@ -154,7 +142,7 @@ end
             e
         end
     end
-    @test fetch(tsk) isa DomainError 
+    @test fetch(tsk) isa DomainError
 end
 
 # Julia wants to treat Tuple (and other things like it) as plain bits, but LLVM wants to treat it as something with a pointer.
@@ -175,7 +163,7 @@ end
         BLAS.dot(N, a, 1, a, 1)
     end
     a = [1.0, 2.0]
-    
+
     mydot_compiled, path = compile(mydot, (Vector{Float64},))
     # Works locally for me, but not on CI. Need some improvements to pointer relocation to be robust.
     @test_skip remote_load_call(path, a) == 5.0
@@ -250,6 +238,22 @@ end
     @test C ≈ A*B
 end
 
+@testset "Standalone Dylibs" begin
+    # Test function
+    # (already defined)
+    # fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
+
+    #Compile dylib
+    name = repr(fib)
+    filepath = compile_shlib(fib, (Int,), "./", name)
+    @test occursin("fib.$(Libdl.dlext)", filepath)
+
+    # Open dylib
+    ptr = Libdl.dlopen(filepath, Libdl.RTLD_LOCAL)
+    fptr = Libdl.dlsym(ptr, "julia_$name")
+    @test fptr != C_NULL
+    @test ccall(fptr, Int, (Int,), 10) == 55
+end
 
 
 @testset "Standalone Executables" begin
