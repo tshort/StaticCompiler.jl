@@ -9,7 +9,7 @@ This is an experimental package to compile Julia code to standalone libraries. A
 
 ```julia
 using Pkg
-Pkg.add(PackageSpec( url = "https://github.com/tshort/StaticCompiler.jl", rev = "master"))
+Pkg.add("StaticCompiler")
 ```
 
 ```julia
