@@ -49,7 +49,6 @@ function instantiate(p::LazyStaticCompiledFunction{rt, tt}) where {rt, tt}
     prefix = LLVM.get_prefix(lljit)
     dg = LLVM.CreateDynamicLibrarySearchGeneratorForProcess(prefix)
     LLVM.add!(jd, dg)
-    
     LLVM.add!(lljit, jd, ofile)
     fptr = pointer(LLVM.lookup(lljit, "julia_" * p.name))
     

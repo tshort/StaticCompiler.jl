@@ -8,6 +8,7 @@ using Libdl: Libdl, dlsym, dlopen
 using Base: RefValue
 using Serialization: serialize, deserialize
 using Clang_jll: clang
+using Infiltrator
 
 export compile, load_function, compile_shlib, compile_executable
 export native_code_llvm, native_code_typed, native_llvm_module, native_code_native
@@ -16,6 +17,7 @@ include("target.jl")
 include("pointer_patching.jl")
 include("code_loading.jl")
 include("optimize.jl")
+include("mixtape.jl")
 
 
 """
@@ -83,7 +85,7 @@ with `load_function(path)`. `LazyStaticcompiledfunction`s contain the requisite 
 `StaticCompiledFunction` and may be called with arguments of type `types` as if it were a function with a
 single method (the method determined by `types`).
 """
-function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_name(repr(f)), filename="obj",
+function compile(f, _tt, ctx = NoContext(), path::String = tempname();  name = GPUCompiler.safe_name(repr(f)), filename="obj",
                  strip_llvm = false,
                  strip_asm  = true,
                  opt_level=3,
@@ -95,7 +97,7 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
     isconcretetype(rt) || error("$f on $_tt did not infer to a concrete type. Got $rt")
 
     f_wrap!(out::Ref, args::Ref{<:Tuple}) = (out[] = f(args[]...); nothing)
-    _, _, table = generate_obj(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, path, name; opt_level, strip_llvm, strip_asm, filename, kwargs...)
+    _, _, table = generate_obj(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, ctx, path, name; opt_level, strip_llvm, strip_asm, filename, kwargs...)
 
     lf = LazyStaticCompiledFunction{rt, tt}(Symbol(f), path, name, filename, table)
     cjl_path = joinpath(path, "$filename.cjl")
@@ -131,7 +133,7 @@ shell> tree \$path
 0 directories, 1 file
 ```
 """
-function generate_obj(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj";
+function generate_obj(f, tt, ctx = NoContext(), path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj";
                         strip_llvm = false,
                         strip_asm  = true,
                         opt_level=3,
@@ -139,9 +141,18 @@ function generate_obj(f, tt, path::String = tempname(), name = GPUCompiler.safe_
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
     tm = GPUCompiler.llvm_machine(NativeCompilerTarget())
-    job, kwargs = native_job(f, tt; name, kwargs...)
+    # job, kwargs = native_job(f, tt; name, kwargs...)
     #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
-    mod, meta = GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false)
+    # mod, meta = GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false)
+    job = CompilerJob(MixtapeCompilerTarget(), 
+                      FunctionSpec(f, tt, false, nothing), 
+                      MixtapeCompilerParams(; 
+                                            opt = false, 
+                                            ctx = ctx,
+                                            optlevel = Base.JLOptions().opt_level))
+    GPUCompiler.eval(:(current_job = $job))
+    mod = codegen(job)
+    @exfiltrate
 
     # Use Enzyme's annotation and optimization pipeline
     annotate!(mod)
