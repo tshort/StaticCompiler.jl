@@ -16,8 +16,6 @@ Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 CodeInfoTools = "0.3"
 GPUCompiler = "0.13"
 LLVM = "4.8"
-julia = "1.7"
-CodeInfoTools = "0.3"
 MacroTools = "0.5"
 julia = "1.7"
 
