@@ -17,7 +17,7 @@ CodeInfoTools = "0.3"
 GPUCompiler = "0.13"
 LLVM = "4.8"
 MacroTools = "0.5"
-julia = "1.7"
+julia = "1.7, 1.8"
 
 [extras]
 Formatting = "59287772-0a20-5a39-b81b-1366585eb4c0"

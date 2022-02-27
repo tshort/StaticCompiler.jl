@@ -210,6 +210,9 @@ Core.Compiler.setindex!(a::Dict, b, c) = setindex!(a, b, c)
 Core.Compiler.may_optimize(si::StaticInterpreter) = si.optimize
 Core.Compiler.may_compress(si::StaticInterpreter) = false
 Core.Compiler.may_discard_trees(si::StaticInterpreter) = false
+@static if VERSION >= v"1.7.0-DEV.577"
+    Core.Compiler.verbose_stmt_info(interp::StaticInterpreter) = false
+end
 function Core.Compiler.add_remark!(si::StaticInterpreter, sv::InferenceState, msg)
     push!(si.messages, (sv.linfo, sv.currpc, msg))
 end
