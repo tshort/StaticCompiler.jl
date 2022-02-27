@@ -450,6 +450,37 @@ function codegen(job::CompilerJob)
         @assert llvm_mod_ref != C_NULL
         llvm_mod = LLVM.Module(llvm_mod_ref)
     end
+    code = cache_lookup(si, ssg.entry, world, world)
+    llvm_func_idx = Ref{Int32}(-1)
+    llvm_specfunc_idx = Ref{Int32}(-1)
+    ccall(:jl_get_function_id, 
+          Nothing, 
+          (Ptr{Cvoid}, Any, Ptr{Int32}, Ptr{Int32}),
+          native_code, code, llvm_func_idx, llvm_specfunc_idx)
+    @assert llvm_specfunc_idx[] != -1
+    @assert llvm_func_idx[] != -1
+    llvm_func_ref = ccall(:jl_get_llvm_function, 
+                          LLVM.API.LLVMValueRef,
+                          (Ptr{Cvoid}, UInt32), 
+                          native_code, 
+                          llvm_func_idx[] - 1)
+    @assert llvm_func_ref != C_NULL
+    llvm_func = LLVM.Function(llvm_func_ref)
+    llvm_specfunc_ref = ccall(:jl_get_llvm_function, 
+                              LLVM.API.LLVMValueRef,
+                              (Ptr{Cvoid}, UInt32), 
+                              native_code, 
+                              llvm_specfunc_idx[] - 1)
+    @assert llvm_specfunc_ref != C_NULL
+    llvm_specfunc = LLVM.Function(llvm_specfunc_ref)
+    triple!(llvm_mod, llvm_triple(job.target))
+    if julia_datalayout(job.target) !== nothing
+        datalayout!(llvm_mod, julia_datalayout(job.target))
+    end
+    # rename and process the entry point
+    #             LLVM.name(LLVM.Function(llvm_func_ref))
+    # entry = functions(llvm_mod)[llvm_specfunc]
+    LLVM.name!(llvm_specfunc, GPUCompiler.safe_name(string("julia_", job.source.name)))
     return llvm_mod
 end
 

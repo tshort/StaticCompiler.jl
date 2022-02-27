@@ -8,7 +8,6 @@ using Libdl: Libdl, dlsym, dlopen
 using Base: RefValue
 using Serialization: serialize, deserialize
 using Clang_jll: clang
-using Infiltrator
 
 export compile, load_function, compile_shlib, compile_executable
 export native_code_llvm, native_code_typed, native_llvm_module, native_code_native
@@ -98,6 +97,7 @@ function compile(f, _tt, ctx = NoContext(), path::String = tempname();  name = G
 
     f_wrap!(out::Ref, args::Ref{<:Tuple}) = (out[] = f(args[]...); nothing)
     _, _, table = generate_obj(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, ctx, path, name; opt_level, strip_llvm, strip_asm, filename, kwargs...)
+    # _, _, table = generate_obj(f, tt, ctx, path, name; opt_level, strip_llvm, strip_asm, filename, kwargs...)
 
     lf = LazyStaticCompiledFunction{rt, tt}(Symbol(f), path, name, filename, table)
     cjl_path = joinpath(path, "$filename.cjl")
@@ -145,14 +145,13 @@ function generate_obj(f, tt, ctx = NoContext(), path::String = tempname(), name 
     #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
     # mod, meta = GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false)
     job = CompilerJob(MixtapeCompilerTarget(), 
-                      FunctionSpec(f, tt, false, nothing), 
+                      FunctionSpec(f, tt, false, name), 
                       MixtapeCompilerParams(; 
-                                            opt = false, 
+                                            opt = true, 
                                             ctx = ctx,
                                             optlevel = Base.JLOptions().opt_level))
     GPUCompiler.eval(:(current_job = $job))
     mod = codegen(job)
-    @exfiltrate
 
     # Use Enzyme's annotation and optimization pipeline
     annotate!(mod)

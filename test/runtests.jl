@@ -6,6 +6,9 @@ using LoopVectorization
 using ManualMemory
 using Distributed
 using StrideArraysCore
+using CodeInfoTools
+using MacroTools
+
 addprocs(1)
 @everywhere using StaticCompiler, StrideArraysCore
 
@@ -309,6 +312,8 @@ end
 # data structures, dictionaries, tuples, named tuples
 
 
+# Mixtape
+
 module SubFoo
 
 function f()
@@ -319,43 +324,37 @@ end
 
 end
 
+struct MyMix <: CompilationContext end
 
 @testset "Mixtape" begin
-    @test begin
-        using CodeInfoTools
-        using MacroTools
+    # 101: How2Mix
 
-        # 101: How2Mix
-        struct MyMix <: CompilationContext end
-
-        # A few little utility functions for working with Expr instances.
-        swap(e) = e
-        function swap(e::Expr)
-            new = MacroTools.postwalk(e) do s
-                isexpr(s, :call) || return s
-                s.args[1] == Base.rand || return s
-                return 4
-            end
-            return new
+    # A few little utility functions for working with Expr instances.
+    swap(e) = e
+    function swap(e::Expr)
+        new = MacroTools.postwalk(e) do s
+            isexpr(s, :call) || return s
+            s.args[1] == Base.rand || return s
+            return 4
         end
-
-        # This is pre-inference - you get to see a CodeInfoTools.Builder instance.
-        function transform(::MyMix, src)
-            b = CodeInfoTools.Builder(src)
-            for (v, st) in b
-                b[v] = swap(st)
-            end
-            return CodeInfoTools.finish(b)
-        end
-
-        # MyMix will only transform functions which you explicitly allow.
-        # You can also greenlight modules.
-        allow(ctx::MyMix, m::Module) = m == SubFoo
-
-        _, path = compile(MyMix, SubFoo.f, (Int,))
-        @test remote_load_call(path, 20) == 8
-        @test(SubFoo.f() != 8)
-
+        return new
     end
+
+    # This is pre-inference - you get to see a CodeInfoTools.Builder instance.
+    function StaticCompiler.transform(::MyMix, src)
+        b = CodeInfoTools.Builder(src)
+        for (v, st) in b
+            b[v] = swap(st)
+        end
+        return CodeInfoTools.finish(b)
+    end
+
+    # MyMix will only transform functions which you explicitly allow.
+    # You can also greenlight modules.
+    StaticCompiler.allow(ctx::MyMix, m::Module) = m == SubFoo
+
+    _, path = compile(SubFoo.f, (), MyMix())
+    @test load_function(path)() == 8
+    @test SubFoo.f() != 8
 end
 
