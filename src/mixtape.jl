@@ -19,7 +19,6 @@ using Core.Compiler: WorldView,
                      slot2reg,
                      compact!,
                      ssa_inlining_pass!,
-                     getfield_elim_pass!,
                      adce_pass!,
                      type_lift_pass!,
                      verify_ir,
@@ -287,7 +286,6 @@ function julia_passes!(ir::Core.Compiler.IRCode, ci::CodeInfo,
     ir = compact!(ir)
     ir = ssa_inlining_pass!(ir, ir.linetable, sv.inlining, ci.propagate_inbounds)
     ir = compact!(ir)
-    ir = getfield_elim_pass!(ir)
     ir = adce_pass!(ir)
     ir = type_lift_pass!(ir)
     ir = compact!(ir)
