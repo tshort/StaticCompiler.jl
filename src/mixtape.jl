@@ -19,7 +19,7 @@ using Core.Compiler: WorldView,
                      slot2reg,
                      compact!,
                      ssa_inlining_pass!,
-                     getfield_elim_pass!,
+#                     getfield_elim_pass!,
                      adce_pass!,
                      type_lift_pass!,
                      verify_ir,
@@ -287,7 +287,7 @@ function julia_passes!(ir::Core.Compiler.IRCode, ci::CodeInfo,
     ir = compact!(ir)
     ir = ssa_inlining_pass!(ir, ir.linetable, sv.inlining, ci.propagate_inbounds)
     ir = compact!(ir)
-    ir = getfield_elim_pass!(ir)
+    # ir = getfield_elim_pass!(ir)
     ir = adce_pass!(ir)
     ir = type_lift_pass!(ir)
     ir = compact!(ir)
@@ -296,20 +296,21 @@ end
 
 julia_passes!(b::OptimizationBundle) = julia_passes!(b.ir, b.sv.src, b.sv)
 
-function optimize(interp::StaticInterpreter, opt::OptimizationState,
-        params::OptimizationParams, @nospecialize(result))
-    nargs = Int(opt.nargs) - 1
-    mi = opt.linfo
-    meth = mi.def
-    preserve_coverage = coverage_enabled(opt.mod)
-    ir = convert_to_ircode(opt.src, copy_exprargs(opt.src.code), preserve_coverage, nargs, opt)
-    ir = slot2reg(ir, opt.src, nargs, opt)
-    b = OptimizationBundle(ir, opt)
-    ir :: Core.Compiler.IRCode = optimize!(interp.ctx, b)
-    verify_ir(ir)
-    verify_linetable(ir.linetable)
-    return _finish(interp, opt, params, ir, result)
-end
+# function optimize(interp::StaticInterpreter, opt::OptimizationState,
+#         params::OptimizationParams, result::InferenceResult)
+#         #params::OptimizationParams, @nospecialize(result))
+#     nargs = Int(opt.nargs) - 1
+#     mi = opt.linfo
+#     meth = mi.def
+#     preserve_coverage = coverage_enabled(opt.mod)
+#     ir = convert_to_ircode(opt.src, copy_exprargs(opt.src.code), preserve_coverage, nargs, opt)
+#     ir = slot2reg(ir, opt.src, nargs, opt)
+#     b = OptimizationBundle(ir, opt)
+#     ir :: Core.Compiler.IRCode = optimize!(interp.ctx, b)
+#     verify_ir(ir)
+#     verify_linetable(ir.linetable)
+#     return _finish(interp, opt, params, ir, result)
+# end
 
 #####
 ##### FunctionGraph
@@ -439,12 +440,21 @@ function codegen(job::CompilerJob)
                                 lookup            = Base.unsafe_convert(Ptr{Nothing}, lookup_cb))
 
     GC.@preserve lookup_cb begin
-        native_code = ccall(:jl_create_native, 
-                            Ptr{Cvoid},
-                            (Vector{MethodInstance}, 
-                             Base.CodegenParams, Cint), 
-                            [ssg.entry],
-                            params, 1) # = extern policy = #
+        native_code = if VERSION >= v"1.8.0-DEV.661"
+            ccall(:jl_create_native, Ptr{Cvoid},
+                  (Vector{MethodInstance}, Ptr{Base.CodegenParams}, Cint),
+                  [ssg.entry], Ref(params), #=extern policy=# 1)
+        else
+            ccall(:jl_create_native, Ptr{Cvoid},
+                  (Vector{MethodInstance}, Base.CodegenParams, Cint),
+                  [ssg.entry], params, #=extern policy=# 1)
+        end
+        # native_code = ccall(:jl_create_native, 
+        #                     Ptr{Cvoid},
+        #                     (Vector{MethodInstance}, 
+        #                      Base.CodegenParams, Cint), 
+        #                     [ssg.entry],
+        #                     params, 1) # = extern policy = #
         @assert native_code != C_NULL
         llvm_mod_ref = ccall(:jl_get_llvm_module, 
                              LLVM.API.LLVMModuleRef, 
