@@ -48,7 +48,7 @@ This package uses the [GPUCompiler package](https://github.com/JuliaGPU/GPUCompi
 ## Limitations 
 
 * GC-tracked allocations and global variables do work with `compile`, but the way they are implemented is brittle and can be dangerous. Allocate with care.
-* GC-tracked allocations and global varaibles do *not* work with `compile_executable` (yet).
+* GC-tracked allocations and global variables do *not* work with `compile_executable` (yet).
 * Type unstable code is not yet supported.
 * Doesn't currently work on Windows.
 * If you find any other limitations, let us know. There's probably lots.
