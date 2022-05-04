@@ -222,7 +222,7 @@ end
 #####
 
 function resolve_generic(a)
-    if a <: Function && isdefined(a, :instance)
+    if a isa Type && a <: Function && isdefined(a, :instance)
         return a.instance
     else
         return resolve(a)
