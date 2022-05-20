@@ -486,7 +486,7 @@ function generate_obj(funcs::Array, path::String = tempname(), filenamebase::Str
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
     fakejob, kwargs = native_job(f,tt, kwargs...)
-    mod = native_llvm_module(funcs, kwargs...)
+    mod = native_llvm_module(funcs, mangle_names, kwargs...)
     obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
     open(obj_path, "w") do io
         write(io, obj)
@@ -498,7 +498,7 @@ function generate_shlib(funcs::Array, path::String = tempname(), filename::Strin
     
     lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
 
-    _,obj_path = generate_obj(funcs, path, kwargs...)
+    _,obj_path = generate_obj(funcs, path, mangle_names, kwargs...)
     # Pick a Clang
     cc = Sys.isapple() ? `cc` : clang()
     # Compile!
