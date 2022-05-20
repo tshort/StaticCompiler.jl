@@ -476,8 +476,8 @@ function native_llvm_module(funcs::Array; mangle_names = false, kwargs...)
     return mod
 end
 
-function generate_obj(funcs::Array, path::String = tempname(), filenamebase::String="obj",
-                        mangle_names =false;
+function generate_obj(funcs::Array, path::String = tempname(), filenamebase::String="obj";
+                        mangle_names =false,
                         strip_llvm = false,
                         strip_asm  = true,
                         opt_level=3,
@@ -486,7 +486,7 @@ function generate_obj(funcs::Array, path::String = tempname(), filenamebase::Str
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
     fakejob, kwargs = native_job(f,tt, kwargs...)
-    mod = native_llvm_module(funcs, mangle_names, kwargs...)
+    mod = native_llvm_module(funcs; mangle_names = mangle_names, kwargs...)
     obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
     open(obj_path, "w") do io
         write(io, obj)
@@ -494,11 +494,11 @@ function generate_obj(funcs::Array, path::String = tempname(), filenamebase::Str
     path, obj_path
 end
 
-function generate_shlib(funcs::Array, path::String = tempname(), filename::String="libfoo", mangle_names=false; kwargs...)
+function generate_shlib(funcs::Array, path::String = tempname(), filename::String="libfoo"; mangle_names=false, kwargs...)
     
     lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
 
-    _,obj_path = generate_obj(funcs, path, mangle_names, kwargs...)
+    _,obj_path = generate_obj(funcs, path, filename; mangle_names=mangle_names, kwargs...)
     # Pick a Clang
     cc = Sys.isapple() ? `cc` : clang()
     # Compile!
@@ -523,7 +523,7 @@ function compile_shlib(funcs::Array, path::String="./";
 # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
 # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
 
-    generate_shlib(funcs, path, filename, mangle_names, kwargs...)
+    generate_shlib(funcs, path, filename; mangle_names=mangle_names, kwargs...)
 
     joinpath(abspath(path), filename * "." * Libdl.dlext)
 end
