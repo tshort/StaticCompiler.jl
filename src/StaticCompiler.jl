@@ -434,7 +434,6 @@ function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.saf
     path, name
 end
 
-
 function native_code_llvm(@nospecialize(func), @nospecialize(types); kwargs...)
     job, kwargs = native_job(func, types; kwargs...)
     GPUCompiler.code_llvm(stdout, job; kwargs...)
@@ -457,9 +456,77 @@ function native_code_native(@nospecialize(f), @nospecialize(tt), name = GPUCompi
     GPUCompiler.code_native(stdout, job; kwargs...)
 end
 
+#Return an LLVM module for multiple functions 
+function native_llvm_module(funcs::Array; mangle_names = false, kwargs...)
+    f,tt = funcs[1]
+    mod = native_llvm_module(f,tt, kwargs...)
+    if length(funcs) > 1
+        for func in funcs[2:end]
+            @show f,tt = func
+            tmod = native_llvm_module(f,tt, kwargs...)
+            link!(mod,tmod)
+        end
+    end
+    if mangle_names
+        for func in functions(mod)
+            fname = name(func)
+            name!(func,fname[7:end])
+        end
+    end
+    return mod
+end
 
+function generate_obj(funcs::Array, path::String = tempname(), filenamebase::String="obj",
+                        mangle_names =false;
+                        strip_llvm = false,
+                        strip_asm  = true,
+                        opt_level=3,
+                        kwargs...)
+    f,tt = funcs[1]
+    mkpath(path)
+    obj_path = joinpath(path, "$filenamebase.o")
+    fakejob, kwargs = native_job(f,tt, kwargs...)
+    mod = native_llvm_module(funcs, kwargs...)
+    obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
+    open(obj_path, "w") do io
+        write(io, obj)
+    end
+    path, obj_path
+end
 
+function generate_shlib(funcs::Array, path::String = tempname(), filename::String="libfoo", mangle_names=false; kwargs...)
+    
+    lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
 
+    _,obj_path = generate_obj(funcs, path, kwargs...)
+    # Pick a Clang
+    cc = Sys.isapple() ? `cc` : clang()
+    # Compile!
+    run(`$cc -shared -o $lib_path $obj_path`)
+
+    path, name
+end
+
+function compile_shlib(funcs::Array, path::String="./";
+    filename="libfoo",
+    mangle_names=false,
+    kwargs...)
+    for func in funcs
+        f, types = func
+        tt = Base.to_tuple_type(types)
+        isconcretetype(tt) || error("input type signature $types is not concrete")
+
+        rt = only(native_code_typed(f, tt))[2]
+        isconcretetype(rt) || error("$f$types did not infer to a concrete type. Got $rt")
+    end
+
+# Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
+# Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
+
+    generate_shlib(funcs, path, filename, mangle_names, kwargs...)
+
+    joinpath(abspath(path), filename * "." * Libdl.dlext)
+end
 
 
 end # module
