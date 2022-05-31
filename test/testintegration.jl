@@ -37,6 +37,7 @@
 
     # --- Test LoopVectorization integration
 
+@static if LoopVectorization.VectorizationBase.has_feature(Val{:x86_64_avx2})
     # Compile...
     status = run(`julia --compile=min $testpath/scripts/loopvec_product.jl`)
     @test isa(status, Base.Process)
@@ -48,6 +49,7 @@
     @test isa(status, Base.Process)
     @test status.exitcode == 0
     @test parsedlm(c"product.tsv",'\t')[] == 3025
+end
 
     # Compile...
     status = run(`julia --compile=min $testpath/scripts/loopvec_matrix.jl`)
