@@ -231,7 +231,7 @@ function compile_executable(f, types=(), path::String="./", name=GPUCompiler.saf
                             kwargs...)
 
     tt = Base.to_tuple_type(types)
-    tt == Tuple{} || tt == Tuple{Int, Ptr{Ptr{UInt8}}} || error("input type signature $types must be either () or (Int, Ptr{Ptr{UInt8}})")
+    # tt == Tuple{} || tt == Tuple{Int, Ptr{Ptr{UInt8}}} || error("input type signature $types must be either () or (Int, Ptr{Ptr{UInt8}})")
 
     rt = only(native_code_typed(f, tt))[2]
     isconcretetype(rt) || error("$f$types did not infer to a concrete type. Got $rt")
