@@ -141,8 +141,9 @@ function generate_obj(f, tt, path::String = tempname(), name = GPUCompiler.safe_
     tm = GPUCompiler.llvm_machine(NativeCompilerTarget())
     job, kwargs = native_job(f, tt; name, kwargs...)
     #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
-    mod, meta = GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false)
-
+    mod, meta = GPUCompiler.JuliaContext() do context
+        GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false, ctx=context)
+    end
     # Use Enzyme's annotation and optimization pipeline
     annotate!(mod)
     optimize!(mod, tm)
@@ -448,7 +449,9 @@ end
 # Return an LLVM module
 function native_llvm_module(f, tt, name = GPUCompiler.safe_name(repr(f)); kwargs...)
     job, kwargs = native_job(f, tt; name, kwargs...)
-    m, _ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false)
+    m, _ = GPUCompiler.JuliaContext() do context
+        GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, ctx=context)
+    end
     return m
 end
 
