@@ -11,6 +11,6 @@ Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 
 [compat]
-GPUCompiler = "0.13"
+GPUCompiler = "0.16"
 LLVM = "4.8"
 julia = "1.7"
