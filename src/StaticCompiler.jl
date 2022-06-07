@@ -141,8 +141,9 @@ function generate_obj(f, tt, path::String = tempname(), name = GPUCompiler.safe_
     tm = GPUCompiler.llvm_machine(NativeCompilerTarget())
     job, kwargs = native_job(f, tt; name, kwargs...)
     #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
-    mod, meta = GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false)
-
+    mod, meta = GPUCompiler.JuliaContext() do context
+        GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false, ctx=context)
+    end
     # Use Enzyme's annotation and optimization pipeline
     annotate!(mod)
     optimize!(mod, tm)
@@ -230,7 +231,7 @@ function compile_executable(f, types=(), path::String="./", name=GPUCompiler.saf
                             kwargs...)
 
     tt = Base.to_tuple_type(types)
-    tt == Tuple{} || tt == Tuple{Int, Ptr{Ptr{UInt8}}} || error("input type signature $types must be either () or (Int, Ptr{Ptr{UInt8}})")
+    # tt == Tuple{} || tt == Tuple{Int, Ptr{Ptr{UInt8}}} || error("input type signature $types must be either () or (Int, Ptr{Ptr{UInt8}})")
 
     rt = only(native_code_typed(f, tt))[2]
     isconcretetype(rt) || error("$f$types did not infer to a concrete type. Got $rt")
@@ -447,7 +448,9 @@ end
 # Return an LLVM module
 function native_llvm_module(f, tt, name = GPUCompiler.safe_name(repr(f)); kwargs...)
     job, kwargs = native_job(f, tt; name, kwargs...)
-    m, _ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false)
+    m, _ = GPUCompiler.JuliaContext() do context
+        GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, ctx=context)
+    end
     return m
 end
 

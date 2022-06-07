@@ -1,7 +1,10 @@
 # StaticCompiler
 
-[![CI](https://github.com/tshort/StaticCompiler.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/tshort/StaticCompiler.jl/actions/workflows/ci.yml)
-[![Codecov](https://codecov.io/gh/tshort/StaticCompiler.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/tshort/StaticCompiler.jl)
+[![CI](https://github.com/tshort/StaticCompiler.jl/workflows/CI/badge.svg)](https://github.com/tshort/StaticCompiler.jl/actions/workflows/ci.yml)
+[![CI (Integration)](https://github.com/tshort/StaticCompiler.jl/workflows/CI%20(Integration)/badge.svg)](https://github.com/tshort/StaticCompiler.jl/actions/workflows/ci-integration.yml)
+[![CI (Julia nightly)](https://github.com/tshort/StaticCompiler.jl/workflows/CI%20(Julia%20nightly)/badge.svg)](https://github.com/tshort/StaticCompiler.jl/actions/workflows/ci-julia-nightly.yml)
+[![CI (Integration nightly)](https://github.com/tshort/StaticCompiler.jl/workflows/CI%20(Integration%20nightly)/badge.svg)](https://github.com/tshort/StaticCompiler.jl/actions/workflows/ci-integration-nightly.yml)
+[![Coverage](https://codecov.io/gh/tshort/StaticCompiler.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/tshort/StaticCompiler.jl)
 
 This is an experimental package to compile Julia code to standalone libraries. A system image is not needed.
 
@@ -45,7 +48,7 @@ marked with `@test_skip`)
 
 This package uses the [GPUCompiler package](https://github.com/JuliaGPU/GPUCompiler.jl) to generate code.
 
-## Limitations 
+## Limitations
 
 * GC-tracked allocations and global variables do work with `compile`, but the way they are implemented is brittle and can be dangerous. Allocate with care.
 * GC-tracked allocations and global variables do *not* work with `compile_executable` (yet).

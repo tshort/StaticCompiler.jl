@@ -5,6 +5,7 @@
 /dev/
 /test/standalone
 /test/test.*
+Manifest.toml
 
 test.o
 test.so
