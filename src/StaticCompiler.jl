@@ -459,7 +459,7 @@ function native_code_native(@nospecialize(f), @nospecialize(tt), name = GPUCompi
     GPUCompiler.code_native(stdout, job; kwargs...)
 end
 
-#Return an LLVM module for multiple functions 
+#Return an LLVM module for multiple functions
 function native_llvm_module(funcs::Array; mangle_names = false, kwargs...)
     f,tt = funcs[1]
     mod = native_llvm_module(f,tt, kwargs...)
@@ -473,7 +473,9 @@ function native_llvm_module(funcs::Array; mangle_names = false, kwargs...)
     if mangle_names
         for func in functions(mod)
             fname = name(func)
-            name!(func,fname[7:end])
+            if fname[1:6] == "julia_"
+                name!(func,fname[7:end])
+            end
         end
     end
     return mod
@@ -498,7 +500,7 @@ function generate_obj(funcs::Array, path::String = tempname(), filenamebase::Str
 end
 
 function generate_shlib(funcs::Array, path::String = tempname(), filename::String="libfoo"; mangle_names=false, kwargs...)
-    
+
     lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
 
     _,obj_path = generate_obj(funcs, path, filename; mangle_names=mangle_names, kwargs...)
