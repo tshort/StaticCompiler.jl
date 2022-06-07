@@ -293,18 +293,18 @@ end
     @test r.exitcode == 0
 end
 
+@noinline square(n) = n*n
+
+function squaresquare(n)
+    square(square(n))
+end
+
+function squaresquaresquare(n)
+    square(squaresquare(n))
+end
 
 @testset "Multiple Function Dylibs" begin
 
-    @noinline square(n) = n*n
-
-    function squaresquare(n)
-        square(square(n))
-    end
-
-    function squaresquaresquare(n)
-        square(squaresquare(n))
-    end
 
     funcs = [(squaresquare,(Float64,)), (squaresquaresquare,(Float64,))]
     filepath = compile_shlib(funcs, mangle_names=true)
@@ -315,6 +315,6 @@ end
     @test ccall(fptr2, Float64, (Float64,), 10.) == squaresquare(10.)
 
     fptr = Libdl.dlsym(ptr, "squaresquaresquare")
-    @test ccall(fptr2, Float64, (Float64,), 10.) == squaresquaresquare(10.)
+    @test ccall(fptr, Float64, (Float64,), 10.) == squaresquaresquare(10.)
     #Compile dylib
 end
