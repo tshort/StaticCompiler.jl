@@ -460,7 +460,7 @@ function native_code_native(@nospecialize(f), @nospecialize(tt), name = GPUCompi
 end
 
 #Return an LLVM module for multiple functions
-function native_llvm_module(funcs::Array; mangle_names = false, kwargs...)
+function native_llvm_module(funcs::Array; demangle = false, kwargs...)
     f,tt = funcs[1]
     mod = native_llvm_module(f,tt, kwargs...)
     if length(funcs) > 1
@@ -470,7 +470,7 @@ function native_llvm_module(funcs::Array; mangle_names = false, kwargs...)
             link!(mod,tmod)
         end
     end
-    if mangle_names
+    if demangle
         for func in functions(mod)
             fname = name(func)
             if fname[1:6] == "julia_"
@@ -486,7 +486,7 @@ function native_llvm_module(funcs::Array; mangle_names = false, kwargs...)
 end
 
 function generate_obj(funcs::Array, path::String = tempname(), filenamebase::String="obj";
-                        mangle_names =false,
+                        demangle =false,
                         strip_llvm = false,
                         strip_asm  = true,
                         opt_level=3,
@@ -495,7 +495,7 @@ function generate_obj(funcs::Array, path::String = tempname(), filenamebase::Str
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
     fakejob, kwargs = native_job(f,tt, kwargs...)
-    mod = native_llvm_module(funcs; mangle_names = mangle_names, kwargs...)
+    mod = native_llvm_module(funcs; demangle = demangle, kwargs...)
     obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
     open(obj_path, "w") do io
         write(io, obj)
@@ -503,11 +503,11 @@ function generate_obj(funcs::Array, path::String = tempname(), filenamebase::Str
     path, obj_path
 end
 
-function generate_shlib(funcs::Array, path::String = tempname(), filename::String="libfoo"; mangle_names=false, kwargs...)
+function generate_shlib(funcs::Array, path::String = tempname(), filename::String="libfoo"; demangle=false, kwargs...)
 
     lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
 
-    _,obj_path = generate_obj(funcs, path, filename; mangle_names=mangle_names, kwargs...)
+    _,obj_path = generate_obj(funcs, path, filename; demangle=demangle, kwargs...)
     # Pick a Clang
     cc = Sys.isapple() ? `cc` : clang()
     # Compile!
@@ -518,7 +518,7 @@ end
 
 function compile_shlib(funcs::Array, path::String="./";
     filename="libfoo",
-    mangle_names=false,
+    demangle=false,
     kwargs...)
     for func in funcs
         f, types = func
@@ -532,7 +532,7 @@ function compile_shlib(funcs::Array, path::String="./";
 # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
 # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
 
-    generate_shlib(funcs, path, filename; mangle_names=mangle_names, kwargs...)
+    generate_shlib(funcs, path, filename; demangle=demangle, kwargs...)
 
     joinpath(abspath(path), filename * "." * Libdl.dlext)
 end
