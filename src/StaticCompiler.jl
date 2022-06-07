@@ -478,6 +478,10 @@ function native_llvm_module(funcs::Array; mangle_names = false, kwargs...)
             end
         end
     end
+    LLVM.ModulePassManager() do pass_manager #remove duplicate functions
+        LLVM.merge_functions!(pass_manager)
+        LLVM.run!(pass_manager, mod)
+    end
     return mod
 end
 
