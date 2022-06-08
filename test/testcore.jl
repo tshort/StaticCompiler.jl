@@ -307,7 +307,7 @@ end
 
 
     funcs = [(squaresquare,(Float64,)), (squaresquaresquare,(Float64,))]
-    filepath = compile_shlib(funcs, mangle_names=true)
+    filepath = compile_shlib(funcs, demangle=true)
 
     ptr = Libdl.dlopen(filepath, Libdl.RTLD_LOCAL)
 
