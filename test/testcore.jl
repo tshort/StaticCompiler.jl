@@ -292,3 +292,29 @@ end
     @test isa(r, Base.Process)
     @test r.exitcode == 0
 end
+
+@noinline square(n) = n*n
+
+function squaresquare(n)
+    square(square(n))
+end
+
+function squaresquaresquare(n)
+    square(squaresquare(n))
+end
+
+@testset "Multiple Function Dylibs" begin
+
+
+    funcs = [(squaresquare,(Float64,)), (squaresquaresquare,(Float64,))]
+    filepath = compile_shlib(funcs, demangle=true)
+
+    ptr = Libdl.dlopen(filepath, Libdl.RTLD_LOCAL)
+
+    fptr2 = Libdl.dlsym(ptr, "squaresquare")
+    @test ccall(fptr2, Float64, (Float64,), 10.) == squaresquare(10.)
+
+    fptr = Libdl.dlsym(ptr, "squaresquaresquare")
+    @test ccall(fptr, Float64, (Float64,), 10.) == squaresquaresquare(10.)
+    #Compile dylib
+end
