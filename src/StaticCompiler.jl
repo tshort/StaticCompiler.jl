@@ -227,8 +227,10 @@ Hello, world!
 ```
 """
 function compile_executable(f, types=(), path::String="./", name=GPUCompiler.safe_name(repr(f));
-                            filename=name,
-                            kwargs...)
+        filename=name,
+        cflags=``,
+        kwargs...
+    )
 
     tt = Base.to_tuple_type(types)
     # tt == Tuple{} || tt == Tuple{Int, Ptr{Ptr{UInt8}}} || error("input type signature $types must be either () or (Int, Ptr{Ptr{UInt8}})")
@@ -239,7 +241,7 @@ function compile_executable(f, types=(), path::String="./", name=GPUCompiler.saf
     # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
     # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
 
-    generate_executable(f, tt, path, name, filename; kwargs...)
+    generate_executable(f, tt, path, name, filename; cflags=cflags, kwargs...)
 
     joinpath(abspath(path), filename)
 end
@@ -252,8 +254,10 @@ compile_shlib(f, types::Tuple, path::String, name::String=repr(f); filename::Str
 As `compile_executable`, but compiling to a standalone `.dylib`/`.so` shared library.
 """
 function compile_shlib(f, types=(), path::String="./", name=GPUCompiler.safe_name(repr(f));
-                        filename=name,
-                        kwargs...)
+        filename=name,
+        cflags=``,
+        kwargs...
+    )
 
     tt = Base.to_tuple_type(types)
     isconcretetype(tt) || error("input type signature $types is not concrete")
@@ -263,8 +267,7 @@ function compile_shlib(f, types=(), path::String="./", name=GPUCompiler.safe_nam
 
     # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
     # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
-
-    generate_shlib(f, tt, path, name, filename; kwargs...)
+    generate_shlib(f, tt, path, name, filename; cflags=cflags, kwargs...)
 
     joinpath(abspath(path), filename * "." * Libdl.dlext)
 end
@@ -348,7 +351,10 @@ test (generic function with 1 method)
 julia> path, name = StaticCompiler.generate_executable(test, Tuple{Int64}, "./scratch")
 ```
 """
-function generate_executable(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filename::String=string(name); kwargs...)
+function generate_executable(f, tt, path=tempname(), name=GPUCompiler.safe_name(repr(f)), filename=string(name);
+        cflags=``,
+        kwargs...
+    )
     mkpath(path)
     obj_path = joinpath(path, "$filename.o")
     exec_path = joinpath(path, filename)
@@ -366,7 +372,7 @@ function generate_executable(f, tt, path::String = tempname(), name = GPUCompile
     if Sys.isapple()
         # Apple no longer uses _start, so we can just specify a custom entry
         entry = "_julia_$name"
-        run(`$cc -e $entry $obj_path -o $exec_path`)
+        run(`$cc -e $entry $cflags $obj_path -o $exec_path`)
     else
         # Write a minimal wrapper to avoid having to specify a custom entry
         wrapper_path = joinpath(path, "wrapper.c")
@@ -377,7 +383,7 @@ function generate_executable(f, tt, path::String = tempname(), name = GPUCompile
             return 0;
         }""")
         close(f)
-        run(`$cc $wrapper_path $obj_path -o $exec_path`)
+        run(`$cc $wrapper_path $cflags $obj_path -o $exec_path`)
         # Clean up
         run(`rm $wrapper_path`)
     end
@@ -416,7 +422,11 @@ julia> ccall(StaticCompiler.generate_shlib_fptr(path, name), Float64, (Int64,), 
 5.256496109495593
 ```
 """
-function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filename::String=name; kwargs...)
+function generate_shlib(f, tt, path=tempname(), name=GPUCompiler.safe_name(repr(f)), filename=name;
+        cflags=``,
+        kwargs...
+    )
+
     mkpath(path)
     obj_path = joinpath(path, "$filename.o")
     lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
@@ -430,7 +440,7 @@ function generate_shlib(f, tt, path::String = tempname(), name = GPUCompiler.saf
     # Pick a Clang
     cc = Sys.isapple() ? `cc` : clang()
     # Compile!
-    run(`$cc -shared -o $lib_path $obj_path`)
+    run(`$cc -shared $cflags $obj_path -o $lib_path`)
 
     path, name
 end
@@ -503,7 +513,11 @@ function generate_obj(funcs::Array, path::String = tempname(), filenamebase::Str
     path, obj_path
 end
 
-function generate_shlib(funcs::Array, path::String = tempname(), filename::String="libfoo"; demangle=false, kwargs...)
+function generate_shlib(funcs::Array, path::String = tempname(), filename::String="libfoo";
+        demangle=false,
+        cflags=``,
+        kwargs...
+    )
 
     lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
 
@@ -511,7 +525,7 @@ function generate_shlib(funcs::Array, path::String = tempname(), filename::Strin
     # Pick a Clang
     cc = Sys.isapple() ? `cc` : clang()
     # Compile!
-    run(`$cc -shared -o $lib_path $obj_path`)
+    run(`$cc -shared $cflags $obj_path -o $lib_path `)
 
     path, name
 end
@@ -519,6 +533,7 @@ end
 function compile_shlib(funcs::Array, path::String="./";
     filename="libfoo",
     demangle=false,
+    cflags=``,
     kwargs...)
     for func in funcs
         f, types = func
@@ -532,7 +547,7 @@ function compile_shlib(funcs::Array, path::String="./";
 # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
 # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
 
-    generate_shlib(funcs, path, filename; demangle=demangle, kwargs...)
+    generate_shlib(funcs, path, filename; demangle=demangle, cflags=cflags, kwargs...)
 
     joinpath(abspath(path), filename * "." * Libdl.dlext)
 end
