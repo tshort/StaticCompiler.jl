@@ -3,44 +3,62 @@ Base.@kwdef struct NativeCompilerTarget <: GPUCompiler.AbstractCompilerTarget
     features::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUFeatures())
 end
 
-GPUCompiler.llvm_triple(::NativeCompilerTarget) = Sys.MACHINE
-
-function GPUCompiler.llvm_machine(target::NativeCompilerTarget)
-    triple = GPUCompiler.llvm_triple(target)
-
-    t = LLVM.Target(triple=triple)
-
-    tm = LLVM.TargetMachine(t, triple, target.cpu, target.features, reloc=LLVM.API.LLVMRelocPIC)
-    GPUCompiler.asm_verbosity!(tm, true)
-
-    return tm
+Base.@kwdef struct ExternalNativeCompilerTarget <: GPUCompiler.AbstractCompilerTarget
+    cpu::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUName())
+    features::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUFeatures())
 end
 
-GPUCompiler.runtime_slug(job::GPUCompiler.CompilerJob{NativeCompilerTarget}) = "native_$(job.target.cpu)-$(hash(job.target.features))"
-
 module StaticRuntime
-    # the runtime library
-    signal_exception() = return
-    malloc(sz) = ccall("extern malloc", llvmcall, Csize_t, (Csize_t,), sz)
-    report_oom(sz) = return
-    report_exception(ex) = return
-    report_exception_name(ex) = return
-    report_exception_frame(idx, func, file, line) = return
+# the runtime library
+signal_exception() = return
+malloc(sz) = ccall("extern malloc", llvmcall, Csize_t, (Csize_t,), sz)
+report_oom(sz) = return
+report_exception(ex) = return
+report_exception_name(ex) = return
+report_exception_frame(idx, func, file, line) = return
 end
 
 struct StaticCompilerParams <: GPUCompiler.AbstractCompilerParams end
 
+for target in (:NativeCompilerTarget, :ExternalNativeCompilerTarget)
+    @eval begin
+        GPUCompiler.llvm_triple(::$target) = Sys.MACHINE
+
+        function GPUCompiler.llvm_machine(target::$target)
+            triple = GPUCompiler.llvm_triple(target)
+
+            t = LLVM.Target(triple=triple)
+
+            tm = LLVM.TargetMachine(t, triple, target.cpu, target.features, reloc=LLVM.API.LLVMRelocPIC)
+            GPUCompiler.asm_verbosity!(tm, true)
+
+            return tm
+        end
+
+        GPUCompiler.runtime_slug(job::GPUCompiler.CompilerJob{$target}) = "native_$(job.target.cpu)-$(hash(job.target.features))"
+
+        GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{$target}) = StaticRuntime
+        GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{$target, StaticCompilerParams}) = StaticRuntime
+
+
+        GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{$target, StaticCompilerParams}) = true
+        GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{$target}) = true
+    end
+end
+
 GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:Any,StaticCompilerParams}) = StaticRuntime
-GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{NativeCompilerTarget}) = StaticRuntime
-GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{NativeCompilerTarget, StaticCompilerParams}) = StaticRuntime
-
 GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:Any,StaticCompilerParams}) = true
-GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{NativeCompilerTarget, StaticCompilerParams}) = true
-GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{NativeCompilerTarget}) = true
 
-function native_job(@nospecialize(func), @nospecialize(types); kernel::Bool=false, name=GPUCompiler.safe_name(repr(func)), kwargs...)
+# GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{<:Any,StaticCompilerParams})) = nothing
+# GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{NativeCompilerTarget})) = nothing
+# GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{NativeCompilerTarget, StaticCompilerParams})) = nothing
+
+GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{ExternalNativeCompilerTarget})) = method_table
+GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{ExternalNativeCompilerTarget, StaticCompilerParams})) = method_table
+
+function native_job(@nospecialize(func), @nospecialize(types); kernel::Bool=false, name=GPUCompiler.safe_name(repr(func)), ext = true, kwargs...)
     source = GPUCompiler.FunctionSpec(func, Base.to_tuple_type(types), kernel, name)
-    target = NativeCompilerTarget()
+    target = ext ? ExternalNativeCompilerTarget() : NativeCompilerTarget()
     params = StaticCompilerParams()
     GPUCompiler.CompilerJob(target, source, params), kwargs
 end

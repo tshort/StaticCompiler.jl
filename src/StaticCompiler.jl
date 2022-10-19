@@ -8,10 +8,13 @@ using Libdl: Libdl, dlsym, dlopen
 using Base: RefValue
 using Serialization: serialize, deserialize
 using Clang_jll: clang
+using StaticTools: @symbolcall, @c_str
 
 export compile, load_function, compile_shlib, compile_executable
 export native_code_llvm, native_code_typed, native_llvm_module, native_code_native
 
+include("utils.jl")
+include("quirks.jl")
 include("target.jl")
 include("pointer_patching.jl")
 include("code_loading.jl")
@@ -95,8 +98,13 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
     isconcretetype(rt) || error("$f on $_tt did not infer to a concrete type. Got $rt")
 
     f_wrap!(out::Ref, args::Ref{<:Tuple}) = (out[] = f(args[]...); nothing)
-    _, _, table = generate_obj(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, path, name; opt_level, strip_llvm, strip_asm, filename, kwargs...)
-
+    @eval GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{<:Any,StaticCompilerParams})) = nothing
+    @eval GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{NativeCompilerTarget})) = nothing
+    @eval GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{NativeCompilerTarget, StaticCompilerParams})) = nothing
+    _, _, table = generate_obj(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, path, name; opt_level, strip_llvm, strip_asm, filename, ext = false, kwargs...)
+    @eval GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{<:Any,StaticCompilerParams})) = method_table
+    @eval GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{NativeCompilerTarget})) = method_table
+    @eval GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{NativeCompilerTarget, StaticCompilerParams})) = method_table
     lf = LazyStaticCompiledFunction{rt, tt}(Symbol(f), path, name, filename, table)
     cjl_path = joinpath(path, "$filename.cjl")
     serialize(cjl_path, lf)
@@ -106,7 +114,7 @@ end
 
 """
 ```julia
-generate_obj(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj";
+(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj";
             \tstrip_llvm = false,
             \tstrip_asm  = true,
             \topt_level=3,
@@ -135,11 +143,12 @@ function generate_obj(f, tt, path::String = tempname(), name = GPUCompiler.safe_
                         strip_llvm = false,
                         strip_asm  = true,
                         opt_level=3,
+                        ext = true,
                         kwargs...)
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
-    tm = GPUCompiler.llvm_machine(NativeCompilerTarget())
-    job, kwargs = native_job(f, tt; name, kwargs...)
+    job, kwargs = native_job(f, tt; name,ext = ext, kwargs...)
+    tm = GPUCompiler.llvm_machine(job.target)
     #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
     mod, meta = GPUCompiler.JuliaContext() do context
         GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false, ctx=context)
@@ -500,11 +509,12 @@ function generate_obj(funcs::Array, path::String = tempname(), filenamebase::Str
                         strip_llvm = false,
                         strip_asm  = true,
                         opt_level=3,
+                        ext = true,
                         kwargs...)
     f,tt = funcs[1]
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
-    fakejob, kwargs = native_job(f,tt, kwargs...)
+    fakejob, kwargs = native_job(f,tt, ext = true, kwargs...)
     mod = native_llvm_module(funcs; demangle = demangle, kwargs...)
     obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
     open(obj_path, "w") do io
