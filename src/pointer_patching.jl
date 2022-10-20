@@ -155,7 +155,17 @@ end
 
 llvmeltype(x::LLVM.Value) = eltype(LLVM.llvmtype(x))
 
-function pointer_patching_diff(mod::LLVM.Module, path1=tempname(), path2=tempname(); show_reloc_table=false)
+function pointer_patching_diff(f, tt, path1=tempname(), path2=tempname(); show_reloc_table=false)
+    tm = GPUCompiler.llvm_machine(NativeCompilerTarget())
+    job, kwargs = native_job(f, tt; name=GPUCompiler.safe_name(repr(f)))
+    #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
+    mod, meta = GPUCompiler.JuliaContext() do context
+        GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, optimize=false, ctx=context)
+    end
+    # Use Enzyme's annotation and optimization pipeline
+    annotate!(mod)
+    optimize!(mod, tm)
+    
     s1 = string(mod)
     write(path1, s1)
     
@@ -167,12 +177,9 @@ function pointer_patching_diff(mod::LLVM.Module, path1=tempname(), path2=tempnam
     s2 = string(mod)
     write(path2, s2)
 
-    try
-        # this always ends in an error for me for some reason
-        run(`diff $path1 $path2`)
-    catch e;
-        nothing
-    end
+    pdiff = run(Cmd(`diff $path1 $path2`, ignorestatus=true))
+    pdiff.exitcode == 2 && error("Showing diff caused an error")
+    nothing
 end
 
 
