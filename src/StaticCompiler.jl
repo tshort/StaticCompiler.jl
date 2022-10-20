@@ -378,7 +378,8 @@ function generate_executable(f, tt, path=tempname(), name=GPUCompiler.safe_name(
         wrapper_path = joinpath(path, "wrapper.c")
         f = open(wrapper_path, "w")
         print(f, """int julia_$name(int argc, char** argv);
-        
+        void* __stack_chk_guard = (void*) $(rand(UInt) >> 1);
+
         int main(int argc, char** argv)
         {
             julia_$name(argc, argv);
