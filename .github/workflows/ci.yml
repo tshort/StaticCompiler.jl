@@ -19,7 +19,7 @@ jobs:
       matrix:
         version:
           - '1.7'
-          - '1.8.0-beta3'
+          - '1.8'
         os:
           - ubuntu-latest
           - macOS-latest
