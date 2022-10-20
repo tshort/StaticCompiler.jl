@@ -15,8 +15,8 @@ end
 
 function loopvec_matrix(argc::Int, argv::Ptr{Ptr{UInt8}})
     argc == 3 || return printf(stderrp(), c"Incorrect number of command-line arguments\n")
-    rows = parse(Int64, argv, 2)            # First command-line argument
-    cols = parse(Int64, argv, 3)            # Second command-line argument
+    rows = argparse(Int64, argv, 2)            # First command-line argument
+    cols = argparse(Int64, argv, 3)            # Second command-line argument
 
     # LHS
     A = MallocArray{Float64}(undef, rows, cols)
@@ -41,9 +41,8 @@ function loopvec_matrix(argc::Int, argv::Ptr{Ptr{UInt8}})
     # Print to stdout
     printf(C)
     # Also print to file
-    fp = fopen(c"table.tsv",c"w")
-    printf(fp, C)
-    fclose(fp)
+    printdlm(c"table.tsv", C, '\t')
+    fwrite(c"table.b", C)
     # Clean up matrices
     free(A)
     free(B)

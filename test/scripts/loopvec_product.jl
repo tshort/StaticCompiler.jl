@@ -4,8 +4,8 @@ using LoopVectorization
 
 function loopvec_product(argc::Int, argv::Ptr{Ptr{UInt8}})
     argc == 3 || return printf(stderrp(), c"Incorrect number of command-line arguments\n")
-    rows = parse(Int64, argv, 2)            # First command-line argument
-    cols = parse(Int64, argv, 3)            # Second command-line argument
+    rows = argparse(Int64, argv, 2)            # First command-line argument
+    cols = argparse(Int64, argv, 3)            # Second command-line argument
 
     s = 0
     @turbo for i=1:rows
