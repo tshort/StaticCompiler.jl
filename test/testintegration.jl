@@ -15,7 +15,7 @@
         status = -1
         try
             isfile("times_table") && rm("times_table")
-            status = run(`$jlpath --compile=min $testpath/scripts/times_table.jl`)
+            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/times_table.jl`)
         catch e
             @warn "Could not compile $testpath/scripts/times_table.jl"
             println(e)
@@ -46,7 +46,7 @@
         status = -1
         try
             isfile("withmallocarray") && rm("withmallocarray")
-            status = run(`$jlpath --compile=min $testpath/scripts/withmallocarray.jl`)
+            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/withmallocarray.jl`)
         catch e
             @warn "Could not compile $testpath/scripts/withmallocarray.jl"
             println(e)
@@ -73,7 +73,7 @@
         status = -1
         try
             isfile("rand_matrix") && rm("rand_matrix")
-            status = run(`$jlpath --compile=min $testpath/scripts/rand_matrix.jl`)
+            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/rand_matrix.jl`)
         catch e
             @warn "Could not compile $testpath/scripts/rand_matrix.jl"
             println(e)
@@ -99,7 +99,7 @@
         status = -1
         try
             isfile("randn_matrix") && rm("randn_matrix")
-            status = run(`$jlpath --compile=min $testpath/scripts/randn_matrix.jl`)
+            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/randn_matrix.jl`)
         catch e
             @warn "Could not compile $testpath/scripts/randn_matrix.jl"
             println(e)
@@ -131,7 +131,7 @@
             status = -1
             try
                 isfile("loopvec_product") && rm("loopvec_product")
-                status = run(`$jlpath --compile=min $testpath/scripts/loopvec_product.jl`)
+                status = run(`$jlpath --startup=no --compile=min $testpath/scripts/loopvec_product.jl`)
             catch e
                 @warn "Could not compile $testpath/scripts/loopvec_product.jl"
                 println(e)
@@ -159,7 +159,7 @@
         status = -1
         try
             isfile("loopvec_matrix") && rm("loopvec_matrix")
-            status = run(`$jlpath --compile=min $testpath/scripts/loopvec_matrix.jl`)
+            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/loopvec_matrix.jl`)
         catch e
             @warn "Could not compile $testpath/scripts/loopvec_matrix.jl"
             println(e)
@@ -190,7 +190,7 @@
         status = -1
         try
             isfile("loopvec_matrix_stack") && rm("loopvec_matrix_stack")
-            status = run(`$jlpath --compile=min $testpath/scripts/loopvec_matrix_stack.jl`)
+            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/loopvec_matrix_stack.jl`)
         catch e
             @warn "Could not compile $testpath/scripts/loopvec_matrix_stack.jl"
             println(e)
@@ -221,7 +221,7 @@
         status = -1
         try
             isfile("print_args") && rm("print_args")
-            status = run(`$jlpath --compile=min $testpath/scripts/print_args.jl`)
+            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/print_args.jl`)
         catch e
             @warn "Could not compile $testpath/scripts/print_args.jl"
             println(e)
@@ -250,7 +250,7 @@
         status = -1
         try
             isfile("interop") && rm("interop")
-            status = run(`$jlpath --compile=min $testpath/scripts/interop.jl`)
+            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/interop.jl`)
         catch e
             @warn "Could not compile $testpath/scripts/interop.jl"
             println(e)
