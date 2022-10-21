@@ -9,13 +9,13 @@ Base.@kwdef struct ExternalNativeCompilerTarget <: GPUCompiler.AbstractCompilerT
 end
 
 module StaticRuntime
-# the runtime library
-signal_exception() = return
-malloc(sz) = ccall("extern malloc", llvmcall, Csize_t, (Csize_t,), sz)
-report_oom(sz) = return
-report_exception(ex) = return
-report_exception_name(ex) = return
-report_exception_frame(idx, func, file, line) = return
+    # the runtime library
+    signal_exception() = return
+    malloc(sz) = ccall("extern malloc", llvmcall, Csize_t, (Csize_t,), sz)
+    report_oom(sz) = return
+    report_exception(ex) = return
+    report_exception_name(ex) = return
+    report_exception_frame(idx, func, file, line) = return
 end
 
 struct StaticCompilerParams <: GPUCompiler.AbstractCompilerParams end
@@ -49,16 +49,17 @@ end
 GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:Any,StaticCompilerParams}) = StaticRuntime
 GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:Any,StaticCompilerParams}) = true
 
-# GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{<:Any,StaticCompilerParams})) = nothing
-# GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{NativeCompilerTarget})) = nothing
-# GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{NativeCompilerTarget, StaticCompilerParams})) = nothing
-
 GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{ExternalNativeCompilerTarget})) = method_table
 GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{ExternalNativeCompilerTarget, StaticCompilerParams})) = method_table
 
-function native_job(@nospecialize(func), @nospecialize(types); kernel::Bool=false, name=GPUCompiler.safe_name(repr(func)), ext = true, kwargs...)
-    source = GPUCompiler.FunctionSpec(func, Base.to_tuple_type(types), kernel, name)
-    target = ext ? ExternalNativeCompilerTarget() : NativeCompilerTarget()
+function native_job(@nospecialize(func::Function), @nospecialize(types::Type);
+        name = GPUCompiler.safe_name(repr(func)),
+        libjulia::Bool = true,
+        kernel::Bool = false,
+        kwargs...
+    )
+    source = GPUCompiler.FunctionSpec(func, types, kernel, name)
+    target = libjulia ? NativeCompilerTarget() : ExternalNativeCompilerTarget()
     params = StaticCompilerParams()
     GPUCompiler.CompilerJob(target, source, params), kwargs
 end
