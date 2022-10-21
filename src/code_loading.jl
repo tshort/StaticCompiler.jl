@@ -31,28 +31,28 @@ function instantiate(p::LazyStaticCompiledFunction{rt, tt}) where {rt, tt}
     flags = LLVM.API.LLVMJITSymbolFlags(LLVM.API.LLVMJITSymbolGenericFlagsExported, 0)
     ofile = LLVM.MemoryBufferFile(joinpath(p.path, "$(p.filename).o")) #$(Libdl.dlext)
 
-    
+
     # Set all the uninitialized global variables to point to julia values from the relocation table
     for (val, name) ∈ p.reloc
         address = LLVM.API.LLVMOrcJITTargetAddress(reinterpret(UInt, unsafe_pointer_from_objref(val)))
 
         symbol = LLVM.API.LLVMJITEvaluatedSymbol(address, flags)
         gv = LLVM.API.LLVMJITCSymbolMapPair(LLVM.mangle(lljit, name), symbol)
-        mu = absolute_symbols(Ref(gv)) 
-        LLVM.define(jd, mu)       
+        mu = absolute_symbols(Ref(gv))
+        LLVM.define(jd, mu)
     end
     # consider switching to one mu for all gvs instead of one per gv.
-    # I tried that already, but I got an error saying 
+    # I tried that already, but I got an error saying
     # JIT session error: Symbols not found: [ __Type_Vector_Float64___274 ]
 
     # Link to libjulia
     prefix = LLVM.get_prefix(lljit)
     dg = LLVM.CreateDynamicLibrarySearchGeneratorForProcess(prefix)
     LLVM.add!(jd, dg)
-    
+
     LLVM.add!(lljit, jd, ofile)
     fptr = pointer(LLVM.lookup(lljit, "julia_" * p.name))
-    
+
     StaticCompiledFunction{rt, tt}(p.f, fptr, lljit, p.reloc)
 end
 
@@ -79,7 +79,7 @@ function (f::StaticCompiledFunction{rt, tt})(args...) where {rt, tt}
     out = RefValue{rt}()
     refargs = Ref(args)
     ccall(f.ptr, Nothing, (Ptr{rt}, Ref{tt}), pointer_from_objref(out), refargs)
-    out[]    
+    out[]
 end
 
 instantiate(f::StaticCompiledFunction) = f

@@ -1,11 +1,11 @@
 function relocation_table!(mod)
     i64 = LLVM.IntType(64; ctx=LLVM.context(mod))
     d = IdDict{Any, Tuple{String, LLVM.GlobalVariable}}()
-    
+
     for func ∈ LLVM.functions(mod), bb ∈ LLVM.blocks(func), inst ∈ LLVM.instructions(bb)
-        if isa(inst, LLVM.LoadInst) && occursin("inttoptr", string(inst)) 
+        if isa(inst, LLVM.LoadInst) && occursin("inttoptr", string(inst))
             get_pointers!(d, mod, inst)
-        elseif isa(inst, LLVM.StoreInst) && occursin("inttoptr", string(inst)) 
+        elseif isa(inst, LLVM.StoreInst) && occursin("inttoptr", string(inst))
             @debug "Relocating StoreInst" inst
             get_pointers!(d, mod, inst)
         elseif inst isa LLVM.RetInst && occursin("inttoptr", string(inst))
@@ -101,7 +101,7 @@ function relocation_table!(mod)
                     end
                 end
 
-                if length(fn) > 1 && fromC                    
+                if length(fn) > 1 && fromC
                     mod = LLVM.parent(LLVM.parent(LLVM.parent(inst)))
                     lfn = LLVM.API.LLVMGetNamedFunction(mod, fn)
 
@@ -139,7 +139,7 @@ function get_pointers!(d, mod, inst)
                     else
                         gv_name = GPUCompiler.safe_name(String(gensym(repr(Core.Typeof(val)))))
                         gv = LLVM.GlobalVariable(mod, llvmeltype(arg), gv_name, LLVM.addrspace(llvmtype(arg)))
-                       
+
                         LLVM.extinit!(gv, true)
                         LLVM.API.LLVMSetOperand(inst, i-1, gv)
 
@@ -155,31 +155,24 @@ end
 
 llvmeltype(x::LLVM.Value) = eltype(LLVM.llvmtype(x))
 
-function pointer_patching_diff(f, tt, path1=tempname(), path2=tempname(); show_reloc_table=false)
-    tm = GPUCompiler.llvm_machine(NativeCompilerTarget())
-    job, kwargs = native_job(f, tt; name=GPUCompiler.safe_name(repr(f)))
-    #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
-    mod, meta = GPUCompiler.JuliaContext() do context
-        GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, optimize=false, ctx=context)
-    end
-    # Use Enzyme's annotation and optimization pipeline
-    annotate!(mod)
-    optimize!(mod, tm)
-    
+function pointer_patching_diff(mod::LLVM.Module, path1=tempname(), path2=tempname(); show_reloc_table=false)
     s1 = string(mod)
     write(path1, s1)
-    
+
     d = StaticCompiler.relocation_table!(mod)
     if show_reloc_table
         @show d
     end
-    
+
     s2 = string(mod)
     write(path2, s2)
 
-    pdiff = run(Cmd(`diff $path1 $path2`, ignorestatus=true))
-    pdiff.exitcode == 2 && error("Showing diff caused an error")
-    nothing
+    try
+        # this always ends in an error for me for some reason
+        run(`diff $path1 $path2`)
+    catch e;
+        nothing
+    end
 end
 
 
