@@ -9,12 +9,13 @@
 This is an experimental package to compile Julia code to standalone libraries. A system image is not needed.
 
 ## Installation and Usage
-
+Installation is the same as any other registered Julia package
 ```julia
 using Pkg
 Pkg.add("StaticCompiler")
 ```
 
+There are two main ways to use this package. The first is via the `compile` function, which can be used when you want to compile a Julia function for later use from within Julia:
 ```julia
 julia> using StaticCompiler
 
@@ -40,9 +41,25 @@ fib(::Int64) :: Int64
 julia> fib_compiled(10)
 55
 ```
+See the file `tests/runtests.jl` for some examples of functions that work with `compile` (and some that don't, marked with `@test_skip`).
 
-See the file `tests/runtests.jl` for some examples of functions that work with static compilation (and some that don't,
-marked with `@test_skip`)
+The second way to use this package is via the `compile_executable` and `compile_shlib` functions, for use when you want to compile a Julia function to a native executable or shared library for use from outside of Julia:
+```julia
+julia> using StaticCompiler, StaticTools
+
+julia> hello() = println(c"Hello, world!")
+hello (generic function with 1 method)
+
+julia> compile_executable(hello, (), "./")
+"/Users/user/hello"
+
+shell> ls -alh hello
+-rwxrwxr-x. 1 user user 8.4K Oct 20 20:36 hello
+
+shell> ./hello
+Hello, world!
+```
+This latter approach comes with substantially more limitations, as you cannot rely on `libjulia` (see, e.g., [StaticTools.jl](https://github.com/brenhinkeller/StaticTools.jl) for some ways to work around these limitations).
 
 ## Approach
 
