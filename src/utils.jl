@@ -3,67 +3,67 @@
 # local method table for device functions
 @static if isdefined(Base.Experimental, Symbol("@overlay"))
     Base.Experimental.@MethodTable(method_table)
-    else
+else
     const method_table = nothing
+end
+
+# list of overrides (only for Julia 1.6)
+const overrides = Expr[]
+
+macro device_override(ex)
+    ex = macroexpand(__module__, ex)
+    if Meta.isexpr(ex, :call)
+        @show ex = eval(ex)
+        error()
+    end
+    code = quote
+        $GPUCompiler.@override(StaticCompiler.method_table, $ex)
+    end
+    if isdefined(Base.Experimental, Symbol("@overlay"))
+        return esc(code)
+    else
+        push!(overrides, code)
+        return
+    end
+end
+
+macro device_function(ex)
+    ex = macroexpand(__module__, ex)
+    def = splitdef(ex)
+
+    # generate a function that errors
+    def[:body] = quote
+        error("This function is not intended for use on the CPU")
     end
 
-    # list of overrides (only for Julia 1.6)
-    const overrides = Expr[]
+    esc(quote
+        $(combinedef(def))
+        @device_override $ex
+    end)
+end
 
-    macro device_override(ex)
-        ex = macroexpand(__module__, ex)
-        if Meta.isexpr(ex, :call)
-            @show ex = eval(ex)
-            error()
-        end
-        code = quote
-            $GPUCompiler.@override(StaticCompiler.method_table, $ex)
-        end
-        if isdefined(Base.Experimental, Symbol("@overlay"))
-            return esc(code)
-        else
-            push!(overrides, code)
-            return
-        end
-    end
+macro device_functions(ex)
+    ex = macroexpand(__module__, ex)
 
-    macro device_function(ex)
-        ex = macroexpand(__module__, ex)
-        def = splitdef(ex)
-
-        # generate a function that errors
-        def[:body] = quote
-            error("This function is not intended for use on the CPU")
-        end
-
-        esc(quote
-            $(combinedef(def))
-            @device_override $ex
-        end)
-    end
-
-    macro device_functions(ex)
-        ex = macroexpand(__module__, ex)
-
-        # recursively prepend `@device_function` to all function definitions
-        function rewrite(block)
-            out = Expr(:block)
-            for arg in block.args
-                if Meta.isexpr(arg, :block)
-                    # descend in blocks
-                    push!(out.args, rewrite(arg))
-                elseif Meta.isexpr(arg, [:function, :(=)])
-                    # rewrite function definitions
-                    push!(out.args, :(@device_function $arg))
-                else
-                    # preserve all the rest
-                    push!(out.args, arg)
-                end
+    # recursively prepend `@device_function` to all function definitions
+    function rewrite(block)
+        out = Expr(:block)
+        for arg in block.args
+            if Meta.isexpr(arg, :block)
+                # descend in blocks
+                push!(out.args, rewrite(arg))
+            elseif Meta.isexpr(arg, [:function, :(=)])
+                # rewrite function definitions
+                push!(out.args, :(@device_function $arg))
+            else
+                # preserve all the rest
+                push!(out.args, arg)
             end
-            out
         end
-
-        esc(rewrite(ex))
+        out
     end
 
-    libcexit(x::Int32) =  @symbolcall exit(x::Int32)::Nothing
+    esc(rewrite(ex))
+end
+
+libcexit(x::Int32) =  @symbolcall exit(x::Int32)::Nothing
