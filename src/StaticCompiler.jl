@@ -616,11 +616,11 @@ function generate_cosmopolitan(f, tt, path=tempname(), name=GPUCompiler.safe_nam
     # Compile
     run(`$gcc $cflags -g -Os -static -nostdlib -nostdinc -fno-pie -no-pie -mno-red-zone \
       -fno-omit-frame-pointer -pg -mnop-mcount -mno-tls-direct-seg-refs -gdwarf-4 \
-      $wrapper_path -o $exec_path*".dbg" -fuse-ld=bfd -Wl,-T,$(archive"cosmopolitan/ape.lds") -Wl,--gc-sections \
+      $wrapper_path -o $(exec_path*".dbg") -fuse-ld=bfd -Wl,-T,$(archive"cosmopolitan/ape.lds") -Wl,--gc-sections \
       -include $(archive"cosmopolitan/cosmopolitan.h") $obj_path $(archive"cosmopolitan/crt.o") \
       $(archive"cosmopolitan/ape-no-modify-self.o") $(archive"cosmopolitan/cosmopolitan.a")`)
 
-     run(`$objcopy -S -O binary $exec_path*".dbg" $exec_path`)
+     run(`$objcopy -S -O binary $(exec_path*".dbg") $exec_path`)
 
     # Clean up intermediate files
      run(`rm $exec_path*".dbg"`)
