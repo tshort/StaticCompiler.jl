@@ -8,6 +8,7 @@ using Libdl: Libdl, dlsym, dlopen
 using Base: RefValue
 using Serialization: serialize, deserialize
 using Clang_jll: clang
+using LazyArtifacts
 
 export compile, load_function, compile_shlib, compile_executable
 export native_code_llvm, native_code_typed, native_llvm_module, native_code_native
@@ -555,5 +556,77 @@ function compile_shlib(funcs::Array, path::String="./";
     joinpath(abspath(path), filename * "." * Libdl.dlext)
 end
 
+# Cosmopolitan executables
+"""
+```julia
+compile_cosmopolitan(f, types::Tuple, path::String, name::String=repr(f);
+    filename = name,
+    objcopy = `objcopy`,
+    gcc = `gcc`,
+    cflags = ``,
+    kwargs...
+)
+```
+As `compile_executable`, but generating a [cosmopolitan executable](https://justine.lol/cosmopolitan/index.html).
+"""
+function compile_cosmopolitan(f, types=(), path::String="./", name=GPUCompiler.safe_name(repr(f));
+        filename=name,
+        objcopy = `objcopy`,
+        gcc = `gcc`,
+        cflags = ``,
+        kwargs...
+    )
+    tt = Base.to_tuple_type(types)
+    rt = only(native_code_typed(f, tt))[2]
+    isconcretetype(rt) || error("$f$types did not infer to a concrete type. Got $rt")
+    generate_cosmopolitan(f, tt, path, name, filename; objcopy, gcc, cflags, kwargs...)
+    joinpath(abspath(path), filename)
+end
+
+function generate_cosmopolitan(f, tt, path=tempname(), name=GPUCompiler.safe_name(repr(f)), filename=string(name);
+        objcopy = `objcopy`,
+        gcc = `gcc`,
+        cflags = ``,
+        kwargs...
+    )
+    mkpath(path)
+    obj_path = joinpath(path, "$filename.o")
+    exec_path = joinpath(path, filename)
+    job, kwargs = native_job(f, tt; name, kwargs...)
+    obj, _ = GPUCompiler.codegen(:obj, job; strip=true, only_entry=false, validate=false)
+
+    # Write to file
+    open(obj_path, "w") do io
+        write(io, obj)
+    end
+
+    # Write a minimal wrapper to avoid having to specify a custom entry
+    wrapper_path = joinpath(path, "wrapper.c")
+    f = open(wrapper_path, "w")
+    print(f, """int julia_$name(int argc, char** argv);
+    void* __stack_chk_guard = (void*) $(rand(UInt) >> 1);
+
+    int main(int argc, char** argv)
+    {
+        julia_$name(argc, argv);
+        return 0;
+    }""")
+    close(f)
+
+    # Compile
+    run(`$gcc $cflags -g -Os -static -nostdlib -nostdinc -fno-pie -no-pie -mno-red-zone \
+      -fno-omit-frame-pointer -pg -mnop-mcount -mno-tls-direct-seg-refs -gdwarf-4 \
+      $wrapper_path -o $exec_path*".dbg" -fuse-ld=bfd -Wl,-T,$(archive"cosmopolitan/ape.lds") -Wl,--gc-sections \
+      -include $(archive"cosmopolitan/cosmopolitan.h") $obj_path $(archive"cosmopolitan/crt.o") \
+      $(archive"cosmopolitan/ape-no-modify-self.o") $(archive"cosmopolitan/cosmopolitan.a")`)
+
+     run(`$objcopy -S -O binary $exec_path*".dbg" $exec_path`)
+
+    # Clean up intermediate files
+     run(`rm $exec_path*".dbg"`)
+     run(`rm $wrapper_path`)
+
+    path, name
+end
 
 end # module

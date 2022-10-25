@@ -1,0 +1,16 @@
+[cosmopolitan]
+git-tree-sha1 = "ff58fd6cb9c94ea11b67c78841af5018902214c9"
+lazy = true
+
+    [[cosmopolitan.download]]
+    url = "https://github.com/brenhinkeller/cosmopolitan-artifact-mirror/raw/main/archives/cosmopolitan-amalgamation-2.1.1.tar.gz"
+    sha256 = "efd09628404ab7bb70605796d66703ba16eb0271263ed0b77fc19c18ed5fee10"
+
+
+[cosmopolitan-tiny]
+git-tree-sha1 = "9032c427d4221119ebc562f6299540f2113a3f44"
+lazy = true
+
+    [[cosmopolitan-tiny.download]]
+    url = "https://github.com/brenhinkeller/cosmopolitan-artifact-mirror/raw/main/archives/cosmopolitan-amalgamation-tiny-2.1.1.tar.gz"
+    sha256 = "d91db150a5d9ceb54bcb21e968b33ed27b77778f23980d267734a2bb3813dc76"

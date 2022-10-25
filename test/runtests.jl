@@ -17,5 +17,9 @@ const GROUP = get(ENV, "GROUP", "All")
 end
 
 @static if GROUP == "Integration" || GROUP == "All"
-    include("testintegration.jl")
+    include("testexecutables.jl")
+end
+
+@static if (GROUP == "Integration" || GROUP == "All") && Sys.ARCH == :x86_64
+    include("testcosmopolitan.jl")
 end
