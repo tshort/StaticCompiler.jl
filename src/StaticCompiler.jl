@@ -261,6 +261,7 @@ generate_shlib(f, tt, path::String, name::String, filenamebase::String="obj"; kw
 Low level interface for compiling a shared object / dynamically loaded library
  (`.so` / `.dylib`) for function `f` given a tuple type `tt` characterizing
 the types of the arguments for which the function will be compiled.
+
 See also `StaticCompiler.generate_shlib_fptr`.
 ### Examples
 ```julia
