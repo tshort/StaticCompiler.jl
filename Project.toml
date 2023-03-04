@@ -6,18 +6,22 @@ version = "0.4.2"
 [deps]
 Clang_jll = "0ee61d77-7f21-5576-8119-9fcc46b10100"
 CodeInfoTools = "bc773b8a-8374-437a-b9f2-0e9785855863"
+Eyeball = "ce36242b-ad83-4f84-8519-47cd8aeefd60"
 GPUCompiler = "61eb1bfa-7361-4325-ad38-22787b887f55"
+Infiltrator = "5903a43b-9cc3-4c30-8d17-598619ec4e9b"
+InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 LLVM = "929cbde3-209d-540e-8aea-75f648917ca0"
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 
 [compat]
 CodeInfoTools = "0.3"
-GPUCompiler = "0.13"
+GPUCompiler = "0.17"
 LLVM = "4.8"
 MacroTools = "0.5"
-julia = "1.7, 1.8"
+julia = "1.7, 1.8, 1.9"
 
 [extras]
 Formatting = "59287772-0a20-5a39-b81b-1366585eb4c0"
