@@ -249,7 +249,7 @@ end
 
     #Compile dylib
     name = repr(fib)
-    filepath = compile_shlib(fib, (Int,), NoContext(), "./", name)
+    filepath = compile_shlib(fib, (Int,), "./", name)
     @test occursin("fib.$(Libdl.dlext)", filepath)
 
     # Open dylib
@@ -271,7 +271,7 @@ end
         return 0
     end
 
-    filepath = compile_executable(foo, (), NoContext(), tempdir())
+    filepath = compile_executable(foo, (), tempdir())
 
     r = run(`$filepath`);
     @test isa(r, Base.Process)
@@ -301,7 +301,7 @@ end
             return 0
         end
 
-        filepath = compile_executable(print_args, (Int, Ptr{Ptr{UInt8}}), NoContext(), tempdir())
+        filepath = compile_executable(print_args, (Int, Ptr{Ptr{UInt8}}), tempdir())
 
         r = run(`$filepath Hello, world!`);
         @test isa(r, Base.Process)
@@ -354,7 +354,7 @@ struct MyMix <: CompilationContext end
     # You can also greenlight modules.
     StaticCompiler.allow(ctx::MyMix, m::Module) = m == SubFoo
 
-    _, path = compile(SubFoo.f, (), MyMix())
+    _, path = compile(SubFoo.f, (), mixtape = MyMix())
     @test load_function(path)() == 8
     # @test SubFoo.f() != 8
 end

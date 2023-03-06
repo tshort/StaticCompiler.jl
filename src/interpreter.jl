@@ -7,7 +7,7 @@ using GPUCompiler:
 using CodeInfoTools
 using CodeInfoTools: resolve
 
-struct StaticInterpreter{C} <: AbstractInterpreter
+struct StaticInterpreter{M} <: AbstractInterpreter
     global_cache::CodeCache
     method_table::Union{Nothing,Core.MethodTable}
 
@@ -21,12 +21,12 @@ struct StaticInterpreter{C} <: AbstractInterpreter
     opt_params::OptimizationParams
 
     # Mixtape context
-    ctx::C
+    mixtape::M
 
-    function StaticInterpreter(cache::CodeCache, mt::Union{Nothing,Core.MethodTable}, world::UInt, ip::InferenceParams, op::OptimizationParams, ctx)
+    function StaticInterpreter(cache::CodeCache, mt::Union{Nothing,Core.MethodTable}, world::UInt, ip::InferenceParams, op::OptimizationParams, mixtape::CompilationContext)
         @assert world <= Base.get_world_counter()
 
-        return new{typeof(ctx)}(
+        return new{typeof(mixtape)}(
             cache,
             mt,
 
@@ -41,7 +41,7 @@ struct StaticInterpreter{C} <: AbstractInterpreter
             op,
 
             # Mixtape context
-            ctx
+            mixtape
         )
     end
 end
@@ -79,9 +79,8 @@ function custom_pass!(interp::StaticInterpreter, result::InferenceResult, mi::Co
     mi.specTypes isa UnionAll && return src
     sig = Tuple(mi.specTypes.parameters)
     as = map(resolve_generic, sig)
-    # @show interp.ctx, mi
-    if allow(interp.ctx, mi.def.module, as...)
-        src = transform(interp.ctx, src, sig)
+    if allow(interp.mixtape, mi.def.module, as...)
+        src = transform(interp.mixtape, src, sig)
     end
     return src
 end
@@ -130,12 +129,12 @@ end
 struct StaticCompilerParams <: AbstractCompilerParams
     opt::Bool
     optlevel::Int
-    ctx::CompilationContext
+    mixtape::CompilationContext
 end
 
 function StaticCompilerParams(; opt = false, 
         optlevel = Base.JLOptions().opt_level, 
-        ctx = NoContext())
-    return StaticCompilerParams(opt, optlevel, ctx)
+        mixtape = NoContext())
+    return StaticCompilerParams(opt, optlevel, mixtape)
 end
 

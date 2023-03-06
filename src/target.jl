@@ -38,10 +38,10 @@ GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:Any,StaticCompilerParams}) 
 GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{NativeCompilerTarget, StaticCompilerParams}) = true
 GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{NativeCompilerTarget}) = true
 
-function native_job(@nospecialize(func), @nospecialize(types), @nospecialize(ctx); kernel::Bool=false, name=GPUCompiler.safe_name(repr(func)), kwargs...)
+function native_job(@nospecialize(func), @nospecialize(types); mixtape::CompilationContext=NoContext(), kernel::Bool=false, name=GPUCompiler.safe_name(repr(func)), kwargs...)
     source = GPUCompiler.FunctionSpec(func, Base.to_tuple_type(types), kernel, name)
     target = NativeCompilerTarget()
-    params = StaticCompilerParams(ctx = ctx)
+    params = StaticCompilerParams(mixtape = mixtape)
     StaticCompiler.CompilerJob(target, source, params), kwargs
 end
 
@@ -49,5 +49,5 @@ end
 StaticCompilerJob = CompilerJob{NativeCompilerTarget,StaticCompilerParams}
 
 function GPUCompiler.get_interpreter(job::StaticCompilerJob)
-    StaticInterpreter(GPUCompiler.ci_cache(job), GPUCompiler.method_table(job), job.source.world, GPUCompiler.inference_params(job), GPUCompiler.optimization_params(job), job.params.ctx)    
+    StaticInterpreter(GPUCompiler.ci_cache(job), GPUCompiler.method_table(job), job.source.world, GPUCompiler.inference_params(job), GPUCompiler.optimization_params(job), job.params.mixtape)    
 end
