@@ -8,6 +8,8 @@ using Libdl: Libdl, dlsym, dlopen
 using Base: RefValue
 using Serialization: serialize, deserialize
 using Clang_jll: clang
+using StaticTools
+using StaticTools: @symbolcall, @c_str, println
 
 export compile, load_function, compile_shlib, compile_executable
 export native_code_llvm, native_code_typed, native_llvm_module, native_code_native
@@ -16,6 +18,7 @@ include("target.jl")
 include("pointer_patching.jl")
 include("code_loading.jl")
 include("optimize.jl")
+include("quirks.jl")
 
 
 """
@@ -95,7 +98,7 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
     isconcretetype(rt) || error("$f on $_tt did not infer to a concrete type. Got $rt")
 
     f_wrap!(out::Ref, args::Ref{<:Tuple}) = (out[] = f(args[]...); nothing)
-    _, _, table = generate_obj(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, path, name; opt_level, strip_llvm, strip_asm, filename, kwargs...)
+    _, _, table = generate_obj(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, false, path, name; opt_level, strip_llvm, strip_asm, filename, kwargs...)
 
     lf = LazyStaticCompiledFunction{rt, tt}(Symbol(f), path, name, filename, table)
     cjl_path = joinpath(path, "$filename.cjl")
@@ -131,15 +134,15 @@ shell> tree \$path
 0 directories, 1 file
 ```
 """
-function generate_obj(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj";
+function generate_obj(f, tt, external = true, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj";
                         strip_llvm = false,
                         strip_asm  = true,
                         opt_level=3,
                         kwargs...)
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
-    tm = GPUCompiler.llvm_machine(NativeCompilerTarget())
-    job, kwargs = native_job(f, tt; name, kwargs...)
+    tm = GPUCompiler.llvm_machine(external ? ExternalNativeCompilerTarget() : NativeCompilerTarget())
+    job, kwargs = native_job(f, tt, external; name, kwargs...)
     #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
     mod, meta = GPUCompiler.JuliaContext() do context
         GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false, ctx=context)
@@ -267,7 +270,7 @@ function compile_shlib(f, types=(), path::String="./", name=GPUCompiler.safe_nam
 
     # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
     # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
-    generate_shlib(f, tt, path, name, filename; cflags=cflags, kwargs...)
+    generate_shlib(f, tt, true, path, name, filename; cflags=cflags, kwargs...)
 
     joinpath(abspath(path), filename * "." * Libdl.dlext)
 end
@@ -276,7 +279,7 @@ function generate_shlib_fptr(f, tt, path::String=tempname(), name = GPUCompiler.
                             temp::Bool=true,
                             kwargs...)
 
-    generate_shlib(f, tt, path, name; kwargs...)
+    generate_shlib(f, tt, false, path, name; kwargs...)
     lib_path = joinpath(abspath(path), "$filename.$(Libdl.dlext)")
     ptr = Libdl.dlopen(lib_path, Libdl.RTLD_LOCAL)
     fptr = Libdl.dlsym(ptr, "julia_$name")
@@ -358,7 +361,7 @@ function generate_executable(f, tt, path=tempname(), name=GPUCompiler.safe_name(
     mkpath(path)
     obj_path = joinpath(path, "$filename.o")
     exec_path = joinpath(path, filename)
-    job, kwargs = native_job(f, tt; name, kwargs...)
+    job, kwargs = native_job(f, tt, true; name, kwargs...)
     obj, _ = GPUCompiler.codegen(:obj, job; strip=true, only_entry=false, validate=false)
 
     # Write to file
@@ -425,7 +428,7 @@ julia> ccall(StaticCompiler.generate_shlib_fptr(path, name), Float64, (Int64,), 
 5.256496109495593
 ```
 """
-function generate_shlib(f, tt, path=tempname(), name=GPUCompiler.safe_name(repr(f)), filename=name;
+function generate_shlib(f, tt, external = true, path=tempname(), name=GPUCompiler.safe_name(repr(f)), filename=name;
         cflags=``,
         kwargs...
     )
@@ -433,7 +436,7 @@ function generate_shlib(f, tt, path=tempname(), name=GPUCompiler.safe_name(repr(
     mkpath(path)
     obj_path = joinpath(path, "$filename.o")
     lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
-    job, kwargs = native_job(f, tt; name, kwargs...)
+    job, kwargs = native_job(f, tt, external; name, kwargs...)
     obj, _ = GPUCompiler.codegen(:obj, job; strip=true, only_entry=false, validate=false)
 
     open(obj_path, "w") do io
@@ -449,18 +452,18 @@ function generate_shlib(f, tt, path=tempname(), name=GPUCompiler.safe_name(repr(
 end
 
 function native_code_llvm(@nospecialize(func), @nospecialize(types); kwargs...)
-    job, kwargs = native_job(func, types; kwargs...)
+    job, kwargs = native_job(func, types, true; kwargs...)
     GPUCompiler.code_llvm(stdout, job; kwargs...)
 end
 
 function native_code_typed(@nospecialize(func), @nospecialize(types); kwargs...)
-    job, kwargs = native_job(func, types; kwargs...)
+    job, kwargs = native_job(func, types, true; kwargs...)
     GPUCompiler.code_typed(job; kwargs...)
 end
 
 # Return an LLVM module
 function native_llvm_module(f, tt, name = GPUCompiler.safe_name(repr(f)); kwargs...)
-    job, kwargs = native_job(f, tt; name, kwargs...)
+    job, kwargs = native_job(f, tt, true; name, kwargs...)
     m, _ = GPUCompiler.JuliaContext() do context
         GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, ctx=context)
     end
@@ -468,7 +471,7 @@ function native_llvm_module(f, tt, name = GPUCompiler.safe_name(repr(f)); kwargs
 end
 
 function native_code_native(@nospecialize(f), @nospecialize(tt), name = GPUCompiler.safe_name(repr(f)); kwargs...)
-    job, kwargs = native_job(f, tt; name, kwargs...)
+    job, kwargs = native_job(f, tt, true; name, kwargs...)
     GPUCompiler.code_native(stdout, job; kwargs...)
 end
 
@@ -498,7 +501,7 @@ function native_llvm_module(funcs::Array; demangle = false, kwargs...)
     return mod
 end
 
-function generate_obj(funcs::Array, path::String = tempname(), filenamebase::String="obj";
+function generate_obj(funcs::Array, external, path::String = tempname(), filenamebase::String="obj";
                         demangle =false,
                         strip_llvm = false,
                         strip_asm  = true,
@@ -507,7 +510,7 @@ function generate_obj(funcs::Array, path::String = tempname(), filenamebase::Str
     f,tt = funcs[1]
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
-    fakejob, kwargs = native_job(f,tt, kwargs...)
+    fakejob, kwargs = native_job(f,tt, external, kwargs...)
     mod = native_llvm_module(funcs; demangle = demangle, kwargs...)
     obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
     open(obj_path, "w") do io
@@ -516,7 +519,7 @@ function generate_obj(funcs::Array, path::String = tempname(), filenamebase::Str
     path, obj_path
 end
 
-function generate_shlib(funcs::Array, path::String = tempname(), filename::String="libfoo";
+function generate_shlib(funcs::Array, external = true, path::String = tempname(), filename::String="libfoo";
         demangle=false,
         cflags=``,
         kwargs...
@@ -524,7 +527,7 @@ function generate_shlib(funcs::Array, path::String = tempname(), filename::Strin
 
     lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
 
-    _,obj_path = generate_obj(funcs, path, filename; demangle=demangle, kwargs...)
+    _,obj_path = generate_obj(funcs, external, path, filename; demangle=demangle, kwargs...)
     # Pick a Clang
     cc = Sys.isapple() ? `cc` : clang()
     # Compile!
@@ -550,7 +553,7 @@ function compile_shlib(funcs::Array, path::String="./";
 # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
 # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
 
-    generate_shlib(funcs, path, filename; demangle=demangle, cflags=cflags, kwargs...)
+    generate_shlib(funcs, true, path, filename; demangle=demangle, cflags=cflags, kwargs...)
 
     joinpath(abspath(path), filename * "." * Libdl.dlext)
 end
