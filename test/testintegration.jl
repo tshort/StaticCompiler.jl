@@ -242,6 +242,41 @@
         @test isa(status, Base.Process) && status.exitcode == 0
     end
 
+    ## --- Test error throwing
+
+    let
+        # Compile...
+        status = -1
+        try
+            isfile("maybe_throw") && rm("maybe_throw")
+            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/throw_errors.jl`)
+        catch e
+            @warn "Could not compile $testpath/scripts/throw_errors.jl"
+            println(e)
+        end
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
+
+        # Run...
+        println("Error handling:")
+        status = -1
+        try
+            status = run(`./maybe_throw 10`)
+        catch e
+            @warn "Could not run $(scratch)/maybe_throw"
+            println(e)
+        end
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
+        status = -1
+        try
+            status = run(`./maybe_throw -10`)
+        catch e
+            @info "maybe_throw: task failed sucessfully!"
+        end
+        @test status === -1
+    end
+
     ## --- Test interop
 
     @static if Sys.isbsd()
