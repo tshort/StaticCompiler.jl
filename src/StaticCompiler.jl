@@ -94,7 +94,7 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
     tt = Base.to_tuple_type(_tt)
     isconcretetype(tt) || error("input type signature $_tt is not concrete")
 
-    rt = only(native_code_typed(f, tt))[2]
+    rt = last(only(native_code_typed(f, tt)))
     isconcretetype(rt) || error("$f on $_tt did not infer to a concrete type. Got $rt")
 
     f_wrap!(out::Ref, args::Ref{<:Tuple}) = (out[] = f(args[]...); nothing)
@@ -236,10 +236,13 @@ function compile_executable(f, types=(), path::String="./", name=GPUCompiler.saf
     )
 
     tt = Base.to_tuple_type(types)
-    # tt == Tuple{} || tt == Tuple{Int, Ptr{Ptr{UInt8}}} || error("input type signature $types must be either () or (Int, Ptr{Ptr{UInt8}})")
+    isexecutableargtype = tt == Tuple{} || tt == Tuple{Int, Ptr{Ptr{UInt8}}}
+    isexecutableargtype || @warn "input type signature $types should be either `()` or `(Int, Ptr{Ptr{UInt8}})` for standard executables"
 
-    rt = only(native_code_typed(f, tt))[2]
-    isconcretetype(rt) || error("$f$types did not infer to a concrete type. Got $rt")
+    rt = last(only(native_code_typed(f, tt)))
+    isconcretetype(rt) || error("`$f$types` did not infer to a concrete type. Got `$rt`")
+    nativetype = isprimitivetype(rt) || isa(rt, Ptr)
+    nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a native machine type (a single float, int/uint, bool, or pointer)!"
 
     # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
     # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
@@ -263,10 +266,12 @@ function compile_shlib(f, types=(), path::String="./", name=GPUCompiler.safe_nam
     )
 
     tt = Base.to_tuple_type(types)
-    isconcretetype(tt) || error("input type signature $types is not concrete")
+    isconcretetype(tt) || error("input type signature `$types` is not concrete")
 
-    rt = only(native_code_typed(f, tt))[2]
-    isconcretetype(rt) || error("$f$types did not infer to a concrete type. Got $rt")
+    rt = last(only(native_code_typed(f, tt)))
+    isconcretetype(rt) || error("`$f$types` did not infer to a concrete type. Got `$rt`")
+    nativetype = isprimitivetype(rt) || isa(rt, Ptr)
+    nativetype || @warn "Return type `$rt` of $f$types does not appear to be a native type. Consider returning only a native machine type (a single float, int/uint, bool, or pointer)!"
 
     # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
     # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
@@ -544,10 +549,12 @@ function compile_shlib(funcs::Array, path::String="./";
     for func in funcs
         f, types = func
         tt = Base.to_tuple_type(types)
-        isconcretetype(tt) || error("input type signature $types is not concrete")
+        isconcretetype(tt) || error("input type signature `$types` is not concrete")
 
-        rt = only(native_code_typed(f, tt))[2]
-        isconcretetype(rt) || error("$f$types did not infer to a concrete type. Got $rt")
+        rt = last(only(native_code_typed(f, tt)))
+        isconcretetype(rt) || error("`$f$types` did not infer to a concrete type. Got `$rt`")
+        nativetype = isprimitivetype(rt) || isa(rt, Ptr)
+        nativetype || @warn "Return type `$rt` of $f$types does not appear to be a native type. Consider returning only a native machine type (a single float, int/uint, bool, or pointer)!"
     end
 
 # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
