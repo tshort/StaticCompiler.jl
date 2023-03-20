@@ -242,7 +242,7 @@ function compile_executable(f, types=(), path::String="./", name=GPUCompiler.saf
     rt = last(only(native_code_typed(f, tt)))
     isconcretetype(rt) || error("`$f$types` did not infer to a concrete type. Got `$rt`")
     nativetype = isprimitivetype(rt) || isa(rt, Ptr)
-    nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a native machine type (a single float, int/uint, bool, or pointer)!"
+    nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
 
     # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
     # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
@@ -271,7 +271,7 @@ function compile_shlib(f, types=(), path::String="./", name=GPUCompiler.safe_nam
     rt = last(only(native_code_typed(f, tt)))
     isconcretetype(rt) || error("`$f$types` did not infer to a concrete type. Got `$rt`")
     nativetype = isprimitivetype(rt) || isa(rt, Ptr)
-    nativetype || @warn "Return type `$rt` of $f$types does not appear to be a native type. Consider returning only a native machine type (a single float, int/uint, bool, or pointer)!"
+    nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
 
     # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
     # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
@@ -554,7 +554,7 @@ function compile_shlib(funcs::Array, path::String="./";
         rt = last(only(native_code_typed(f, tt)))
         isconcretetype(rt) || error("`$f$types` did not infer to a concrete type. Got `$rt`")
         nativetype = isprimitivetype(rt) || isa(rt, Ptr)
-        nativetype || @warn "Return type `$rt` of $f$types does not appear to be a native type. Consider returning only a native machine type (a single float, int/uint, bool, or pointer)!"
+        nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
     end
 
 # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
