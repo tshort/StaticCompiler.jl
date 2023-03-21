@@ -173,7 +173,11 @@ end
 
 """
 ```julia
-compile_executable(f, types::Tuple, path::String, name::String=repr(f); filename::String=name, kwargs...)
+compile_executable(f::Function, types::Tuple, path::String, [name::String=repr(f)];
+    filename::String=name,
+    cflags=``, # Specify libraries you would like to link against, and other compiler options here
+    kwargs...
+)
 ```
 Attempt to compile a standalone executable that runs function `f` with a type signature given by the tuple of `types`.
 
@@ -207,7 +211,7 @@ julia> function print_args(argc::Int, argv::Ptr{Ptr{UInt8}})
        end
 
 julia> compile_executable(print_args, (Int, Ptr{Ptr{UInt8}}))
-"/Users/foo/code/StaticCompiler.jl/print_args"
+""/Users/user/print_args""
 
 shell> ./print_args 1 2 3 4 Five
 ./print_args
@@ -223,13 +227,16 @@ julia> using StaticTools # So you don't have to define `puts` and friends every 
 julia> hello() = println(c"Hello, world!") # c"..." makes a stack-allocated StaticString
 
 julia> compile_executable(hello)
-"/Users/foo/code/StaticCompiler.jl/hello"
+"/Users/cbkeller/hello"
+
+shell> ls -alh hello
+-rwxr-xr-x  1 user  staff    33K Mar 20 21:11 hello
 
 shell> ./hello
 Hello, world!
 ```
 """
-function compile_executable(f, types=(), path::String="./", name=GPUCompiler.safe_name(repr(f));
+function compile_executable(f::Function, types=(), path::String="./", name=GPUCompiler.safe_name(repr(f));
         filename=name,
         cflags=``,
         kwargs...
@@ -244,9 +251,6 @@ function compile_executable(f, types=(), path::String="./", name=GPUCompiler.saf
     nativetype = isprimitivetype(rt) || isa(rt, Ptr)
     nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
 
-    # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
-    # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
-
     generate_executable(f, tt, path, name, filename; cflags=cflags, kwargs...)
 
     joinpath(abspath(path), filename)
@@ -255,11 +259,35 @@ end
 
 """
 ```julia
-compile_shlib(f, types::Tuple, path::String, name::String=repr(f); filename::String=name, kwargs...)
+compile_shlib(f::Function, types::Tuple, [path::String="./"], [name::String=repr(f)]; filename::String=name, cflags=``, kwargs...)
+compile_shlib(funcs::Array, [path::String="./"]; filename="libfoo", demangle=false, cflags=``, kwargs...)
 ```
 As `compile_executable`, but compiling to a standalone `.dylib`/`.so` shared library.
+
+### Examples
+```julia
+julia> using StaticCompiler, LoopVectorization
+
+julia> function test(n)
+                  r = 0.0
+                  @turbo for i=1:n
+                      r += log(sqrt(i))
+                  end
+                  return r/n
+              end
+test (generic function with 1 method)
+
+julia> compile_shlib(test, (Int,))
+"/Users/user/test.dylib"
+
+julia> test(100_000)
+5.2564961094956075
+
+julia> ccall(("julia_test", "test.dylib"), Float64, (Int64,), 100_000)
+5.2564961094956075
+```
 """
-function compile_shlib(f, types=(), path::String="./", name=GPUCompiler.safe_name(repr(f));
+function compile_shlib(f::Function, types=(), path::String="./", name=GPUCompiler.safe_name(repr(f));
         filename=name,
         cflags=``,
         kwargs...
@@ -273,27 +301,33 @@ function compile_shlib(f, types=(), path::String="./", name=GPUCompiler.safe_nam
     nativetype = isprimitivetype(rt) || isa(rt, Ptr)
     nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
 
-    # Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
-    # Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
     generate_shlib(f, tt, true, path, name, filename; cflags=cflags, kwargs...)
 
     joinpath(abspath(path), filename * "." * Libdl.dlext)
 end
+# As above, but taking an array of functions and returning a single shlib
+function compile_shlib(funcs::Array, path::String="./";
+        filename="libfoo",
+        demangle=false,
+        cflags=``,
+        kwargs...
+    )
+    for func in funcs
+        f, types = func
+        tt = Base.to_tuple_type(types)
+        isconcretetype(tt) || error("input type signature `$types` is not concrete")
 
-function generate_shlib_fptr(f, tt, path::String=tempname(), name = GPUCompiler.safe_name(repr(f)), filename::String=name;
-                            temp::Bool=true,
-                            kwargs...)
-
-    generate_shlib(f, tt, false, path, name; kwargs...)
-    lib_path = joinpath(abspath(path), "$filename.$(Libdl.dlext)")
-    ptr = Libdl.dlopen(lib_path, Libdl.RTLD_LOCAL)
-    fptr = Libdl.dlsym(ptr, "julia_$name")
-    @assert fptr != C_NULL
-    if temp
-        atexit(()->rm(path; recursive=true))
+        rt = last(only(native_code_typed(f, tt)))
+        isconcretetype(rt) || error("`$f$types` did not infer to a concrete type. Got `$rt`")
+        nativetype = isprimitivetype(rt) || isa(rt, Ptr)
+        nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
     end
-    fptr
+
+    generate_shlib(funcs, true, path, filename; demangle=demangle, cflags=cflags, kwargs...)
+
+    joinpath(abspath(path), filename * "." * Libdl.dlext)
 end
+
 
 """
 ```julia
@@ -338,25 +372,40 @@ function generate_shlib_fptr(path::String, name, filename::String=name)
     @assert fptr != C_NULL
     fptr
 end
+# As above, but also compile (maybe remove this method in the future?)
+function generate_shlib_fptr(f, tt, path::String=tempname(), name = GPUCompiler.safe_name(repr(f)), filename::String=name;
+                            temp::Bool=true,
+                            kwargs...)
+
+    generate_shlib(f, tt, false, path, name; kwargs...)
+    lib_path = joinpath(abspath(path), "$filename.$(Libdl.dlext)")
+    ptr = Libdl.dlopen(lib_path, Libdl.RTLD_LOCAL)
+    fptr = Libdl.dlsym(ptr, "julia_$name")
+    @assert fptr != C_NULL
+    if temp
+        atexit(()->rm(path; recursive=true))
+    end
+    fptr
+end
 
 """
 ```julia
 generate_executable(f, tt, path::String, name, filename=string(name); kwargs...)
 ```
 Attempt to compile a standalone executable that runs `f`.
+Low-level interface; you should generally use `compile_executable` instead.
 
 ### Examples
 ```julia
-julia> function test(n)
-           r = 0.0
-           for i=1:n
-               r += log(sqrt(i))
-           end
-           return r/n
-       end
-test (generic function with 1 method)
+julia> using StaticCompiler, StaticTools
 
-julia> path, name = StaticCompiler.generate_executable(test, Tuple{Int64}, "./scratch")
+julia> hello() = println(c"Hello, world!")
+
+julia> path, name = StaticCompiler.generate_executable(hello, Tuple{}, "./")
+("./", "hello")
+
+shell> ./hello
+Hello, world!
 ```
 """
 function generate_executable(f, tt, path=tempname(), name=GPUCompiler.safe_name(repr(f)), filename=string(name);
@@ -404,36 +453,43 @@ end
 
 """
 ```julia
-generate_shlib(f, tt, path::String, name::String, filenamebase::String="obj"; kwargs...)
+generate_shlib(f::Function, tt, [external::Bool=true], [path::String], [name], [filename]; kwargs...)
+generate_shlib(funcs::Array, [external::Bool=true], [path::String], [filename::String]; demangle=false, kwargs...)
 ```
 Low level interface for compiling a shared object / dynamically loaded library
  (`.so` / `.dylib`) for function `f` given a tuple type `tt` characterizing
 the types of the arguments for which the function will be compiled.
-See also `StaticCompiler.generate_shlib_fptr`.
+
 ### Examples
 ```julia
+julia> using StaticCompiler, LoopVectorization
+
 julia> function test(n)
            r = 0.0
-           for i=1:n
+           @turbo for i=1:n
                r += log(sqrt(i))
            end
            return r/n
        end
 test (generic function with 1 method)
-julia> path, name = StaticCompiler.generate_shlib(test, Tuple{Int64}, "./test")
-("./test", "test")
+
+julia> path, name = StaticCompiler.generate_shlib(test, Tuple{Int64}, true, "./example")
+("./example", "test")
+
 shell> tree \$path
-./test
-|-- obj.o
-`-- obj.so
+./example
+|-- test.dylib
+`-- test.o
 0 directories, 2 files
+
 julia> test(100_000)
-5.256496109495593
-julia> ccall(StaticCompiler.generate_shlib_fptr(path, name), Float64, (Int64,), 100_000)
-5.256496109495593
+5.2564961094956075
+
+julia> ccall(("julia_test", "example/test.dylib"), Float64, (Int64,), 100_000)
+5.2564961094956075
 ```
 """
-function generate_shlib(f, tt, external = true, path=tempname(), name=GPUCompiler.safe_name(repr(f)), filename=name;
+function generate_shlib(f::Function, tt, external::Bool=true, path::String=tempname(), name=GPUCompiler.safe_name(repr(f)), filename=name;
         cflags=``,
         kwargs...
     )
@@ -452,6 +508,23 @@ function generate_shlib(f, tt, external = true, path=tempname(), name=GPUCompile
     cc = Sys.isapple() ? `cc` : clang()
     # Compile!
     run(`$cc -shared $cflags $obj_path -o $lib_path`)
+
+    path, name
+end
+# As above, but taking an array of functions and returning a single shlib
+function generate_shlib(funcs::Array, external::Bool=true, path::String=tempname(), filename::String="libfoo";
+        demangle=false,
+        cflags=``,
+        kwargs...
+    )
+
+    lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
+
+    _,obj_path = generate_obj(funcs, external, path, filename; demangle=demangle, kwargs...)
+    # Pick a Clang
+    cc = Sys.isapple() ? `cc` : clang()
+    # Compile!
+    run(`$cc -shared $cflags $obj_path -o $lib_path `)
 
     path, name
 end
@@ -523,47 +596,5 @@ function generate_obj(funcs::Array, external, path::String = tempname(), filenam
     end
     path, obj_path
 end
-
-function generate_shlib(funcs::Array, external = true, path::String = tempname(), filename::String="libfoo";
-        demangle=false,
-        cflags=``,
-        kwargs...
-    )
-
-    lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
-
-    _,obj_path = generate_obj(funcs, external, path, filename; demangle=demangle, kwargs...)
-    # Pick a Clang
-    cc = Sys.isapple() ? `cc` : clang()
-    # Compile!
-    run(`$cc -shared $cflags $obj_path -o $lib_path `)
-
-    path, name
-end
-
-function compile_shlib(funcs::Array, path::String="./";
-    filename="libfoo",
-    demangle=false,
-    cflags=``,
-    kwargs...)
-    for func in funcs
-        f, types = func
-        tt = Base.to_tuple_type(types)
-        isconcretetype(tt) || error("input type signature `$types` is not concrete")
-
-        rt = last(only(native_code_typed(f, tt)))
-        isconcretetype(rt) || error("`$f$types` did not infer to a concrete type. Got `$rt`")
-        nativetype = isprimitivetype(rt) || isa(rt, Ptr)
-        nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
-    end
-
-# Would be nice to use a compiler pass or something to check if there are any heap allocations or references to globals
-# Keep an eye on https://github.com/JuliaLang/julia/pull/43747 for this
-
-    generate_shlib(funcs, true, path, filename; demangle=demangle, cflags=cflags, kwargs...)
-
-    joinpath(abspath(path), filename * "." * Libdl.dlext)
-end
-
 
 end # module

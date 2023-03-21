@@ -173,15 +173,14 @@ end
     end
     hello_compiled, path = compile(hello, (String,))
     @test remote_load_call(path, "world") == "Hello, world!"
-end
 
-@testset "Hello World" begin
-    function hello(N)
-        println("Hello World $N")
-        N
-    end
     # We'll need to be able to relocate a bunch of UV stuff for this, and deal with dynamic dispatch.
     @test_skip begin
+        function hello(N)
+            println("Hello World $N")
+            N
+        end
+
         hello_compiled, path = compile(hello, (Int,))
         @test_skip remote_load_call(path, 1) == 1
     end

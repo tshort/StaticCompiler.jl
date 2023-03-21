@@ -15,7 +15,10 @@ using Pkg
 Pkg.add("StaticCompiler")
 ```
 
-There are two main ways to use this package. The first is via the `compile` function, which can be used when you want to compile a Julia function for later use from within Julia:
+There are two main ways to use this package:
+
+### Linked compilation
+The first option is via the `compile` function, which can be used when you want to compile a Julia function for later use from within Julia:
 ```julia
 julia> using StaticCompiler
 
@@ -43,7 +46,8 @@ julia> fib_compiled(10)
 ```
 See the file `tests/runtests.jl` for some examples of functions that work with `compile` (and some that don't, marked with `@test_skip`).
 
-The second way to use this package is via the `compile_executable` and `compile_shlib` functions, for use when you want to compile a Julia function to a native executable or shared library for use from outside of Julia:
+### Standalone compilation
+The second way to use this package is via the `compile_executable` and `compile_shlib` functions, for when you want to compile a Julia function to a native executable or shared library for use from outside of Julia:
 ```julia
 julia> using StaticCompiler, StaticTools
 
@@ -68,7 +72,7 @@ This package uses the [GPUCompiler package](https://github.com/JuliaGPU/GPUCompi
 ## Limitations
 
 * GC-tracked allocations and global variables do work with `compile`, but the way they are implemented is brittle and can be dangerous. Allocate with care.
-* GC-tracked allocations and global variables do *not* work with `compile_executable` (yet).
-* Type unstable code is not yet supported.
-* Doesn't currently work on Windows.
+* GC-tracked allocations and global variables do *not* work with `compile_executable`. This has some interesting consequences, including that all functions _within_ the function you want to compile must either be inlined or return only native types (otherwise Julia would have to allocate a place to put the results, which will fail).
+* Type instability. Type unstable code cannot currently be statically compiled.
+* Doesn't work on Windows. PRs welcome.
 * If you find any other limitations, let us know. There's probably lots.
