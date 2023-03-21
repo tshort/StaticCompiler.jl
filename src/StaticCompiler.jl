@@ -264,8 +264,11 @@ compile_shlib(f::Function, types::Tuple, [path::String="./"], [name::String=repr
 compile_shlib(funcs::Array, [path::String="./"]; filename="libfoo", demangle=false, cflags=``, kwargs...)
 ```
 As `compile_executable`, but compiling to a standalone `.dylib`/`.so` shared library.
-The compiled function is given the symbol name `julia_$(name)`, i.e.,
+
+The compiled function is by default given the symbol name `julia_$(name)`, i.e.,
 the function `test` in the example below is called `julia_test` in the shared library.
+The keword argument `demangle=true` will remove this prefix, but is currently only
+supported the second (multi-function-shlib) method.
 
 ### Examples
 ```julia
