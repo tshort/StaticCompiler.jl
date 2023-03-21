@@ -72,7 +72,7 @@ This package uses the [GPUCompiler package](https://github.com/JuliaGPU/GPUCompi
 ## Limitations
 
 * GC-tracked allocations and global variables do work with `compile`, but the way they are implemented is brittle and can be dangerous. Allocate with care.
-* GC-tracked allocations and global variables do *not* work with `compile_executable`. This has some interesting consequences, including that all functions _within_ the function you want to compile must either be inlined or return only native types (otherwise Julia would have to allocate a place to put the results, which will fail).
-* Type instability. Type unstable code cannot currently be statically compiled.
+* GC-tracked allocations and global variables do *not* work with `compile_executable` or `compile_shlib`. This has some interesting consequences, including that all functions _within_ the function you want to compile must either be inlined or return only native types (otherwise Julia would have to allocate a place to put the results, which will fail).
+* Since error handling relies on libjulia, you can only throw errors from standalone-compiled (`compile_executable` / `compile_shlib`) code if an explicit overload has been defined for that particular error with `@device_overload` (see [quirks.jl](src/quirks.jl)).
+* Type instability. Type unstable code cannot currently be statically compiled via this package.
 * Doesn't work on Windows. PRs welcome.
-* If you find any other limitations, let us know. There's probably lots.

@@ -13,6 +13,7 @@ using StaticTools: @symbolcall, @c_str, println
 
 export compile, load_function, compile_shlib, compile_executable
 export native_code_llvm, native_code_typed, native_llvm_module, native_code_native
+export @device_override, @print_and_throw
 
 include("target.jl")
 include("pointer_patching.jl")
