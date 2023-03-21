@@ -6,7 +6,18 @@ end
 
 const overrides = quote end
 
-
+"""
+```julia
+@device_override old_bad_method(arg1::Type1, arg2::Type2) = new_good_method(arg1, arg2)
+```
+Override a non-static-compilable method (e.g. `old_bad_method(::Type1, ::Type2)`)
+with a more compileable replacement.
+### Examples
+```
+@device_override @noinline Core.throw_inexacterror(f::Symbol, ::Type{T}, val) where {T} =
+    @print_and_throw c"Inexact conversion"
+```
+"""
 macro device_override(ex)
     ex = macroexpand(__module__, ex)
     if Meta.isexpr(ex, :call)
@@ -23,7 +34,6 @@ macro device_override(ex)
         return
     end
 end
-
 
 Base.@kwdef struct NativeCompilerTarget <: GPUCompiler.AbstractCompilerTarget
     cpu::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUName())
