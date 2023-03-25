@@ -55,8 +55,6 @@ module StaticRuntime
     report_exception_frame(idx, func, file, line) = return
 end
 
-# struct StaticCompilerParams <: GPUCompiler.AbstractCompilerParams end
-
 for target in (:NativeCompilerTarget, :ExternalNativeCompilerTarget)
     @eval begin
         GPUCompiler.llvm_triple(::$target) = Sys.MACHINE
@@ -92,12 +90,18 @@ function native_job(@nospecialize(func::Function), @nospecialize(types::Type), e
         kernel::Bool = false,
         kwargs...
     )
-    source = GPUCompiler.FunctionSpec(typeof(func), Base.to_tuple_type(types))
+    source = GPUCompiler.FunctionSpec(func, types, kernel, name)
     target = external ? ExternalNativeCompilerTarget() : NativeCompilerTarget()
     params = StaticCompilerParams(mixtape = mixtape)
     StaticCompiler.CompilerJob(target, source, params), kwargs
 end
 
+function native_job(@nospecialize(func), @nospecialize(types), external; mixtape = NoContext(), kernel::Bool=false, name=GPUCompiler.safe_name(repr(func)), kwargs...)
+    source = GPUCompiler.FunctionSpec(func, Base.to_tuple_type(types), kernel, name)
+    target = external ? ExternalNativeCompilerTarget() : NativeCompilerTarget()
+    params = StaticCompilerParams(mixtape = mixtape)
+    GPUCompiler.CompilerJob(target, source, params), kwargs
+end
 
 StaticCompilerJob = CompilerJob{NativeCompilerTarget,StaticCompilerParams}
 
