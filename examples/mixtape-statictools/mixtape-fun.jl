@@ -4,7 +4,6 @@ using StaticCompiler
 using CodeInfoTools
 using MacroTools
 using StaticTools
-using Eyeball
 
 struct MyMix <: CompilationContext end
 

@@ -78,6 +78,12 @@ for target in (:NativeCompilerTarget, :ExternalNativeCompilerTarget)
 
         GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{$target, StaticCompilerParams}) = true
         GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{$target}) = true
+
+        GPUCompiler.get_interpreter(job::GPUCompiler.CompilerJob{$target, StaticCompilerParams}) =
+            StaticInterpreter(job.params.cache, GPUCompiler.method_table(job), job.source.world, 
+                              GPUCompiler.inference_params(job), GPUCompiler.optimization_params(job), 
+                              job.params.mixtape)    
+        GPUCompiler.ci_cache(job::GPUCompiler.CompilerJob{$target, StaticCompilerParams}) = job.params.cache       
     end
 end
 
@@ -101,10 +107,4 @@ function native_job(@nospecialize(func), @nospecialize(types), external; mixtape
     target = external ? ExternalNativeCompilerTarget() : NativeCompilerTarget()
     params = StaticCompilerParams(mixtape = mixtape)
     GPUCompiler.CompilerJob(target, source, params), kwargs
-end
-
-StaticCompilerJob = CompilerJob{NativeCompilerTarget,StaticCompilerParams}
-
-function GPUCompiler.get_interpreter(job::StaticCompilerJob)
-    StaticInterpreter(GPUCompiler.ci_cache(job), GPUCompiler.method_table(job), job.source.world, GPUCompiler.inference_params(job), GPUCompiler.optimization_params(job), job.params.mixtape)    
 end

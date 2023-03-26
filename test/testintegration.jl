@@ -355,6 +355,19 @@ struct MyMix <: CompilationContext end
 
     _, path = compile(SubFoo.f, (), mixtape = MyMix())
     @test load_function(path)() == 8
-    # @test SubFoo.f() != 8
+    @test SubFoo.f() != 8
+
+    # redefine swap to test caching
+    function swap(e::Expr)
+        new = MacroTools.postwalk(e) do s
+            isexpr(s, :call) || return s
+            s.args[1] == Base.rand || return s
+            return 2
+        end
+        return new
+    end
+    _, path = compile(SubFoo.f, (), mixtape = MyMix())
+    @test load_function(path)() == 4
+
 end
 

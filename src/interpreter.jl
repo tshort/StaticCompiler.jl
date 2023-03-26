@@ -130,11 +130,12 @@ struct StaticCompilerParams <: AbstractCompilerParams
     opt::Bool
     optlevel::Int
     mixtape::CompilationContext
+    cache::CodeCache
 end
 
-function StaticCompilerParams(; opt = false, 
-        optlevel = Base.JLOptions().opt_level, 
-        mixtape = NoContext())
-    return StaticCompilerParams(opt, optlevel, mixtape)
+function StaticCompilerParams(; opt = false,
+        optlevel = Base.JLOptions().opt_level,
+        mixtape = NoContext(),
+        cache = CodeCache())
+    return StaticCompilerParams(opt, optlevel, mixtape, cache)
 end
-
