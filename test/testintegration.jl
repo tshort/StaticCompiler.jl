@@ -322,6 +322,14 @@ function f()
     return x + y
 end
 
+function stringfun(s1, s2)
+    return s1 * s2
+end
+
+function teststring()
+    return stringfun("ab", "c") == "abc"
+end
+
 end
 
 struct MyMix <: CompilationContext end
@@ -357,9 +365,10 @@ struct MyMix <: CompilationContext end
     @test load_function(path)() == 8
     @test SubFoo.f() != 8
 
-    # redefine swap to test caching
+    # redefine swap to test caching and add StaticString substitution
     function swap(e::Expr)
         new = MacroTools.postwalk(e) do s
+            s isa String && return StaticTools.StaticString(tuple(codeunits(s)..., 0x00))
             isexpr(s, :call) || return s
             s.args[1] == Base.rand || return s
             return 2
@@ -368,6 +377,9 @@ struct MyMix <: CompilationContext end
     end
     _, path = compile(SubFoo.f, (), mixtape = MyMix())
     @test load_function(path)() == 4
+
+    _, path = compile(SubFoo.teststring, (), mixtape = MyMix())
+    @test load_function(path)()
 
 end
 
