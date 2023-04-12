@@ -155,7 +155,6 @@ function generate_obj(f, tt, external = true, path::String = tempname(), name = 
                                             opt = true, 
                                             mixtape = mixtape,
                                             optlevel = Base.JLOptions().opt_level))
-    GPUCompiler.eval(:(current_job = $job))
 
     mod, meta = GPUCompiler.JuliaContext() do context
         GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false, ctx=context)
