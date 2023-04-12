@@ -7,6 +7,9 @@ using ManualMemory
 using Distributed
 using StaticTools
 using StrideArraysCore
+using CodeInfoTools
+using MacroTools
+
 addprocs(1)
 @everywhere using StaticCompiler, StrideArraysCore
 

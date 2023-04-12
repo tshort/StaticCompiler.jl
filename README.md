@@ -65,6 +65,14 @@ Hello, world!
 ```
 This latter approach comes with substantially more limitations, as you cannot rely on `libjulia` (see, e.g., [StaticTools.jl](https://github.com/brenhinkeller/StaticTools.jl) for some ways to work around these limitations).
 
+### Mixtape
+
+This feature allows one to change functionality when statically compiling. This uses code and API from [Mixtape](https://github.com/JuliaCompilerPlugins/Mixtape.jl) to transform lowered code much like [Cassette](https://github.com/JuliaLabs/Cassette.jl).
+
+To use the Mixtape feature, define a `CompilationContext` struct and pass this to any of the compilation functions with the `mixtape` keyword. Define `transform` and `allow` functions for this `CompilationContext` to define the transformation to be done.
+
+See [here](https://github.com/tshort/StaticCompiler.jl/blob/master/test/testintegration.jl#L329) for an example.
+
 ## Approach
 
 This package uses the [GPUCompiler package](https://github.com/JuliaGPU/GPUCompiler.jl) to generate code.

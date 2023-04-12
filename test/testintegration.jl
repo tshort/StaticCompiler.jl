@@ -311,3 +311,75 @@
 
     cd(testpath)
 end
+
+# Mixtape
+
+module SubFoo
+
+function f()
+    x = rand()
+    y = rand()
+    return x + y
+end
+
+function stringfun(s1, s2)
+    return s1 * s2
+end
+
+function teststring()
+    return stringfun("ab", "c") == "abc"
+end
+
+end
+
+struct MyMix <: CompilationContext end
+
+@testset "Mixtape" begin
+    # 101: How2Mix
+
+    # A few little utility functions for working with Expr instances.
+    swap(e) = e
+    function swap(e::Expr)
+        new = MacroTools.postwalk(e) do s
+            isexpr(s, :call) || return s
+            s.args[1] == Base.rand || return s
+            return 4
+        end
+        return new
+    end
+
+    # This is pre-inference - you get to see a CodeInfoTools.Builder instance.
+    function StaticCompiler.transform(::MyMix, src)
+        b = CodeInfoTools.Builder(src)
+        for (v, st) in b
+            b[v] = swap(st)
+        end
+        return CodeInfoTools.finish(b)
+    end
+
+    # MyMix will only transform functions which you explicitly allow.
+    # You can also greenlight modules.
+    StaticCompiler.allow(ctx::MyMix, m::Module) = m == SubFoo
+
+    _, path = compile(SubFoo.f, (), mixtape = MyMix())
+    @test load_function(path)() == 8
+    @test SubFoo.f() != 8
+
+    # redefine swap to test caching and add StaticString substitution
+    function swap(e::Expr)
+        new = MacroTools.postwalk(e) do s
+            s isa String && return StaticTools.StaticString(tuple(codeunits(s)..., 0x00))
+            isexpr(s, :call) || return s
+            s.args[1] == Base.rand || return s
+            return 2
+        end
+        return new
+    end
+    _, path = compile(SubFoo.f, (), mixtape = MyMix())
+    @test load_function(path)() == 4
+
+    _, path = compile(SubFoo.teststring, (), mixtape = MyMix())
+    @test load_function(path)()
+
+end
+

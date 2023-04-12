@@ -1,5 +1,5 @@
 module StaticCompiler
-
+using InteractiveUtils
 using GPUCompiler: GPUCompiler
 using LLVM
 using LLVM.Interop
@@ -15,6 +15,8 @@ export compile, load_function, compile_shlib, compile_executable
 export native_code_llvm, native_code_typed, native_llvm_module, native_code_native
 export @device_override, @print_and_throw
 
+include("mixtape.jl")
+include("interpreter.jl")
 include("target.jl")
 include("pointer_patching.jl")
 include("code_loading.jl")
@@ -87,7 +89,10 @@ with `load_function(path)`. `LazyStaticcompiledfunction`s contain the requisite 
 `StaticCompiledFunction` and may be called with arguments of type `types` as if it were a function with a
 single method (the method determined by `types`).
 """
-function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_name(repr(f)), filename="obj",
+function compile(f, _tt, path::String = tempname(); 
+                 mixtape = NoContext(), 
+                 name = GPUCompiler.safe_name(repr(f)), 
+                 filename = "obj",
                  strip_llvm = false,
                  strip_asm  = true,
                  opt_level=3,
@@ -95,11 +100,10 @@ function compile(f, _tt, path::String = tempname();  name = GPUCompiler.safe_nam
     tt = Base.to_tuple_type(_tt)
     isconcretetype(tt) || error("input type signature $_tt is not concrete")
 
-    rt = last(only(native_code_typed(f, tt)))
+    rt = last(only(native_code_typed(f, tt, mixtape = mixtape)))
     isconcretetype(rt) || error("$f on $_tt did not infer to a concrete type. Got $rt")
-
     f_wrap!(out::Ref, args::Ref{<:Tuple}) = (out[] = f(args[]...); nothing)
-    _, _, table = generate_obj(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, false, path, name; opt_level, strip_llvm, strip_asm, filename, kwargs...)
+    _, _, table = generate_obj(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, false, path, name; mixtape = mixtape, opt_level, strip_llvm, strip_asm, filename, kwargs...)
 
     lf = LazyStaticCompiledFunction{rt, tt}(Symbol(f), path, name, filename, table)
     cjl_path = joinpath(path, "$filename.cjl")
@@ -136,6 +140,7 @@ shell> tree \$path
 ```
 """
 function generate_obj(f, tt, external = true, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj";
+                        mixtape = NoContext(),
                         strip_llvm = false,
                         strip_asm  = true,
                         opt_level=3,
@@ -143,11 +148,18 @@ function generate_obj(f, tt, external = true, path::String = tempname(), name = 
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
     tm = GPUCompiler.llvm_machine(external ? ExternalNativeCompilerTarget() : NativeCompilerTarget())
-    job, kwargs = native_job(f, tt, external; name, kwargs...)
     #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
+    job = CompilerJob(NativeCompilerTarget(), 
+                      FunctionSpec(f, tt, false, name), 
+                      StaticCompilerParams(; 
+                                            opt = true, 
+                                            mixtape = mixtape,
+                                            optlevel = Base.JLOptions().opt_level))
+
     mod, meta = GPUCompiler.JuliaContext() do context
         GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false, ctx=context)
-    end
+    end  
+
     # Use Enzyme's annotation and optimization pipeline
     annotate!(mod)
     optimize!(mod, tm)
@@ -247,7 +259,7 @@ function compile_executable(f::Function, types=(), path::String="./", name=GPUCo
     isexecutableargtype = tt == Tuple{} || tt == Tuple{Int, Ptr{Ptr{UInt8}}}
     isexecutableargtype || @warn "input type signature $types should be either `()` or `(Int, Ptr{Ptr{UInt8}})` for standard executables"
 
-    rt = last(only(native_code_typed(f, tt)))
+    rt = last(only(native_code_typed(f, tt; kwargs...)))
     isconcretetype(rt) || error("`$f$types` did not infer to a concrete type. Got `$rt`")
     nativetype = isprimitivetype(rt) || isa(rt, Ptr)
     nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
@@ -302,7 +314,7 @@ function compile_shlib(f::Function, types=(), path::String="./", name=GPUCompile
     tt = Base.to_tuple_type(types)
     isconcretetype(tt) || error("input type signature `$types` is not concrete")
 
-    rt = last(only(native_code_typed(f, tt)))
+    rt = last(only(native_code_typed(f, tt; kwargs...)))
     isconcretetype(rt) || error("`$f$types` did not infer to a concrete type. Got `$rt`")
     nativetype = isprimitivetype(rt) || isa(rt, Ptr)
     nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
