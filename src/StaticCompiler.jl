@@ -115,14 +115,23 @@ end
 """
 ```julia
 generate_obj(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj";
+            \tmixtape = NoContext(),
             \tstrip_llvm = false,
             \tstrip_asm  = true,
+            \ttarget = (),
             \topt_level=3,
             \tkwargs...)
 ```
 Low level interface for compiling object code (`.o`) for for function `f` given
 a tuple type `tt` characterizing the types of the arguments for which the
 function will be compiled.
+
+`mixtape` defines a context that can be used to transform IR prior to compilation using 
+[Mixtape](https://github.com/JuliaCompilerPlugins/Mixtape.jl) features.
+
+`target` can be used to change the output target. This is useful for compiling to WebAssembly and embedded targets.
+This is a named tuple with fields `triple`, `cpu`, and `features` (each of these are strings). 
+The defaults compile to the native target.
 
 ### Examples
 ```julia
@@ -144,12 +153,13 @@ function generate_obj(f, tt, external = true, path::String = tempname(), name = 
                         strip_llvm = false,
                         strip_asm  = true,
                         opt_level=3,
+                        target = (),
                         kwargs...)
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
-    tm = GPUCompiler.llvm_machine(external ? ExternalNativeCompilerTarget() : NativeCompilerTarget())
+    tm = GPUCompiler.llvm_machine(external ? ExternalNativeCompilerTarget(target...) : NativeCompilerTarget(target...))
     #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
-    job = CompilerJob(NativeCompilerTarget(), 
+    job = CompilerJob(NativeCompilerTarget(target...), 
                       FunctionSpec(f, tt, false, name), 
                       StaticCompilerParams(; 
                                             opt = true, 

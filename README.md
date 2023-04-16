@@ -65,6 +65,8 @@ Hello, world!
 ```
 This latter approach comes with substantially more limitations, as you cannot rely on `libjulia` (see, e.g., [StaticTools.jl](https://github.com/brenhinkeller/StaticTools.jl) for some ways to work around these limitations).
 
+The low-level function `StaticCompiler.generate_obj` (not exported) generates object files. This can be used for more control of compilation. This can be used to cross-compile to other targets.
+
 ### Mixtape
 
 This feature allows one to change functionality when statically compiling. This uses code and API from [Mixtape](https://github.com/JuliaCompilerPlugins/Mixtape.jl) to transform lowered code much like [Cassette](https://github.com/JuliaLabs/Cassette.jl).

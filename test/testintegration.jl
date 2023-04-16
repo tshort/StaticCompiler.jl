@@ -383,3 +383,9 @@ struct MyMix <: CompilationContext end
 
 end
 
+@testset "Cross compiling" begin
+
+    x, obj_path = StaticCompiler.generate_obj(sin, Tuple{Float64}, true, tempname(); target = (triple = "wasm32-unknown-wasi", cpu = "wasm?", features = ""))
+
+end
+
