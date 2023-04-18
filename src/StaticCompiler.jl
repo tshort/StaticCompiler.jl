@@ -157,7 +157,6 @@ function generate_obj(f, tt, external = true, path::String = tempname(), name = 
                         kwargs...)
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
-    tm = GPUCompiler.llvm_machine(external ? ExternalNativeCompilerTarget(target...) : NativeCompilerTarget(target...))
     #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
     job = CompilerJob(NativeCompilerTarget(target...), 
                       FunctionSpec(f, tt, false, name), 
@@ -172,6 +171,7 @@ function generate_obj(f, tt, external = true, path::String = tempname(), name = 
 
     # Use Enzyme's annotation and optimization pipeline
     annotate!(mod)
+    tm = GPUCompiler.llvm_machine(external ? ExternalNativeCompilerTarget(target...) : NativeCompilerTarget(target...))
     optimize!(mod, tm)
 
     # Scoop up all the pointers in the optimized module, and replace them with unitialized global variables.

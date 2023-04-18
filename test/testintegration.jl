@@ -385,7 +385,7 @@ end
 
 @testset "Cross compiling" begin
 
-    x, obj_path = StaticCompiler.generate_obj(sin, Tuple{Float64}, true, tempname(); target = (triple = "wasm32-unknown-wasi", cpu = "wasm?", features = ""))
+    x, obj_path = StaticCompiler.generate_obj(x -> 2x, Tuple{Float64}, true, tempname(); target = (triple = "wasm32-unknown-wasi", cpu = "", features = ""))
 
 end
 
