@@ -3,7 +3,7 @@
 using Core.Compiler:
     AbstractInterpreter, InferenceResult, InferenceParams, InferenceState, MethodInstance, OptimizationParams, WorldView
 using GPUCompiler:
-    @safe_debug, AbstractCompilerParams, CodeCache, CompilerJob, FunctionSpec
+    @safe_debug, AbstractCompilerParams, CodeCache, CompilerJob, methodinstance
 using CodeInfoTools
 using CodeInfoTools: resolve
 

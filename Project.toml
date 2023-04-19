@@ -16,8 +16,8 @@ StaticTools = "86c06d3c-3f03-46de-9781-57580aa96d0a"
 
 [compat]
 CodeInfoTools = "0.3"
-GPUCompiler = "0.17"
-LLVM = "4.8, 5"
+GPUCompiler = "0.19"
+LLVM = "5"
 StaticTools = "0.8"
 MacroTools = "0.5"
 julia = "1.8, 1.9"

@@ -23,6 +23,7 @@ include("code_loading.jl")
 include("optimize.jl")
 include("quirks.jl")
 
+fix_name(s) = string("julia_", GPUCompiler.safe_name(s))
 
 """
     compile(f, types, path::String = tempname()) --> (compiled_f, path)
@@ -91,12 +92,13 @@ single method (the method determined by `types`).
 """
 function compile(f, _tt, path::String = tempname(); 
                  mixtape = NoContext(), 
-                 name = GPUCompiler.safe_name(repr(f)), 
+                 name = fix_name(repr(f)), 
                  filename = "obj",
                  strip_llvm = false,
                  strip_asm  = true,
                  opt_level=3,
                  kwargs...)
+
     tt = Base.to_tuple_type(_tt)
     isconcretetype(tt) || error("input type signature $_tt is not concrete")
 
@@ -114,7 +116,7 @@ end
 
 """
 ```julia
-generate_obj(f, tt, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj";
+generate_obj(f, tt, path::String = tempname(), name = fix_name(repr(f)), filenamebase::String="obj";
             \tmixtape = NoContext(),
             \tstrip_llvm = false,
             \tstrip_asm  = true,
@@ -148,7 +150,7 @@ shell> tree \$path
 0 directories, 1 file
 ```
 """
-function generate_obj(f, tt, external = true, path::String = tempname(), name = GPUCompiler.safe_name(repr(f)), filenamebase::String="obj";
+function generate_obj(f, tt, external = true, path::String = tempname(), name = fix_name(repr(f)), filenamebase::String="obj";
                         mixtape = NoContext(),
                         strip_llvm = false,
                         strip_asm  = true,
@@ -158,12 +160,9 @@ function generate_obj(f, tt, external = true, path::String = tempname(), name = 
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
     #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
-    job = CompilerJob(NativeCompilerTarget(target...), 
-                      FunctionSpec(f, tt, false, name), 
-                      StaticCompilerParams(; 
-                                            opt = true, 
-                                            mixtape = mixtape,
-                                            optlevel = Base.JLOptions().opt_level))
+    params = StaticCompilerParams(opt = true, mixtape = mixtape, optlevel = Base.JLOptions().opt_level)
+    config = GPUCompiler.CompilerConfig(NativeCompilerTarget(target...), params, name = name, kernel = false)
+    job = GPUCompiler.CompilerJob(GPUCompiler.methodinstance(typeof(f), tt), config)
 
     mod, meta = GPUCompiler.JuliaContext() do context
         GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false, ctx=context)
@@ -259,7 +258,7 @@ shell> ./hello
 Hello, world!
 ```
 """
-function compile_executable(f::Function, types=(), path::String="./", name=GPUCompiler.safe_name(repr(f));
+function compile_executable(f::Function, types=(), path::String="./", name=fix_name(repr(f));
         filename=name,
         cflags=``,
         kwargs...
@@ -315,7 +314,7 @@ julia> ccall(("julia_test", "test.dylib"), Float64, (Int64,), 100_000)
 5.2564961094956075
 ```
 """
-function compile_shlib(f::Function, types=(), path::String="./", name=GPUCompiler.safe_name(repr(f));
+function compile_shlib(f::Function, types=(), path::String="./", name=fix_name(repr(f));
         filename=name,
         cflags=``,
         kwargs...
@@ -396,19 +395,19 @@ julia> test(100_000)
 function generate_shlib_fptr(path::String, name, filename::String=name)
     lib_path = joinpath(abspath(path), "$filename.$(Libdl.dlext)")
     ptr = Libdl.dlopen(lib_path, Libdl.RTLD_LOCAL)
-    fptr = Libdl.dlsym(ptr, "julia_$name")
+    fptr = Libdl.dlsym(ptr, name)
     @assert fptr != C_NULL
     fptr
 end
 # As above, but also compile (maybe remove this method in the future?)
-function generate_shlib_fptr(f, tt, path::String=tempname(), name = GPUCompiler.safe_name(repr(f)), filename::String=name;
+function generate_shlib_fptr(f, tt, path::String=tempname(), name = fix_name(repr(f)), filename::String=name;
                             temp::Bool=true,
                             kwargs...)
 
     generate_shlib(f, tt, false, path, name; kwargs...)
     lib_path = joinpath(abspath(path), "$filename.$(Libdl.dlext)")
     ptr = Libdl.dlopen(lib_path, Libdl.RTLD_LOCAL)
-    fptr = Libdl.dlsym(ptr, "julia_$name")
+    fptr = Libdl.dlsym(ptr, name)
     @assert fptr != C_NULL
     if temp
         atexit(()->rm(path; recursive=true))
@@ -436,7 +435,7 @@ shell> ./hello
 Hello, world!
 ```
 """
-function generate_executable(f, tt, path=tempname(), name=GPUCompiler.safe_name(repr(f)), filename=string(name);
+function generate_executable(f, tt, path=tempname(), name=fix_name(repr(f)), filename=string(name);
         cflags=``,
         kwargs...
     )
@@ -517,7 +516,7 @@ julia> ccall(("julia_test", "example/test.dylib"), Float64, (Int64,), 100_000)
 5.2564961094956075
 ```
 """
-function generate_shlib(f::Function, tt, external::Bool=true, path::String=tempname(), name=GPUCompiler.safe_name(repr(f)), filename=name;
+function generate_shlib(f::Function, tt, external::Bool=true, path::String=tempname(), name=fix_name(repr(f)), filename=name;
         cflags=``,
         kwargs...
     )
@@ -568,7 +567,7 @@ function native_code_typed(@nospecialize(func), @nospecialize(types); kwargs...)
 end
 
 # Return an LLVM module
-function native_llvm_module(f, tt, name = GPUCompiler.safe_name(repr(f)); kwargs...)
+function native_llvm_module(f, tt, name = fix_name(repr(f)); kwargs...)
     job, kwargs = native_job(f, tt, true; name, kwargs...)
     m, _ = GPUCompiler.JuliaContext() do context
         GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, ctx=context)
@@ -576,7 +575,7 @@ function native_llvm_module(f, tt, name = GPUCompiler.safe_name(repr(f)); kwargs
     return m
 end
 
-function native_code_native(@nospecialize(f), @nospecialize(tt), name = GPUCompiler.safe_name(repr(f)); kwargs...)
+function native_code_native(@nospecialize(f), @nospecialize(tt), name = fix_name(repr(f)); kwargs...)
     job, kwargs = native_job(f, tt, true; name, kwargs...)
     GPUCompiler.code_native(stdout, job; kwargs...)
 end
@@ -587,7 +586,7 @@ function native_llvm_module(funcs::Array; demangle = false, kwargs...)
     mod = native_llvm_module(f,tt, kwargs...)
     if length(funcs) > 1
         for func in funcs[2:end]
-            @show f,tt = func
+            f,tt = func
             tmod = native_llvm_module(f,tt, kwargs...)
             link!(mod,tmod)
         end

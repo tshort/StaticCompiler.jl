@@ -6,7 +6,7 @@ remote_load_call(path, args...) = fetch(@spawnat 2 load_function(path)(args...))
 
     # This probably needs a macro
     for T ∈ (Int, Float64, Int32, Float32, Int16, Float16)
-        _, path, = compile(simple_sum, (T,))
+        @show _, path, = compile(simple_sum, (T,))
         @test remote_load_call(path, T(1)) == T(2)
     end
 end
@@ -232,13 +232,13 @@ end
     # fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
 
     #Compile dylib
-    name = repr(fib)
+    name = "julia_" * repr(fib)
     filepath = compile_shlib(fib, (Int,), "./", name)
     @test occursin("fib.$(Libdl.dlext)", filepath)
 
     # Open dylib
     ptr = Libdl.dlopen(filepath, Libdl.RTLD_LOCAL)
-    fptr = Libdl.dlsym(ptr, "julia_$name")
+    fptr = Libdl.dlsym(ptr, name)
     @test fptr != C_NULL
     @test ccall(fptr, Int, (Int,), 10) == 55
 end

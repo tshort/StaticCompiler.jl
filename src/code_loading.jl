@@ -50,7 +50,7 @@ function instantiate(p::LazyStaticCompiledFunction{rt, tt}) where {rt, tt}
     dg = LLVM.CreateDynamicLibrarySearchGeneratorForProcess(prefix)
     LLVM.add!(jd, dg)
     LLVM.add!(lljit, jd, ofile)
-    fptr = pointer(LLVM.lookup(lljit, "julia_" * p.name))
+    fptr = pointer(LLVM.lookup(lljit, p.name))
     
     StaticCompiledFunction{rt, tt}(p.f, fptr, lljit, p.reloc)
 end
