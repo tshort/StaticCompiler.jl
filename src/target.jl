@@ -99,7 +99,7 @@ function native_job(@nospecialize(func::Function), @nospecialize(types::Type), e
         target = (),
         kwargs...
     )
-    source = methodinstance(typeof(func), types) 
+    source = methodinstance(typeof(func), Base.to_tuple_type(types)) 
     target = external ? ExternalNativeCompilerTarget(;target...) : NativeCompilerTarget(;target...)
     params = StaticCompilerParams(mixtape = mixtape)
     config = GPUCompiler.CompilerConfig(target, params, name = name, kernel = kernel)
@@ -107,9 +107,9 @@ function native_job(@nospecialize(func::Function), @nospecialize(types::Type), e
 end
 
 function native_job(@nospecialize(func), @nospecialize(types), external; mixtape = NoContext(), kernel::Bool=false, name=fix_name(repr(func)), target = (), kwargs...)
-    source = methodinstance(typeof(func), types) 
+    source = methodinstance(typeof(func), Base.to_tuple_type(types)) 
     target = external ? ExternalNativeCompilerTarget(;target...) : NativeCompilerTarget(;target...)
     params = StaticCompilerParams(mixtape = mixtape)
-    config = GPUCompiler.CompilerConfig(target, params, name = name)
+    config = GPUCompiler.CompilerConfig(target, params, name = name, kernel = kernel)
     GPUCompiler.CompilerJob(source, config), kwargs
 end

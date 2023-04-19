@@ -7,6 +7,8 @@
 /test/test.*
 Manifest.toml
 
+*.o
+*.so
 test.o
 test.so
 test.bc

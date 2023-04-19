@@ -455,18 +455,18 @@ function generate_executable(f, tt, path=tempname(), name=fix_name(repr(f)), fil
     # Compile!
     if Sys.isapple()
         # Apple no longer uses _start, so we can just specify a custom entry
-        entry = "_julia_$name"
+        entry = "_$name"
         run(`$cc -e $entry $cflags $obj_path -o $exec_path`)
     else
         # Write a minimal wrapper to avoid having to specify a custom entry
         wrapper_path = joinpath(path, "wrapper.c")
         f = open(wrapper_path, "w")
-        print(f, """int julia_$name(int argc, char** argv);
+        print(f, """int $name(int argc, char** argv);
         void* __stack_chk_guard = (void*) $(rand(UInt) >> 1);
 
         int main(int argc, char** argv)
         {
-            julia_$name(argc, argv);
+            $name(argc, argv);
             return 0;
         }""")
         close(f)
@@ -612,10 +612,10 @@ function generate_obj(funcs::Array, external, path::String = tempname(), filenam
                         strip_asm  = true,
                         opt_level=3,
                         kwargs...)
-    f,tt = funcs[1]
+    f, tt = funcs[1]
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
-    fakejob, kwargs = native_job(f,tt, external, kwargs...)
+    fakejob, kwargs = native_job(f, tt, external, kwargs...)
     mod = native_llvm_module(funcs; demangle = demangle, kwargs...)
     obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
     open(obj_path, "w") do io
