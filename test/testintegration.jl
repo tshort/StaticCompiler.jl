@@ -383,9 +383,12 @@ struct MyMix <: CompilationContext end
 
 end
 
-@testset "Cross compiling" begin
+@testset "Cross compiling to WebAssembly" begin
 
-    x, obj_path = StaticCompiler.generate_obj(x -> 2x, Tuple{Float64}, true, tempname(); target = (triple = "wasm32-unknown-wasi", cpu = "", features = ""))
+    m2(x) = 2x
+    obj_path, name = StaticCompiler.generate_obj(m2, Tuple{Float64}, true, tempname(); target = (triple = "wasm32-unknown-unknown", cpu = "", features = ""))
+    run(`$(Base.Linking.lld()) -flavor wasm --no-entry --export-all $obj_path/obj.o -o $name.wasm`)
+    # run(`wasm2wat $name.wasm`)   # to see a text representation (wasm2wat isn't included)
 
 end
 

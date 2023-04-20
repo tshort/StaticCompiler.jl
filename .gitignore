@@ -7,6 +7,8 @@
 /test/test.*
 Manifest.toml
 
+*.wasm
+*.dll
 *.o
 *.so
 test.o
