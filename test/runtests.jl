@@ -9,6 +9,7 @@ using StaticTools
 using StrideArraysCore
 using CodeInfoTools
 using MacroTools
+using LLD_jll
 
 addprocs(1)
 @everywhere using StaticCompiler, StrideArraysCore

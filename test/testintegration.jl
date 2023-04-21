@@ -387,7 +387,10 @@ end
 
     m2(x) = 2x
     obj_path, name = StaticCompiler.generate_obj(m2, Tuple{Float64}, true, tempname(); target = (triple = "wasm32-unknown-unknown", cpu = "", features = ""))
-    run(`$(Base.Linking.lld()) -flavor wasm --no-entry --export-all $obj_path/obj.o -o $name.wasm`)
+    # link with `lld` from LLD_jll
+    run(`$(lld()) -flavor wasm --no-entry --export-all $obj_path/obj.o -o $name.wasm`)
+    # On Julia v1.9, link with included linker
+    # run(`$(Base.Linking.lld()) -flavor wasm --no-entry --export-all $obj_path/obj.o -o $name.wasm`)
     # run(`wasm2wat $name.wasm`)   # to see a text representation (wasm2wat isn't included)
 
 end

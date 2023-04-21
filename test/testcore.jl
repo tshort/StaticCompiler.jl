@@ -6,7 +6,7 @@ remote_load_call(path, args...) = fetch(@spawnat 2 load_function(path)(args...))
 
     # This probably needs a macro
     for T ∈ (Int, Float64, Int32, Float32, Int16, Float16)
-        @show _, path, = compile(simple_sum, (T,))
+        _, path, = compile(simple_sum, (T,))
         @test remote_load_call(path, T(1)) == T(2)
     end
 end
