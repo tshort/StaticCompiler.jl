@@ -8,10 +8,11 @@ using Libdl: Libdl, dlsym, dlopen
 using Base: RefValue
 using Serialization: serialize, deserialize
 using Clang_jll: clang
+using LLD_jll: lld
 using StaticTools
 using StaticTools: @symbolcall, @c_str, println
 
-export compile, load_function, compile_shlib, compile_executable
+export compile, load_function, compile_shlib, compile_executable, compile_wasm
 export native_code_llvm, native_code_typed, native_llvm_module, native_code_native
 export @device_override, @print_and_throw
 
@@ -355,6 +356,38 @@ function compile_shlib(funcs::Array, path::String="./";
     joinpath(abspath(path), filename * "." * Libdl.dlext)
 end
 
+"""
+```julia
+compile_wasm(f::Function, types::Tuple, [path::String="./"], [name::String=repr(f)]; filename::String=name, flags=``, kwargs...)
+compile_wasm(funcs::Array, [path::String="./"]; filename="libfoo", demangle=false, flags=``, kwargs...)
+```
+As `compile_shlib`, but compiling to a WebAssembly library.
+
+The compiled function is by default given the symbol name `julia_$(name)`, i.e.,
+the function `test` in the example below is called `julia_test` in the shared library.
+The keword argument `demangle=true` will remove this prefix, but is currently only
+supported the second (multi-function-shlib) method.
+```
+"""
+function compile_wasm(f::Function, types=(), path::String="./";
+        filename=fix_name(repr(f)),
+        flags=``,
+        kwargs...
+    )
+    tt = Base.to_tuple_type(types)
+    obj_path, name = generate_obj(f, tt, true, filename; target = (triple = "wasm32-unknown-wasi", cpu = "", features = ""), kwargs...)
+    run(`$(lld()) -flavor wasm --no-entry --export-all $flags $obj_path/obj.o -o $name.wasm`)
+    joinpath(abspath(path), filename * ".wasm")
+end
+function compile_wasm(funcs::Array, path::String="./";
+        filename="libfoo",
+        flags=``,
+        kwargs...
+    )
+    obj_path, name = generate_obj(funcs, true; target = (triple = "wasm32-unknown-wasi", cpu = "", features = ""), kwargs...)
+    run(`$(lld()) -flavor wasm --no-entry --export-all $flags $obj_path/obj.o -o $path/$filename.wasm`)
+    joinpath(abspath(path), filename * ".wasm")
+end
 
 """
 ```julia
@@ -606,7 +639,7 @@ function native_llvm_module(funcs::Array; demangle = false, kwargs...)
     return mod
 end
 
-function generate_obj(funcs::Array, external, path::String = tempname(), filenamebase::String="obj";
+function generate_obj(funcs::Array, external::Bool, path::String = tempname(), filenamebase::String="obj";
                         demangle =false,
                         strip_llvm = false,
                         strip_asm  = true,
@@ -615,7 +648,7 @@ function generate_obj(funcs::Array, external, path::String = tempname(), filenam
     f, tt = funcs[1]
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
-    fakejob, kwargs = native_job(f, tt, external, kwargs...)
+    fakejob, kwargs = native_job(f, tt, external; kwargs...)
     mod = native_llvm_module(funcs; demangle = demangle, kwargs...)
     obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
     open(obj_path, "w") do io
