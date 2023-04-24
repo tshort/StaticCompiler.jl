@@ -36,11 +36,13 @@ macro device_override(ex)
 end
 
 Base.@kwdef struct NativeCompilerTarget <: GPUCompiler.AbstractCompilerTarget
+    triple::String=Sys.MACHINE
     cpu::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUName())
     features::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUFeatures())
 end
 
 Base.@kwdef struct ExternalNativeCompilerTarget <: GPUCompiler.AbstractCompilerTarget
+    triple::String=Sys.MACHINE
     cpu::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUName())
     features::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUFeatures())
 end
@@ -57,7 +59,7 @@ end
 
 for target in (:NativeCompilerTarget, :ExternalNativeCompilerTarget)
     @eval begin
-        GPUCompiler.llvm_triple(::$target) = Sys.MACHINE
+        GPUCompiler.llvm_triple(target::$target) = target.triple
 
         function GPUCompiler.llvm_machine(target::$target)
             triple = GPUCompiler.llvm_triple(target)
@@ -94,17 +96,18 @@ function native_job(@nospecialize(func::Function), @nospecialize(types::Type), e
         mixtape = NoContext(),
         name = GPUCompiler.safe_name(repr(func)),
         kernel::Bool = false,
+        target = (),
         kwargs...
     )
     source = GPUCompiler.FunctionSpec(func, types, kernel, name)
-    target = external ? ExternalNativeCompilerTarget() : NativeCompilerTarget()
+    target = external ? ExternalNativeCompilerTarget(;target...) : NativeCompilerTarget(;target...)
     params = StaticCompilerParams(mixtape = mixtape)
     StaticCompiler.CompilerJob(target, source, params), kwargs
 end
 
-function native_job(@nospecialize(func), @nospecialize(types), external; mixtape = NoContext(), kernel::Bool=false, name=GPUCompiler.safe_name(repr(func)), kwargs...)
+function native_job(@nospecialize(func), @nospecialize(types), external; mixtape = NoContext(), kernel::Bool=false, name=GPUCompiler.safe_name(repr(func)), target = (), kwargs...)
     source = GPUCompiler.FunctionSpec(func, Base.to_tuple_type(types), kernel, name)
-    target = external ? ExternalNativeCompilerTarget() : NativeCompilerTarget()
+    target = external ? ExternalNativeCompilerTarget(;target...) : NativeCompilerTarget(;target...)
     params = StaticCompilerParams(mixtape = mixtape)
     GPUCompiler.CompilerJob(target, source, params), kwargs
 end
