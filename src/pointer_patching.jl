@@ -137,7 +137,7 @@ function get_pointers!(d, mod, inst)
                         _, gv = d[val]
                         LLVM.API.LLVMSetOperand(inst, i-1, gv)
                     else
-                        gv_name = GPUCompiler.safe_name(String(gensym(repr(Core.Typeof(val)))))
+                        gv_name = fix_name(String(gensym(repr(Core.Typeof(val)))))
                         gv = LLVM.GlobalVariable(mod, llvmeltype(arg), gv_name, LLVM.addrspace(llvmtype(arg)))
 
                         LLVM.extinit!(gv, true)
@@ -157,7 +157,7 @@ llvmeltype(x::LLVM.Value) = eltype(LLVM.llvmtype(x))
 
 function pointer_patching_diff(f, tt, path1=tempname(), path2=tempname(); show_reloc_table=false)
     tm = GPUCompiler.llvm_machine(NativeCompilerTarget())
-    job, kwargs = native_job(f, tt, false; name=GPUCompiler.safe_name(repr(f)))
+    job, kwargs = native_job(f, tt, false; name=fix_name(repr(f)))
     #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
     mod, meta = GPUCompiler.JuliaContext() do context
         GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, optimize=false, ctx=context)

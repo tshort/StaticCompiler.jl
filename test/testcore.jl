@@ -232,13 +232,13 @@ end
     # fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
 
     #Compile dylib
-    name = repr(fib)
+    name = "julia_" * repr(fib)
     filepath = compile_shlib(fib, (Int,), "./", name)
     @test occursin("fib.$(Libdl.dlext)", filepath)
 
     # Open dylib
     ptr = Libdl.dlopen(filepath, Libdl.RTLD_LOCAL)
-    fptr = Libdl.dlsym(ptr, "julia_$name")
+    fptr = Libdl.dlsym(ptr, name)
     @test fptr != C_NULL
     @test ccall(fptr, Int, (Int,), 10) == 55
 end
