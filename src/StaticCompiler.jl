@@ -155,7 +155,8 @@ function generate_obj(f, tt, external = true, path::String = tempname(), name = 
                         mixtape = NoContext(),
                         strip_llvm = false,
                         strip_asm  = true,
-                        opt_level=3,
+                        opt_level = 3,
+                        remove_julia_addrspaces = false,
                         target = (),
                         kwargs...)
     mkpath(path)
@@ -181,7 +182,7 @@ function generate_obj(f, tt, external = true, path::String = tempname(), name = 
 
     # Now that we've removed all the pointers from the code, we can (hopefully) safely lower all the instrinsics
     # (again, using Enzyme's pipeline)
-    post_optimize!(mod, tm)
+    post_optimize!(mod, tm; remove_julia_addrspaces)
 
     # Make sure we didn't make any glaring errors
     LLVM.verify(mod)
@@ -375,7 +376,7 @@ function compile_wasm(f::Function, types=(), path::String="./";
         kwargs...
     )
     tt = Base.to_tuple_type(types)
-    obj_path, name = generate_obj(f, tt, true, filename; target = (triple = "wasm32-unknown-wasi", cpu = "", features = ""), kwargs...)
+    obj_path, name = generate_obj(f, tt, true, filename; target = (triple = "wasm32-unknown-wasi", cpu = "", features = ""), remove_julia_addrspaces = true, kwargs...)
     run(`$(lld()) -flavor wasm --no-entry --export-all $flags $obj_path/obj.o -o $name.wasm`)
     joinpath(abspath(path), filename * ".wasm")
 end
@@ -384,7 +385,7 @@ function compile_wasm(funcs::Array, path::String="./";
         flags=``,
         kwargs...
     )
-    obj_path, name = generate_obj(funcs, true; target = (triple = "wasm32-unknown-wasi", cpu = "", features = ""), kwargs...)
+    obj_path, name = generate_obj(funcs, true; target = (triple = "wasm32-unknown-wasi", cpu = "", features = ""), remove_julia_addrspaces = true, kwargs...)
     run(`$(lld()) -flavor wasm --no-entry --export-all $flags $obj_path/obj.o -o $path/$filename.wasm`)
     joinpath(abspath(path), filename * ".wasm")
 end
