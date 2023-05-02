@@ -370,17 +370,19 @@ The keword argument `demangle=true` will remove this prefix, but is currently on
 supported the second (multi-function-shlib) method.
 ```
 """
-function compile_wasm(f::Function, types=(), path::String="./";
+function compile_wasm(f::Function, types=(); 
+        path::String="./",
         filename=fix_name(repr(f)),
         flags=``,
         kwargs...
     )
     tt = Base.to_tuple_type(types)
-    obj_path, name = generate_obj(f, tt, true, filename; target = (triple = "wasm32-unknown-wasi", cpu = "", features = ""), remove_julia_addrspaces = true, kwargs...)
-    run(`$(lld()) -flavor wasm --no-entry --export-all $flags $obj_path/obj.o -o $name.wasm`)
+    obj_path, name = generate_obj(f, tt, true, path, filename; target = (triple = "wasm32-unknown-wasi", cpu = "", features = ""), remove_julia_addrspaces = true, kwargs...)
+    run(`$(lld()) -flavor wasm --no-entry --export-all $flags $obj_path/obj.o -o $path/$name.wasm`)
     joinpath(abspath(path), filename * ".wasm")
 end
-function compile_wasm(funcs::Array, path::String="./";
+function compile_wasm(funcs::Array; 
+        path::String="./",
         filename="libfoo",
         flags=``,
         kwargs...
