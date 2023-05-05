@@ -211,8 +211,8 @@ function addJuliaLegalizationPasses!(pm, lower_intrinsics=true)
         remove_ni!(pm)
     end
 end
-
-function post_optimize!(mod, tm)
+                        
+function post_optimize!(mod, tm; remove_julia_addrspaces = false)
     # @show "pre_post", mod
     # flush(stdout)
     # flush(stderr)
@@ -224,6 +224,9 @@ function post_optimize!(mod, tm)
     LLVM.ModulePassManager() do pm
         addJuliaLegalizationPasses!(pm, true)
         addMachinePasses!(pm)
+        if remove_julia_addrspaces
+            remove_julia_addrspaces!(pm)
+        end
         run!(pm, mod)
     end
     # @show "post_mod", mod
