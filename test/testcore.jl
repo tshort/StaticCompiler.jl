@@ -293,7 +293,7 @@ end
 
     # Compile a function that definitely fails
     @inline foo_err() = UInt64(-1)
-    filepath = compile_executable(maybe_throw, (Int, Ptr{Ptr{UInt8}}), tempdir())
+    filepath = compile_executable(foo_err, (Int, Ptr{Ptr{UInt8}}), tempdir())
     @test isfile(filepath)
     status = -1
     try
