@@ -211,7 +211,7 @@ julia> using StaticCompiler
 
 julia> function puts(s::Ptr{UInt8}) # Can't use Base.println because it allocates.
            # Note, this `llvmcall` requires Julia 1.8+
-           Base.llvmcall((\"""
+           Base.llvmcall((\"\"\"
            ; External declaration of the puts function
            declare i32 @puts(i8* nocapture) nounwind
 
@@ -220,7 +220,7 @@ julia> function puts(s::Ptr{UInt8}) # Can't use Base.println because it allocate
                %call = call i32 (i8*) @puts(i8* %0)
                ret i32 0
            }
-           \""", "main"), Int32, Tuple{Ptr{UInt8}}, s)
+           \"\"\", "main"), Int32, Tuple{Ptr{UInt8}}, s)
        end
 puts (generic function with 1 method)
 
