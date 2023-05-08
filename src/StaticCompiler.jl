@@ -619,11 +619,11 @@ end
 #Return an LLVM module for multiple functions
 function native_llvm_module(funcs::Array; demangle = false, kwargs...)
     f,tt = funcs[1]
-    mod = native_llvm_module(f,tt, kwargs...)
+    mod = native_llvm_module(f,tt; kwargs...)
     if length(funcs) > 1
         for func in funcs[2:end]
             f,tt = func
-            tmod = native_llvm_module(f,tt, kwargs...)
+            tmod = native_llvm_module(f,tt; kwargs...)
             link!(mod,tmod)
         end
     end
