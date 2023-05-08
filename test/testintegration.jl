@@ -159,7 +159,7 @@
         status = -1
         try
             isfile("loopvec_matrix") && rm("loopvec_matrix")
-            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/loopvec_matrix.jl`)
+            status = run(`$jlpath --startup=no $testpath/scripts/loopvec_matrix.jl`)
         catch e
             @warn "Could not compile $testpath/scripts/loopvec_matrix.jl"
             println(e)
@@ -190,7 +190,7 @@
         status = -1
         try
             isfile("loopvec_matrix_stack") && rm("loopvec_matrix_stack")
-            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/loopvec_matrix_stack.jl`)
+            status = run(`$jlpath --startup=no  $testpath/scripts/loopvec_matrix_stack.jl`)
         catch e
             @warn "Could not compile $testpath/scripts/loopvec_matrix_stack.jl"
             println(e)
