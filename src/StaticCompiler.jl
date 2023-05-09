@@ -106,7 +106,7 @@ function compile(f, _tt, path::String = tempname();
     rt = last(only(native_code_typed(f, tt, mixtape = mixtape)))
     isconcretetype(rt) || error("$f on $_tt did not infer to a concrete type. Got $rt")
     f_wrap!(out::Ref, args::Ref{<:Tuple}) = (out[] = f(args[]...); nothing)
-    _, _, table = generate_obj(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, false, path, name; mixtape = mixtape, opt_level, strip_llvm, strip_asm, filename, kwargs...)
+    _, _, table = generate_obj_for_compile(f_wrap!, Tuple{RefValue{rt}, RefValue{tt}}, false, path, name; mixtape = mixtape, opt_level, strip_llvm, strip_asm, filename, kwargs...)
 
     lf = LazyStaticCompiledFunction{rt, tt}(Symbol(f), path, name, filename, table)
     cjl_path = joinpath(path, "$filename.cjl")
@@ -117,7 +117,7 @@ end
 
 """
 ```julia
-generate_obj(f, tt, path::String = tempname(), name = fix_name(repr(f)), filenamebase::String="obj";
+generate_obj_for_compile(f, tt, path::String = tempname(), name = fix_name(repr(f)), filenamebase::String="obj";
             \tmixtape = NoContext(),
             \tstrip_llvm = false,
             \tstrip_asm  = true,
@@ -141,7 +141,7 @@ The defaults compile to the native target.
 julia> fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
 fib (generic function with 1 method)
 
-julia> path, name, table = StaticCompiler.generate_obj(fib, Tuple{Int64}, "./test")
+julia> path, name, table = StaticCompiler.generate_obj_for_compile(fib, Tuple{Int64}, "./test")
 ("./test", "fib", IdDict{Any, String}())
 
 shell> tree \$path
@@ -151,7 +151,7 @@ shell> tree \$path
 0 directories, 1 file
 ```
 """
-function generate_obj(f, tt, external = true, path::String = tempname(), name = fix_name(repr(f)), filenamebase::String="obj";
+function generate_obj_for_compile(f, tt, external = true, path::String = tempname(), name = fix_name(repr(f)), filenamebase::String="obj";
                         mixtape = NoContext(),
                         strip_llvm = false,
                         strip_asm  = true,
@@ -553,23 +553,15 @@ julia> ccall(("julia_test", "example/test.dylib"), Float64, (Int64,), 100_000)
 ```
 """
 function generate_shlib(f::Function, tt, external::Bool=true, path::String=tempname(), name=fix_name(repr(f)), filename=name;
-        cflags=``,
+        cflags=``, demangle=false,
         kwargs...
     )
-
-    mkpath(path)
-    obj_path = joinpath(path, "$filename.o")
     lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
-    job, kwargs = native_job(f, tt, external; name, kwargs...)
-    obj, _ = GPUCompiler.codegen(:obj, job; strip=true, only_entry=false, validate=false)
-
-    open(obj_path, "w") do io
-        write(io, obj)
-    end
-
+    _, obj_path = generate_obj([(f, tt)], external, path, filename; demangle=demangle, kwargs...)
+    
     # Pick a Clang
     cc = Sys.isapple() ? `cc` : clang()
-    # Compile!
+    # Compile
     run(`$cc -shared $cflags $obj_path -o $lib_path`)
 
     path, name
@@ -583,7 +575,7 @@ function generate_shlib(funcs::Array, external::Bool=true, path::String=tempname
 
     lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
 
-    _,obj_path = generate_obj(funcs, external, path, filename; demangle=demangle, kwargs...)
+    _, obj_path = generate_obj(funcs, external, path, filename; demangle=demangle, kwargs...)
     # Pick a Clang
     cc = Sys.isapple() ? `cc` : clang()
     # Compile!
@@ -642,6 +634,67 @@ function native_llvm_module(funcs::Array; demangle = false, kwargs...)
     return mod
 end
 
+
+"""
+```julia
+generate_obj(f, tt, external::Bool, path::String = tempname(), filenamebase::String="obj";
+             demangle =false,
+             strip_llvm = false,
+             strip_asm  = true,
+             opt_level=3,
+             kwargs...)
+```
+Low level interface for compiling object code (`.o`) for for function `f` given
+a tuple type `tt` characterizing the types of the arguments for which the
+function will be compiled.
+
+`mixtape` defines a context that can be used to transform IR prior to compilation using 
+[Mixtape](https://github.com/JuliaCompilerPlugins/Mixtape.jl) features.
+
+`target` can be used to change the output target. This is useful for compiling to WebAssembly and embedded targets.
+This is a named tuple with fields `triple`, `cpu`, and `features` (each of these are strings). 
+The defaults compile to the native target.
+
+### Examples
+```julia
+julia> fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
+fib (generic function with 1 method)
+
+julia> path, name, table = StaticCompiler.generate_obj_for_compile(fib, Tuple{Int64}, "./test")
+("./test", "fib", IdDict{Any, String}())
+
+shell> tree \$path
+./test
+└── obj.o
+
+0 directories, 1 file
+```
+"""
+function generate_obj(f, tt, args...; kwargs...)
+    generate_obj([(f, tt)], args...; kwargs...)
+end
+
+
+"""
+```julia
+generate_obj(funcs::Array, external::Bool, path::String = tempname(), filenamebase::String="obj";
+             demangle =false,
+             strip_llvm = false,
+             strip_asm  = true,
+             opt_level=3,
+             kwargs...)
+```
+Low level interface for compiling object code (`.o`) for an array of Tuples
+(f, tt) where each function `f` and tuple type `tt` determine the set of methods
+which will be compiled.
+
+`mixtape` defines a context that can be used to transform IR prior to compilation using 
+[Mixtape](https://github.com/JuliaCompilerPlugins/Mixtape.jl) features.
+
+`target` can be used to change the output target. This is useful for compiling to WebAssembly and embedded targets.
+This is a named tuple with fields `triple`, `cpu`, and `features` (each of these are strings). 
+The defaults compile to the native target.
+"""
 function generate_obj(funcs::Array, external::Bool, path::String = tempname(), filenamebase::String="obj";
                         demangle =false,
                         strip_llvm = false,
