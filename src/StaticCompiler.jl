@@ -388,7 +388,7 @@ function compile_wasm(f::Function, types=();
         kwargs...
     )
     tt = Base.to_tuple_type(types)
-    obj_path, name = generate_obj(f, tt, true, path, filename; target = (triple = "wasm32-unknown-wasi", cpu = "", features = ""), remove_julia_addrspaces = true, kwargs...)
+    obj_path, name = generate_obj_for_compile(f, tt, true, path, filename; target = (triple = "wasm32-unknown-wasi", cpu = "", features = ""), remove_julia_addrspaces = true, kwargs...)
     run(`$(lld()) -flavor wasm --no-entry --export-all $flags $obj_path/obj.o -o $path/$name.wasm`)
     joinpath(abspath(path), filename * ".wasm")
 end
