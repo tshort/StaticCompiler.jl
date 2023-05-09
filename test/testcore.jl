@@ -316,8 +316,6 @@ function squaresquaresquare(n)
 end
 
 @testset "Multiple Function Dylibs" begin
-
-
     funcs = [(squaresquare,(Float64,)), (squaresquaresquare,(Float64,))]
     filepath = compile_shlib(funcs, demangle=true)
 

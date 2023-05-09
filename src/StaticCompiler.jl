@@ -200,10 +200,13 @@ end
 compile_executable(f::Function, types::Tuple, path::String, [name::String=repr(f)];
     filename::String=name,
     cflags=``, # Specify libraries you would like to link against, and other compiler options here
+    also_expose=[],
     kwargs...
 )
 ```
 Attempt to compile a standalone executable that runs function `f` with a type signature given by the tuple of `types`.
+If there are extra methods you would like to protect from name mangling in the produced binary for whatever reason,
+you can provide them as a vector of tuples of functions and types, i.e. `[(f1, types1), (f2, types2), ...]`
 
 ### Examples
 ```julia
@@ -279,7 +282,6 @@ function compile_executable(f::Function, types=(), path::String="./", name=fix_n
 
     joinpath(abspath(path), filename)
 end
-
 
 """
 ```julia
@@ -471,21 +473,19 @@ shell> ./hello
 Hello, world!
 ```
 """
-function generate_executable(f, tt, path=tempname(), name=fix_name(repr(f)), filename=string(name);
-        cflags=``,
-        kwargs...
-    )
-    mkpath(path)
-    obj_path = joinpath(path, "$filename.o")
+function generate_executable(f, tt, args...; kwargs...)
+    generate_executable([(f, tt)], args...; kwargs...)
+end
+
+function generate_executable(funcs::Array, path=tempname(), name=fix_name(repr(funcs[1][1])), filename=string(name);
+                             demangle=false,
+                             cflags=``,
+                             kwargs...
+                             )
+    lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
     exec_path = joinpath(path, filename)
-    job, kwargs = native_job(f, tt, true; name, kwargs...)
-    obj, _ = GPUCompiler.codegen(:obj, job; strip=true, only_entry=false, validate=false)
-
-    # Write to file
-    open(obj_path, "w") do io
-        write(io, obj)
-    end
-
+    external = true
+    _, obj_path = generate_obj(funcs, external, path, filename; demangle=demangle, kwargs...)
     # Pick a compiler
     cc = Sys.isapple() ? `cc` : clang()
     # Compile!
@@ -510,9 +510,9 @@ function generate_executable(f, tt, path=tempname(), name=fix_name(repr(f)), fil
         # Clean up
         run(`rm $wrapper_path`)
     end
-
     path, name
 end
+
 
 """
 ```julia
@@ -638,6 +638,8 @@ end
 """
 ```julia
 generate_obj(f, tt, external::Bool, path::String = tempname(), filenamebase::String="obj";
+             mixtape = NoContext(),
+             target = (),
              demangle =false,
              strip_llvm = false,
              strip_asm  = true,
@@ -678,6 +680,8 @@ end
 """
 ```julia
 generate_obj(funcs::Array, external::Bool, path::String = tempname(), filenamebase::String="obj";
+             mixtape = NoContext(),
+             target = (),
              demangle =false,
              strip_llvm = false,
              strip_asm  = true,
