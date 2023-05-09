@@ -138,7 +138,7 @@ function get_pointers!(d, mod, inst)
                         LLVM.API.LLVMSetOperand(inst, i-1, gv)
                     else
                         gv_name = fix_name(String(gensym(repr(Core.Typeof(val)))))
-                        gv = LLVM.GlobalVariable(mod, llvmeltype(arg), gv_name, LLVM.addrspace(llvmtype(arg)))
+                        gv = LLVM.GlobalVariable(mod, llvmeltype(arg), gv_name, LLVM.addrspace(value_type(arg)))
 
                         LLVM.extinit!(gv, true)
                         LLVM.API.LLVMSetOperand(inst, i-1, gv)
@@ -153,7 +153,7 @@ function get_pointers!(d, mod, inst)
     end
 end
 
-llvmeltype(x::LLVM.Value) = eltype(LLVM.llvmtype(x))
+llvmeltype(x::LLVM.Value) = eltype(LLVM.value_type(x))
 
 function pointer_patching_diff(f, tt, path1=tempname(), path2=tempname(); show_reloc_table=false)
     tm = GPUCompiler.llvm_machine(NativeCompilerTarget())
