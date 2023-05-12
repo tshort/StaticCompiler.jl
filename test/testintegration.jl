@@ -4,7 +4,7 @@
     testpath = pwd()
     scratch = tempdir()
     cd(scratch)
-    jlpath = joinpath(Sys.BINDIR, Base.julia_exename()) # Get path to julia executable
+    jlpath = joinpath(Sys.BINDIR, Base.exename()) # Get path to julia executable
 
     ## --- Times table, file IO, mallocarray
     let
@@ -14,7 +14,7 @@
         # faster.
         status = -1
         try
-            isfile("julia_times_table") && rm("julia_times_table")
+            isfile("times_table") && rm("times_table")
             status = run(`$jlpath --startup=no --compile=min $testpath/scripts/times_table.jl`)
         catch e
             @warn "Could not compile $testpath/scripts/times_table.jl"
@@ -27,7 +27,7 @@
         println("5x5 times table:")
         status = -1
         try
-            status = run(`./julia_times_table 5 5`)
+            status = run(`./times_table 5 5`)
         catch e
             @warn "Could not run $(scratch)/times_table"
             println(e)
@@ -58,7 +58,7 @@
         println("3x3 malloc arrays via do-block syntax:")
         status = -1
         try
-            status = run(`./julia_withmallocarray 3 3`)
+            status = run(`./withmallocarray 3 3`)
         catch e
             @warn "Could not run $(scratch)/withmallocarray"
             println(e)
@@ -85,7 +85,7 @@
         println("5x5 uniform random matrix:")
         status = -1
         try
-            status = run(`./julia_rand_matrix 5 5`)
+            status = run(`./rand_matrix 5 5`)
         catch e
             @warn "Could not run $(scratch)/rand_matrix"
             println(e)
@@ -113,7 +113,7 @@
         println("5x5 Normal random matrix:")
         status = -1
         try
-            status = run(`./julia_randn_matrix 5 5`)
+            status = run(`./randn_matrix 5 5`)
         catch e
             @warn "Could not run $(scratch)/randn_matrix"
             println(e)
@@ -143,7 +143,7 @@
             println("10x10 table sum:")
             status = -1
             try
-                status = run(`./julia_loopvec_product 10 10`)
+                status = run(`./loopvec_product 10 10`)
             catch e
                 @warn "Could not run $(scratch)/loopvec_product"
                 println(e)
@@ -171,7 +171,7 @@
         println("10x5 matrix product:")
         status = -1
         try
-            status = run(`./julia_loopvec_matrix 10 5`)
+            status = run(`./loopvec_matrix 10 5`)
         catch e
             @warn "Could not run $(scratch)/loopvec_matrix"
             println(e)
@@ -202,7 +202,7 @@
         println("10x5 matrix product:")
         status = -1
         try
-            status = run(`./julia_loopvec_matrix_stack`)
+            status = run(`./loopvec_matrix_stack`)
         catch e
             @warn "Could not run $(scratch)/loopvec_matrix_stack"
             println(e)
@@ -233,7 +233,7 @@
         println("String indexing and handling:")
         status = -1
         try
-            status = run(`./julia_print_args foo bar`)
+            status = run(`./print_args foo bar`)
         catch e
             @warn "Could not run $(scratch)/print_args"
             println(e)
@@ -261,7 +261,7 @@
         println("Error handling:")
         status = -1
         try
-            status = run(`./julia_maybe_throw 10`)
+            status = run(`./maybe_throw 10`)
         catch e
             @warn "Could not run $(scratch)/maybe_throw"
             println(e)
@@ -297,7 +297,7 @@
         println("Interop:")
         status = -1
         try
-            status = run(`./julia_interop`)
+            status = run(`./interop`)
         catch e
             @warn "Could not run $(scratch)/interop"
             println(e)
@@ -394,4 +394,3 @@ end
     wasm_path2 = compile_wasm([(m2, (Float64,)), (m3, (Float64,))])
 
 end
-
