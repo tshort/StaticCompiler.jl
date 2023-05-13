@@ -487,15 +487,16 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
         entry = demangle ? "_$name" : "_julia_$name"
         run(`$cc -e $entry $cflags $obj_path -o $exec_path`)
     else
+        fn = demangle ? "$name" : "julia_$name"
         # Write a minimal wrapper to avoid having to specify a custom entry
         wrapper_path = joinpath(path, "wrapper.c")
         f = open(wrapper_path, "w")
-        print(f, """int $name(int argc, char** argv);
+        print(f, """int $fn(int argc, char** argv);
         void* __stack_chk_guard = (void*) $(rand(UInt) >> 1);
 
         int main(int argc, char** argv)
         {
-            $name(argc, argv);
+            $fn(argc, argv);
             return 0;
         }""")
         close(f)
