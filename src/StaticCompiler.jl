@@ -576,8 +576,8 @@ function native_code_typed(@nospecialize(func), @nospecialize(types); kwargs...)
     GPUCompiler.code_typed(job; kwargs...)
 end
 
-function native_code_native(@nospecialize(f), @nospecialize(tt), name = fix_name(f); kwargs...)
-    job, kwargs = native_job(f, tt, true; name, kwargs...)
+function native_code_native(@nospecialize(f), @nospecialize(tt), fname=fix_name(f); kwargs...)
+    job, kwargs = native_job(f, tt, true; fname, kwargs...)
     GPUCompiler.code_native(stdout, job; kwargs...)
 end
 
@@ -604,14 +604,15 @@ function native_llvm_module(funcs::Union{Array,Tuple}; demangle=false, kwargs...
             link!(mod,tmod)
         end
     end
-    # if demangle
-    #     for func in functions(mod)
-    #         fname = name(func)
-    #         if length(fname) > 6 && fname[1:6] == "julia_"
-    #             name!(func,fname[7:end])
-    #         end
-    #     end
-    # end
+    # Just to be sure
+    for (modfunc, func) in zip(functions(mod), funcs)
+        fname = name(modfunc)
+        expectedname = (demangle ? "" : "julia_") * fix_name(func)
+        d = prefixlen(fname) - prefixlen(expectedname) + 1
+        if d > 1
+            name!(modfunc,fname[d:end])
+        end
+    end
     LLVM.ModulePassManager() do pass_manager #remove duplicate functions
         LLVM.merge_functions!(pass_manager)
         LLVM.run!(pass_manager, mod)
@@ -619,6 +620,14 @@ function native_llvm_module(funcs::Union{Array,Tuple}; demangle=false, kwargs...
     return mod
 end
 
+function prefixlen(s)
+    m = match(r"^(?:julia_)+", s)
+    if m isa RegexMatch
+        length(m.match)
+    else
+        0
+    end
+end
 
 """
 ```julia

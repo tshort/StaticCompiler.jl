@@ -1,3 +1,6 @@
+workdir = tempdir()
+# workdir = "./" # For debugging
+
 remote_load_call(path, args...) = fetch(@spawnat 2 load_function(path)(args...))
 
 @testset "Basics" begin
@@ -225,9 +228,6 @@ end
     C .= fetch(@spawnat 2 (load_function(path)(C, A, B); C))
     @test C ≈ A*B
 end
-
-workdir = tempdir()
-# workdir = "./" # For debugging
 
 @testset "Standalone Dylibs" begin
     # Test function
