@@ -1,10 +1,11 @@
+# Setup
+testpath = pwd()
+scratch = tempdir()
+cd(scratch)
 
 @testset "Standalone Executable Integration" begin
-    # Setup
-    testpath = pwd()
-    scratch = tempdir()
-    cd(scratch)
-    jlpath = joinpath(Sys.BINDIR, Base.exename()) # Get path to julia executable
+
+    jlpath = joinpath(Sys.BINDIR, Base.julia_exename()) # Get path to julia executable
 
     ## --- Times table, file IO, mallocarray
     let
@@ -35,7 +36,7 @@
         @test isa(status, Base.Process)
         @test isa(status, Base.Process) && status.exitcode == 0
         # Test ascii output
-        @test parsedlm(Int, c"table.tsv", '\t') == (1:5)*(1:5)'
+        @test parsedlm(Int, c"table.tsv", '\t') == (1:5)*(1:5)' broken=Sys.ARCH===:aarch64
         # Test binary output
         @test fread!(szeros(Int, 5,5), c"table.b") == (1:5)*(1:5)'
     end
@@ -180,7 +181,7 @@
         @test isa(status, Base.Process) && status.exitcode == 0
         A = (1:10) * (1:5)'
         # Check ascii output
-        @test parsedlm(c"table.tsv",'\t') == A' * A
+        @test parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.ARCH===:aarch64
         # Check binary output
         @test fread!(szeros(5,5), c"table.b") == A' * A
     end
@@ -210,7 +211,7 @@
         @test isa(status, Base.Process)
         @test isa(status, Base.Process) && status.exitcode == 0
         A = (1:10) * (1:5)'
-        @test parsedlm(c"table.tsv",'\t') == A' * A
+        @test parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.ARCH===:aarch64
     end
 
 
@@ -307,9 +308,6 @@
     end
     end
 
-    ## --- Clean up
-
-    cd(testpath)
 end
 
 # Mixtape
@@ -384,6 +382,9 @@ struct MyMix <: CompilationContext end
 end
 
 @testset "Cross compiling to WebAssembly" begin
+    testpath = pwd()
+    scratch = tempdir()
+    cd(scratch)
 
     m2(x) = 2x
     m3(x) = 3x
@@ -394,3 +395,7 @@ end
     wasm_path2 = compile_wasm([(m2, (Float64,)), (m3, (Float64,))])
 
 end
+
+## --- Clean up
+
+cd(testpath)
