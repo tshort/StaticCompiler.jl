@@ -1,3 +1,6 @@
+workdir = tempdir()
+# workdir = "./" # For debugging
+
 remote_load_call(path, args...) = fetch(@spawnat 2 load_function(path)(args...))
 
 @testset "Basics" begin
@@ -232,15 +235,23 @@ end
     # fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
 
     #Compile dylib
-    name = "julia_" * repr(fib)
-    filepath = compile_shlib(fib, (Int,), "./", name)
+    name = repr(fib)
+    filepath = compile_shlib(fib, (Int,), workdir, name, demangle=true)
     @test occursin("fib.$(Libdl.dlext)", filepath)
-
-    # Open dylib
+    # Open dylib manually
     ptr = Libdl.dlopen(filepath, Libdl.RTLD_LOCAL)
     fptr = Libdl.dlsym(ptr, name)
     @test fptr != C_NULL
     @test ccall(fptr, Int, (Int,), 10) == 55
+    Libdl.dlclose(ptr)
+
+    # As above, but without demangling
+    filepath = compile_shlib(fib, (Int,), workdir, name, demangle=false)
+    ptr = Libdl.dlopen(filepath, Libdl.RTLD_LOCAL)
+    fptr = Libdl.dlsym(ptr, "julia_"*name)
+    @test fptr != C_NULL
+    @test ccall(fptr, Int, (Int,), 10) == 55
+    Libdl.dlclose(ptr)
 end
 
 @testset "Standalone Executables" begin
@@ -254,8 +265,12 @@ end
         return 0
     end
 
-    filepath = compile_executable(foo, (), tempdir())
+    filepath = compile_executable(foo, (), workdir, demangle=false)
+    r = run(`$filepath`);
+    @test isa(r, Base.Process)
+    @test r.exitcode == 0
 
+    filepath = compile_executable(foo, (), workdir, demangle=true)
     r = run(`$filepath`);
     @test isa(r, Base.Process)
     @test r.exitcode == 0
@@ -285,15 +300,20 @@ end
         return 0
     end
 
-    filepath = compile_executable(print_args, (Int, Ptr{Ptr{UInt8}}), tempdir())
-
+    filepath = compile_executable(print_args, (Int, Ptr{Ptr{UInt8}}), workdir, demangle=false)
     r = run(`$filepath Hello, world!`);
     @test isa(r, Base.Process)
     @test r.exitcode == 0
 
+    filepath = compile_executable(print_args, (Int, Ptr{Ptr{UInt8}}), workdir, demangle=true)
+    r = run(`$filepath Hello, world!`);
+    @test isa(r, Base.Process)
+    @test r.exitcode == 0
+
+
     # Compile a function that definitely fails
     @inline foo_err() = UInt64(-1)
-    filepath = compile_executable(foo_err, (), tempdir())
+    filepath = compile_executable(foo_err, (), workdir, demangle=true)
     @test isfile(filepath)
     status = -1
     try
@@ -317,9 +337,8 @@ end
 
 @testset "Multiple Function Dylibs" begin
 
-
     funcs = [(squaresquare,(Float64,)), (squaresquaresquare,(Float64,))]
-    filepath = compile_shlib(funcs, demangle=true)
+    filepath = compile_shlib(funcs, workdir, demangle=true)
 
     ptr = Libdl.dlopen(filepath, Libdl.RTLD_LOCAL)
 

@@ -24,7 +24,8 @@ include("code_loading.jl")
 include("optimize.jl")
 include("quirks.jl")
 
-fix_name(s) = string("julia_", GPUCompiler.safe_name(s))
+fix_name(f::Function) = fix_name(repr(f))
+fix_name(s) = String(GPUCompiler.safe_name(s))
 
 """
     compile(f, types, path::String = tempname()) --> (compiled_f, path)
@@ -91,9 +92,9 @@ with `load_function(path)`. `LazyStaticcompiledfunction`s contain the requisite 
 `StaticCompiledFunction` and may be called with arguments of type `types` as if it were a function with a
 single method (the method determined by `types`).
 """
-function compile(f, _tt, path::String = tempname(); 
-                 mixtape = NoContext(), 
-                 name = fix_name(repr(f)), 
+function compile(f, _tt, path::String = tempname();
+                 mixtape = NoContext(),
+                 name = fix_name(f),
                  filename = "obj",
                  strip_llvm = false,
                  strip_asm  = true,
@@ -117,7 +118,7 @@ end
 
 """
 ```julia
-generate_obj_for_compile(f, tt, path::String = tempname(), name = fix_name(repr(f)), filenamebase::String="obj";
+generate_obj_for_compile(f, tt, path::String = tempname(), name = fix_name(f), filenamebase::String="obj";
             \tmixtape = NoContext(),
             \tstrip_llvm = false,
             \tstrip_asm  = true,
@@ -129,11 +130,11 @@ Low level interface for compiling object code (`.o`) for for function `f` given
 a tuple type `tt` characterizing the types of the arguments for which the
 function will be compiled.
 
-`mixtape` defines a context that can be used to transform IR prior to compilation using 
+`mixtape` defines a context that can be used to transform IR prior to compilation using
 [Mixtape](https://github.com/JuliaCompilerPlugins/Mixtape.jl) features.
 
 `target` can be used to change the output target. This is useful for compiling to WebAssembly and embedded targets.
-This is a named tuple with fields `triple`, `cpu`, and `features` (each of these are strings). 
+This is a named tuple with fields `triple`, `cpu`, and `features` (each of these are strings).
 The defaults compile to the native target.
 
 ### Examples
@@ -151,7 +152,7 @@ shell> tree \$path
 0 directories, 1 file
 ```
 """
-function generate_obj_for_compile(f, tt, external = true, path::String = tempname(), name = fix_name(repr(f)), filenamebase::String="obj";
+function generate_obj_for_compile(f, tt, external = true, path::String = tempname(), name = fix_name(f), filenamebase::String="obj";
                         mixtape = NoContext(),
                         strip_llvm = false,
                         strip_asm  = true,
@@ -168,7 +169,7 @@ function generate_obj_for_compile(f, tt, external = true, path::String = tempnam
 
     mod, meta = GPUCompiler.JuliaContext() do context
         GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false, ctx=context)
-    end  
+    end
 
     # Use Enzyme's annotation and optimization pipeline
     annotate!(mod)
@@ -263,17 +264,15 @@ shell> ./hello
 Hello, world!
 ```
 """
-function compile_executable(f::Function, types=(), path::String="./", name=fix_name(repr(f));
-                            also_expose=[],
-                            filename=name,
-                            cflags=``,
+function compile_executable(f::Function, types=(), path::String="./", name=fix_name(f);
+                            also_expose=Tuple{Function, Tuple{DataType}}[],
                             kwargs...)
-    compile_executable(vcat([(f, types)], also_expose), path, name; filename, cflags, kwargs...)
+    compile_executable(vcat([(f, types)], also_expose), path, name; kwargs...)
 end
 
-
-function compile_executable(funcs::Array, path::String="./", name=fix_name(repr(funcs[1][1]));
+function compile_executable(funcs::Union{Array,Tuple}, path::String="./", name=fix_name(first(first(funcs)));
         filename=name,
+        demangle=false,
         cflags=``,
         kwargs...
     )
@@ -287,8 +286,8 @@ function compile_executable(funcs::Array, path::String="./", name=fix_name(repr(
     isconcretetype(rt) || error("`$f$types` did not infer to a concrete type. Got `$rt`")
     nativetype = isprimitivetype(rt) || isa(rt, Ptr)
     nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
-    
-    generate_executable(funcs, path, name, filename; cflags=cflags, kwargs...)
+
+    generate_executable(funcs, path, name, filename; demangle, cflags, kwargs...)
     joinpath(abspath(path), filename)
 end
 
@@ -327,26 +326,14 @@ julia> ccall(("julia_test", "test.dylib"), Float64, (Int64,), 100_000)
 5.2564961094956075
 ```
 """
-function compile_shlib(f::Function, types=(), path::String="./", name=fix_name(repr(f));
+function compile_shlib(f::Function, types=(), path::String="./", name=fix_name(f);
         filename=name,
-        cflags=``,
         kwargs...
     )
-
-    tt = Base.to_tuple_type(types)
-    isconcretetype(tt) || error("input type signature `$types` is not concrete")
-
-    rt = last(only(native_code_typed(f, tt; kwargs...)))
-    isconcretetype(rt) || error("`$f$types` did not infer to a concrete type. Got `$rt`")
-    nativetype = isprimitivetype(rt) || isa(rt, Ptr)
-    nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
-
-    generate_shlib(f, tt, true, path, name, filename; cflags=cflags, kwargs...)
-
-    joinpath(abspath(path), filename * "." * Libdl.dlext)
+    compile_shlib(((f, types),), path; filename, kwargs...)
 end
 # As above, but taking an array of functions and returning a single shlib
-function compile_shlib(funcs::Array, path::String="./";
+function compile_shlib(funcs::Union{Array,Tuple}, path::String="./";
         filename="libfoo",
         demangle=false,
         cflags=``,
@@ -363,7 +350,7 @@ function compile_shlib(funcs::Array, path::String="./";
         nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
     end
 
-    generate_shlib(funcs, true, path, filename; demangle=demangle, cflags=cflags, kwargs...)
+    generate_shlib(funcs, true, path, filename; demangle, cflags, kwargs...)
 
     joinpath(abspath(path), filename * "." * Libdl.dlext)
 end
@@ -371,7 +358,7 @@ end
 """
 ```julia
 compile_wasm(f::Function, types::Tuple, [path::String="./"], [name::String=repr(f)]; filename::String=name, flags=``, kwargs...)
-compile_wasm(funcs::Array, [path::String="./"]; filename="libfoo", demangle=false, flags=``, kwargs...)
+compile_wasm(funcs::Union{Array,Tuple}, [path::String="./"]; filename="libfoo", demangle=false, flags=``, kwargs...)
 ```
 As `compile_shlib`, but compiling to a WebAssembly library.
 
@@ -381,9 +368,9 @@ The keword argument `demangle=true` will remove this prefix, but is currently on
 supported the second (multi-function-shlib) method.
 ```
 """
-function compile_wasm(f::Function, types=(); 
+function compile_wasm(f::Function, types=();
         path::String="./",
-        filename=fix_name(repr(f)),
+        filename=fix_name(f),
         flags=``,
         kwargs...
     )
@@ -392,7 +379,7 @@ function compile_wasm(f::Function, types=();
     run(`$(lld()) -flavor wasm --no-entry --export-all $flags $obj_path/obj.o -o $path/$name.wasm`)
     joinpath(abspath(path), filename * ".wasm")
 end
-function compile_wasm(funcs::Array; 
+function compile_wasm(funcs::Union{Array,Tuple};
         path::String="./",
         filename="libfoo",
         flags=``,
@@ -447,7 +434,7 @@ function generate_shlib_fptr(path::String, name, filename::String=name)
     fptr
 end
 # As above, but also compile (maybe remove this method in the future?)
-function generate_shlib_fptr(f, tt, path::String=tempname(), name = fix_name(repr(f)), filename::String=name;
+function generate_shlib_fptr(f, tt, path::String=tempname(), name=fix_name(f), filename::String=name;
                             temp::Bool=true,
                             kwargs...)
 
@@ -482,11 +469,8 @@ shell> ./hello
 Hello, world!
 ```
 """
-function generate_executable(f, tt, args...; kwargs...)
-    generate_executable([(f, tt)], args...; kwargs...)
-end
-
-function generate_executable(funcs::Array, path=tempname(), name=fix_name(repr(funcs[1][1])), filename=string(name);
+generate_executable(f, tt, args...; kwargs...) = generate_executable(((f, tt),), args...; kwargs...)
+function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fix_name(first(first(funcs))), filename=name;
                              demangle=false,
                              cflags=``,
                              kwargs...
@@ -494,24 +478,25 @@ function generate_executable(funcs::Array, path=tempname(), name=fix_name(repr(f
     lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
     exec_path = joinpath(path, filename)
     external = true
-    _, obj_path = generate_obj(funcs, external, path, filename; demangle=demangle, kwargs...)
+    _, obj_path = generate_obj(funcs, external, path, filename; demangle, kwargs...)
     # Pick a compiler
     cc = Sys.isapple() ? `cc` : clang()
     # Compile!
     if Sys.isapple()
         # Apple no longer uses _start, so we can just specify a custom entry
-        entry = "_$name"
+        entry = demangle ? "_$name" : "_julia_$name"
         run(`$cc -e $entry $cflags $obj_path -o $exec_path`)
     else
+        fn = demangle ? "$name" : "julia_$name"
         # Write a minimal wrapper to avoid having to specify a custom entry
         wrapper_path = joinpath(path, "wrapper.c")
         f = open(wrapper_path, "w")
-        print(f, """int $name(int argc, char** argv);
+        print(f, """int $fn(int argc, char** argv);
         void* __stack_chk_guard = (void*) $(rand(UInt) >> 1);
 
         int main(int argc, char** argv)
         {
-            $name(argc, argv);
+            $fn(argc, argv);
             return 0;
         }""")
         close(f)
@@ -561,22 +546,11 @@ julia> ccall(("julia_test", "example/test.dylib"), Float64, (Int64,), 100_000)
 5.2564961094956075
 ```
 """
-function generate_shlib(f::Function, tt, external::Bool=true, path::String=tempname(), name=fix_name(repr(f)), filename=name;
-        cflags=``, demangle=false,
-        kwargs...
-    )
-    lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
-    _, obj_path = generate_obj([(f, tt)], external, path, filename; demangle=demangle, kwargs...)
-    
-    # Pick a Clang
-    cc = Sys.isapple() ? `cc` : clang()
-    # Compile
-    run(`$cc -shared $cflags $obj_path -o $lib_path`)
-
-    path, name
+function generate_shlib(f::Function, tt, external::Bool=true, path::String=tempname(), name=fix_name(f), filename=name; kwargs...)
+    generate_shlib(((f, tt),), external, path, filename; kwargs...)
 end
 # As above, but taking an array of functions and returning a single shlib
-function generate_shlib(funcs::Array, external::Bool=true, path::String=tempname(), filename::String="libfoo";
+function generate_shlib(funcs::Union{Array,Tuple}, external::Bool=true, path::String=tempname(), filename::String="libfoo";
         demangle=false,
         cflags=``,
         kwargs...
@@ -584,7 +558,7 @@ function generate_shlib(funcs::Array, external::Bool=true, path::String=tempname
 
     lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
 
-    _, obj_path = generate_obj(funcs, external, path, filename; demangle=demangle, kwargs...)
+    _, obj_path = generate_obj(funcs, external, path, filename; demangle, kwargs...)
     # Pick a Clang
     cc = Sys.isapple() ? `cc` : clang()
     # Compile!
@@ -603,8 +577,16 @@ function native_code_typed(@nospecialize(func), @nospecialize(types); kwargs...)
     GPUCompiler.code_typed(job; kwargs...)
 end
 
+function native_code_native(@nospecialize(f), @nospecialize(tt), fname=fix_name(f); kwargs...)
+    job, kwargs = native_job(f, tt, true; fname, kwargs...)
+    GPUCompiler.code_native(stdout, job; kwargs...)
+end
+
 # Return an LLVM module
-function native_llvm_module(f, tt, name = fix_name(repr(f)); kwargs...)
+function native_llvm_module(f, tt, name=fix_name(f); demangle, kwargs...)
+    if !demangle
+        name = "julia_"*name
+    end
     job, kwargs = native_job(f, tt, true; name, kwargs...)
     m, _ = GPUCompiler.JuliaContext() do context
         GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, ctx=context)
@@ -612,28 +594,24 @@ function native_llvm_module(f, tt, name = fix_name(repr(f)); kwargs...)
     return m
 end
 
-function native_code_native(@nospecialize(f), @nospecialize(tt), name = fix_name(repr(f)); kwargs...)
-    job, kwargs = native_job(f, tt, true; name, kwargs...)
-    GPUCompiler.code_native(stdout, job; kwargs...)
-end
-
 #Return an LLVM module for multiple functions
-function native_llvm_module(funcs::Array; demangle = false, kwargs...)
+function native_llvm_module(funcs::Union{Array,Tuple}; demangle=false, kwargs...)
     f,tt = funcs[1]
-    mod = native_llvm_module(f,tt; kwargs...)
+    mod = native_llvm_module(f,tt; demangle, kwargs...)
     if length(funcs) > 1
         for func in funcs[2:end]
             f,tt = func
-            tmod = native_llvm_module(f,tt; kwargs...)
+            tmod = native_llvm_module(f,tt; demangle, kwargs...)
             link!(mod,tmod)
         end
     end
-    if demangle
-        for func in functions(mod)
-            fname = name(func)
-            if fname[1:6] == "julia_"
-                name!(func,fname[7:end])
-            end
+    # Just to be sure
+    for (modfunc, func) in zip(functions(mod), funcs)
+        fname = name(modfunc)
+        expectedname = (demangle ? "" : "julia_") * fix_name(func)
+        d = prefixlen(fname) - prefixlen(expectedname) + 1
+        if d > 1
+            name!(modfunc,fname[d:end])
         end
     end
     LLVM.ModulePassManager() do pass_manager #remove duplicate functions
@@ -643,6 +621,14 @@ function native_llvm_module(funcs::Array; demangle = false, kwargs...)
     return mod
 end
 
+function prefixlen(s)
+    m = match(r"^(?:julia_)+", s)
+    if m isa RegexMatch
+        length(m.match)
+    else
+        0
+    end
+end
 
 """
 ```julia
@@ -659,11 +645,11 @@ Low level interface for compiling object code (`.o`) for for function `f` given
 a tuple type `tt` characterizing the types of the arguments for which the
 function will be compiled.
 
-`mixtape` defines a context that can be used to transform IR prior to compilation using 
+`mixtape` defines a context that can be used to transform IR prior to compilation using
 [Mixtape](https://github.com/JuliaCompilerPlugins/Mixtape.jl) features.
 
 `target` can be used to change the output target. This is useful for compiling to WebAssembly and embedded targets.
-This is a named tuple with fields `triple`, `cpu`, and `features` (each of these are strings). 
+This is a named tuple with fields `triple`, `cpu`, and `features` (each of these are strings).
 The defaults compile to the native target.
 
 ### Examples
@@ -682,13 +668,13 @@ shell> tree \$path
 ```
 """
 function generate_obj(f, tt, args...; kwargs...)
-    generate_obj([(f, tt)], args...; kwargs...)
+    generate_obj(((f, tt),), args...; kwargs...)
 end
 
 
 """
 ```julia
-generate_obj(funcs::Array, external::Bool, path::String = tempname(), filenamebase::String="obj";
+generate_obj(funcs::Union{Array,Tuple}, external::Bool, path::String = tempname(), filenamebase::String="obj";
              mixtape = NoContext(),
              target = (),
              demangle =false,
@@ -701,24 +687,24 @@ Low level interface for compiling object code (`.o`) for an array of Tuples
 (f, tt) where each function `f` and tuple type `tt` determine the set of methods
 which will be compiled.
 
-`mixtape` defines a context that can be used to transform IR prior to compilation using 
+`mixtape` defines a context that can be used to transform IR prior to compilation using
 [Mixtape](https://github.com/JuliaCompilerPlugins/Mixtape.jl) features.
 
 `target` can be used to change the output target. This is useful for compiling to WebAssembly and embedded targets.
-This is a named tuple with fields `triple`, `cpu`, and `features` (each of these are strings). 
+This is a named tuple with fields `triple`, `cpu`, and `features` (each of these are strings).
 The defaults compile to the native target.
 """
-function generate_obj(funcs::Array, external::Bool, path::String = tempname(), filenamebase::String="obj";
-                        demangle =false,
+function generate_obj(funcs::Union{Array,Tuple}, external::Bool, path::String = tempname(), filenamebase::String="obj";
+                        demangle = false,
                         strip_llvm = false,
-                        strip_asm  = true,
-                        opt_level=3,
+                        strip_asm = true,
+                        opt_level = 3,
                         kwargs...)
     f, tt = funcs[1]
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
     fakejob, kwargs = native_job(f, tt, external; kwargs...)
-    mod = native_llvm_module(funcs; demangle = demangle, kwargs...)
+    mod = native_llvm_module(funcs; demangle, kwargs...)
     obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
     open(obj_path, "w") do io
         write(io, obj)

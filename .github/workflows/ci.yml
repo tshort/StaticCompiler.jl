@@ -19,7 +19,7 @@ jobs:
       matrix:
         version:
           - '1.8'
-          - '^1.9.0-rc3'
+          - '1.9'
         os:
           - ubuntu-latest
           - macOS-latest
@@ -30,7 +30,7 @@ jobs:
         include:
           - arch: x86
             version: '1'
-            os: ubuntu-latest   
+            os: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@latest
