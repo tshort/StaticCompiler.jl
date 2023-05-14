@@ -272,7 +272,7 @@ end
 
 function compile_executable(funcs::Union{Array,Tuple}, path::String="./", name=fix_name(first(first(funcs)));
         filename=name,
-        demangle=false,
+        demangle=true,
         cflags=``,
         kwargs...
     )
@@ -294,14 +294,11 @@ end
 """
 ```julia
 compile_shlib(f::Function, types::Tuple, [path::String="./"], [name::String=repr(f)]; filename::String=name, cflags=``, kwargs...)
-compile_shlib(funcs::Array, [path::String="./"]; filename="libfoo", demangle=false, cflags=``, kwargs...)
+compile_shlib(funcs::Array, [path::String="./"]; filename="libfoo", demangle=true, cflags=``, kwargs...)
 ```
 As `compile_executable`, but compiling to a standalone `.dylib`/`.so` shared library.
 
-The compiled function is by default given the symbol name `julia_$(name)`, i.e.,
-the function `test` in the example below is called `julia_test` in the shared library.
-The keword argument `demangle=true` will remove this prefix, but is currently only
-supported the second (multi-function-shlib) method.
+If `demangle` is set to `false`, compiled function names are prepended with "julia_".
 
 ### Examples
 ```julia
@@ -322,7 +319,7 @@ julia> compile_shlib(test, (Int,))
 julia> test(100_000)
 5.2564961094956075
 
-julia> ccall(("julia_test", "test.dylib"), Float64, (Int64,), 100_000)
+julia> ccall(("test", "test.dylib"), Float64, (Int64,), 100_000)
 5.2564961094956075
 ```
 """
@@ -335,7 +332,7 @@ end
 # As above, but taking an array of functions and returning a single shlib
 function compile_shlib(funcs::Union{Array,Tuple}, path::String="./";
         filename="libfoo",
-        demangle=false,
+        demangle=true,
         cflags=``,
         kwargs...
     )
@@ -357,15 +354,12 @@ end
 
 """
 ```julia
-compile_wasm(f::Function, types::Tuple, [path::String="./"], [name::String=repr(f)]; filename::String=name, flags=``, kwargs...)
-compile_wasm(funcs::Union{Array,Tuple}, [path::String="./"]; filename="libfoo", demangle=false, flags=``, kwargs...)
+compile_wasm(f::Function, types::Tuple, [path::String="./"], [name::String=repr(f)]; filename::String=name, demangle=true, flags=``, kwargs...)
+compile_wasm(funcs::Union{Array,Tuple}, [path::String="./"]; filename="libfoo", demangle=true, flags=``, kwargs...)
 ```
 As `compile_shlib`, but compiling to a WebAssembly library.
 
-The compiled function is by default given the symbol name `julia_$(name)`, i.e.,
-the function `test` in the example below is called `julia_test` in the shared library.
-The keword argument `demangle=true` will remove this prefix, but is currently only
-supported the second (multi-function-shlib) method.
+If `demangle` is set to `false`, compiled function names are prepended with "julia_".
 ```
 """
 function compile_wasm(f::Function, types=();
@@ -471,7 +465,7 @@ Hello, world!
 """
 generate_executable(f, tt, args...; kwargs...) = generate_executable(((f, tt),), args...; kwargs...)
 function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fix_name(first(first(funcs))), filename=name;
-                             demangle=false,
+                             demangle=true,
                              cflags=``,
                              kwargs...
                              )
@@ -510,12 +504,14 @@ end
 
 """
 ```julia
-generate_shlib(f::Function, tt, [external::Bool=true], [path::String], [name], [filename]; kwargs...)
-generate_shlib(funcs::Array, [external::Bool=true], [path::String], [filename::String]; demangle=false, kwargs...)
+generate_shlib(f::Function, tt, [external::Bool=true], [path::String], [name], [filename]; demangle=true, kwargs...)
+generate_shlib(funcs::Array, [external::Bool=true], [path::String], [filename::String]; demangle=true, kwargs...)
 ```
 Low level interface for compiling a shared object / dynamically loaded library
  (`.so` / `.dylib`) for function `f` given a tuple type `tt` characterizing
 the types of the arguments for which the function will be compiled.
+
+If `demangle` is set to `false`, compiled function names are prepended with "julia_".
 
 ### Examples
 ```julia
@@ -542,7 +538,7 @@ shell> tree \$path
 julia> test(100_000)
 5.2564961094956075
 
-julia> ccall(("julia_test", "example/test.dylib"), Float64, (Int64,), 100_000)
+julia> ccall(("test", "example/test.dylib"), Float64, (Int64,), 100_000)
 5.2564961094956075
 ```
 """
@@ -551,7 +547,7 @@ function generate_shlib(f::Function, tt, external::Bool=true, path::String=tempn
 end
 # As above, but taking an array of functions and returning a single shlib
 function generate_shlib(funcs::Union{Array,Tuple}, external::Bool=true, path::String=tempname(), filename::String="libfoo";
-        demangle=false,
+        demangle=true,
         cflags=``,
         kwargs...
     )
@@ -595,7 +591,7 @@ function native_llvm_module(f, tt, name=fix_name(f); demangle, kwargs...)
 end
 
 #Return an LLVM module for multiple functions
-function native_llvm_module(funcs::Union{Array,Tuple}; demangle=false, kwargs...)
+function native_llvm_module(funcs::Union{Array,Tuple}; demangle=true, kwargs...)
     f,tt = funcs[1]
     mod = native_llvm_module(f,tt; demangle, kwargs...)
     if length(funcs) > 1
@@ -635,7 +631,7 @@ end
 generate_obj(f, tt, external::Bool, path::String = tempname(), filenamebase::String="obj";
              mixtape = NoContext(),
              target = (),
-             demangle =false,
+             demangle = false,
              strip_llvm = false,
              strip_asm  = true,
              opt_level=3,
@@ -651,6 +647,8 @@ function will be compiled.
 `target` can be used to change the output target. This is useful for compiling to WebAssembly and embedded targets.
 This is a named tuple with fields `triple`, `cpu`, and `features` (each of these are strings).
 The defaults compile to the native target.
+
+If `demangle` is set to `false`, compiled function names are prepended with "julia_".
 
 ### Examples
 ```julia
