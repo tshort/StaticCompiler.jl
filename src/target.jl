@@ -82,10 +82,10 @@ for target in (:NativeCompilerTarget, :ExternalNativeCompilerTarget)
         GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{$target}) = true
 
         GPUCompiler.get_interpreter(job::GPUCompiler.CompilerJob{$target, StaticCompilerParams}) =
-            StaticInterpreter(job.config.params.cache, GPUCompiler.method_table(job), job.world, 
-                              GPUCompiler.inference_params(job), GPUCompiler.optimization_params(job), 
-                              job.config.params.mixtape)    
-        GPUCompiler.ci_cache(job::GPUCompiler.CompilerJob{$target, StaticCompilerParams}) = job.config.params.cache       
+            StaticInterpreter(job.config.params.cache, GPUCompiler.method_table(job), job.world,
+                              GPUCompiler.inference_params(job), GPUCompiler.optimization_params(job),
+                              job.config.params.mixtape)
+        GPUCompiler.ci_cache(job::GPUCompiler.CompilerJob{$target, StaticCompilerParams}) = job.config.params.cache
     end
 end
 
@@ -94,12 +94,12 @@ GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{ExternalNati
 
 function native_job(@nospecialize(func::Function), @nospecialize(types::Type), external::Bool;
         mixtape = NoContext(),
-        name = fix_name(repr(func)),
+        name = fix_name(func),
         kernel::Bool = false,
         target = (),
         kwargs...
     )
-    source = methodinstance(typeof(func), Base.to_tuple_type(types)) 
+    source = methodinstance(typeof(func), Base.to_tuple_type(types))
     target = external ? ExternalNativeCompilerTarget(;target...) : NativeCompilerTarget(;target...)
     params = StaticCompilerParams(mixtape = mixtape)
     config = GPUCompiler.CompilerConfig(target, params, name = name, kernel = kernel)
@@ -107,7 +107,7 @@ function native_job(@nospecialize(func::Function), @nospecialize(types::Type), e
 end
 
 function native_job(@nospecialize(func), @nospecialize(types), external; mixtape = NoContext(), kernel::Bool=false, name=fix_name(repr(func)), target = (), kwargs...)
-    source = methodinstance(typeof(func), Base.to_tuple_type(types)) 
+    source = methodinstance(typeof(func), Base.to_tuple_type(types))
     target = external ? ExternalNativeCompilerTarget(;target...) : NativeCompilerTarget(;target...)
     params = StaticCompilerParams(mixtape = mixtape)
     config = GPUCompiler.CompilerConfig(target, params, name = name, kernel = kernel)

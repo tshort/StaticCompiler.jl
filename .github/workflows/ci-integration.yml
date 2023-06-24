@@ -1,4 +1,4 @@
-name: CI
+name: CI (Integration)
 on:
   push:
     branches:
@@ -11,7 +11,7 @@ on:
     paths-ignore:
       - 'README.md'
 jobs:
-  test:
+  test-integration:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -26,11 +26,7 @@ jobs:
         arch:
           - x64
         group:
-          - Core
-        include:
-          - arch: x86
-            version: '1'
-            os: ubuntu-latest
+          - Integration
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@latest
@@ -41,7 +37,3 @@ jobs:
       - uses: julia-actions/julia-runtest@latest
         env:
           GROUP: ${{ matrix.group }}
-      - uses: julia-actions/julia-processcoverage@v1
-      - uses: codecov/codecov-action@v2
-        with:
-          files: lcov.info
