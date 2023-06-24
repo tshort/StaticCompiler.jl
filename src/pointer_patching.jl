@@ -157,7 +157,7 @@ llvmeltype(x::LLVM.Value) = eltype(LLVM.value_type(x))
 
 function pointer_patching_diff(f, tt, path1=tempname(), path2=tempname(); show_reloc_table=false)
     tm = GPUCompiler.llvm_machine(NativeCompilerTarget())
-    job, kwargs = native_job(f, tt, false; name=fix_name(repr(f)))
+    job, kwargs = native_job(f, tt, false; name=fix_name(string(nameof(f))))
     #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
     mod, meta = GPUCompiler.JuliaContext() do context
         GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, optimize=false, ctx=context)
