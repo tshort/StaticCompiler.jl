@@ -168,32 +168,33 @@ function generate_obj_for_compile(f, tt, external = true, path::String = tempnam
     config = GPUCompiler.CompilerConfig(NativeCompilerTarget(target...), params, name = name, kernel = false)
     job = GPUCompiler.CompilerJob(GPUCompiler.methodinstance(typeof(f), tt), config)
 
-    mod, meta = GPUCompiler.JuliaContext() do context
-        GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false, ctx=context)
+    table = GPUCompiler.JuliaContext() do context
+        mod, meta = GPUCompiler.codegen(:llvm, job; strip=strip_llvm, only_entry=false, validate=false, optimize=false)
+        # Use Enzyme's annotation and optimization pipeline
+        annotate!(mod)
+        tm = GPUCompiler.llvm_machine(external ? ExternalNativeCompilerTarget(target...) : NativeCompilerTarget(target...))
+        optimize!(mod, tm)
+
+        # Scoop up all the pointers in the optimized module, and replace them with unitialized global variables.
+        # `table` is a dictionary where the keys are julia objects that are needed by the function, and the values
+        # of the dictionary are the names of their associated LLVM GlobalVariable names.
+        table = relocation_table!(mod)
+
+        # Now that we've removed all the pointers from the code, we can (hopefully) safely lower all the instrinsics
+        # (again, using Enzyme's pipeline)
+        post_optimize!(mod, tm; remove_julia_addrspaces)
+
+        # Make sure we didn't make any glaring errors
+        LLVM.verify(mod)
+        obj, _ = GPUCompiler.emit_asm(job, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
+        # Compile the LLVM module to native code and save it to disk
+        open(obj_path, "w") do io
+            write(io, obj)
+        end
+        table
     end
 
-    # Use Enzyme's annotation and optimization pipeline
-    annotate!(mod)
-    tm = GPUCompiler.llvm_machine(external ? ExternalNativeCompilerTarget(target...) : NativeCompilerTarget(target...))
-    optimize!(mod, tm)
 
-    # Scoop up all the pointers in the optimized module, and replace them with unitialized global variables.
-    # `table` is a dictionary where the keys are julia objects that are needed by the function, and the values
-    # of the dictionary are the names of their associated LLVM GlobalVariable names.
-    table = relocation_table!(mod)
-
-    # Now that we've removed all the pointers from the code, we can (hopefully) safely lower all the instrinsics
-    # (again, using Enzyme's pipeline)
-    post_optimize!(mod, tm; remove_julia_addrspaces)
-
-    # Make sure we didn't make any glaring errors
-    LLVM.verify(mod)
-
-    # Compile the LLVM module to native code and save it to disk
-    obj, _ = GPUCompiler.emit_asm(job, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
-    open(obj_path, "w") do io
-        write(io, obj)
-    end
     path, name, table
 end
 
@@ -586,7 +587,7 @@ function native_llvm_module(f, tt, name=fix_name(f); demangle, kwargs...)
     end
     job, kwargs = native_job(f, tt, true; name, kwargs...)
     m, _ = GPUCompiler.JuliaContext() do context
-        GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, ctx=context)
+        GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false)
     end
     return m
 end
