@@ -188,7 +188,7 @@ function generate_obj_for_compile(f, tt, external = true, path::String = tempnam
 
     # Make sure we didn't make any glaring errors
     LLVM.verify(mod)
-@show mod
+
     # Compile the LLVM module to native code and save it to disk
     obj, _ = GPUCompiler.emit_asm(job, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
     open(obj_path, "w") do io
@@ -703,7 +703,6 @@ function generate_obj(funcs::Union{Array,Tuple}, external::Bool, path::String = 
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
     mod = native_llvm_module(funcs; demangle, kwargs...)
-    @show mod
     fakejob, _ = native_job(f, tt, external; kwargs...)
     obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
     open(obj_path, "w") do io
