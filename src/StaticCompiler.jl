@@ -199,7 +199,7 @@ end
 
 """
 ```julia
-compile_executable(f::Function, types::Tuple, path::String, [name::String=repr(f)];
+compile_executable(f::Function, types::Tuple, path::String, [name::String=string(nameof(f))];
     filename::String=name,
     cflags=``, # Specify libraries you would like to link against, and other compiler options here
     also_expose=[],
@@ -294,7 +294,7 @@ end
 
 """
 ```julia
-compile_shlib(f::Function, types::Tuple, [path::String="./"], [name::String=repr(f)]; filename::String=name, cflags=``, kwargs...)
+compile_shlib(f::Function, types::Tuple, [path::String="./"], [name::String=string(nameof(f))]; filename::String=name, cflags=``, kwargs...)
 compile_shlib(funcs::Array, [path::String="./"]; filename="libfoo", demangle=true, cflags=``, kwargs...)
 ```
 As `compile_executable`, but compiling to a standalone `.dylib`/`.so` shared library.
@@ -355,7 +355,7 @@ end
 
 """
 ```julia
-compile_wasm(f::Function, types::Tuple, [path::String="./"], [name::String=repr(f)]; filename::String=name, flags=``, kwargs...)
+compile_wasm(f::Function, types::Tuple, [path::String="./"], [name::String=string(nameof(f))]; filename::String=name, flags=``, kwargs...)
 compile_wasm(funcs::Union{Array,Tuple}, [path::String="./"]; filename="libfoo", demangle=true, flags=``, kwargs...)
 ```
 As `compile_shlib`, but compiling to a WebAssembly library.

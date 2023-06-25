@@ -86,3 +86,40 @@ This package uses the [GPUCompiler package](https://github.com/JuliaGPU/GPUCompi
 * Since error handling relies on libjulia, you can only throw errors from standalone-compiled (`compile_executable` / `compile_shlib`) code if an explicit overload has been defined for that particular error with `@device_override` (see [quirks.jl](src/quirks.jl)).
 * Type instability. Type unstable code cannot currently be statically compiled via this package.
 * Doesn't work on Windows (but works in WSL on Windows 10+). PRs welcome.
+
+## Guide for Package Authors
+
+To enable code to be statically compiled, consider the following:
+
+* Use type-stable code.
+
+* Use Tuples, NamedTuples, StaticArrays, and other types where appropriate. These allocate on the stack and don't use Julia's heap allocation.
+
+* Avoid Julia's internal allocations. That means don't bake in use of Arrays or Strings or Dicts. Types from StaticTools can help, like StaticStrings and MallocArrays.
+
+* If need be, manage memory manually, using `malloc` and `free`. This works with StaticTools.MallocString and StaticTools.MallocArray.
+
+* Don't use global variables that need to be allocated and initialized. Instead of global variables, use context structures that have an initialization function. It is okay to use global Tuples or NamedTuples as the use of these should be baked into compiled code.
+
+* Use context variables to store program state, inputs, and outputs. Parameterize these typese as needed, so your code can handle normal types (Arrays) and static-friendly types (StaticArrays, MallocArrays, or StrideArrays). The SciML ecosystem does this well ([example](https://github.com/SciML/OrdinaryDiffEq.jl/blob/e7f045950615352ddfcb126d13d92afd2bad05e4/src/integrators/type.jl#L82)). Use of these context variables also enables allocations and initialization to be centralized, so these could be managed by the calling routines in Julia, Python, JavaScript, or other language.
+
+* If your code needs an array as a workspace, instead of directly creating it, create it as a function argument (where it could default to a standard array creation). That code could be statically compiled if that function argument is changed to a MallocArray or another static-friendly alternative. 
+
+* Use [Bumper.jl](https://github.com/MasonProtter/Bumper.jl) to avoid allocations in some loops.
+
+## Guide for Statically Compiling Code
+
+If you're trying to statically compile generic code, you may run into issues if that code uses features not supported by StaticCompiler. One option is to change the code you're calling using the tips above. If that is not easy, you may by able to compile it anyway. One option is to use method overrides to change what methods are called. Another option is to use the Mixtape feature to change problematic code as part of compilation. For example, you could convert all Strings to StaticStrings.
+
+[Cthulhu](https://github.com/JuliaDebug/Cthulhu.jl) is a great help in digging into code, finding type instabilities, and finding other sources of code that may break static compilation.
+
+## Foreign Function Interfacing
+
+Because Julia objects follow C memory layouts, compiled libraries should be usable from most languages that can interface with C. For example, results should be usable with Python's [CFFI](https://cffi.readthedocs.io/en/latest/) package.
+
+For WebAssembly, interface helpers are available at [WebAssemblyInterfaces](https://github.com/tshort/WebAssemblyInterfaces.jl).
+
+
+
+
+
