@@ -380,8 +380,8 @@ function compile_wasm(funcs::Union{Array,Tuple};
         flags=``,
         kwargs...
     )
-    obj_path, name = generate_obj(funcs, true; target = (triple = "wasm32-unknown-wasi", cpu = "", features = ""), remove_julia_addrspaces = true, kwargs...)
-    run(`$(lld()) -flavor wasm --no-entry --export-all $flags $obj_path/obj.o -o $path/$filename.wasm`)
+    obj_path, name = generate_obj(funcs, true, path, filename; target = (triple = "wasm32-unknown-wasi", cpu = "", features = ""), remove_julia_addrspaces = true, kwargs...)
+    run(`$(lld()) -flavor wasm --no-entry --export-all $flags $obj_path/$filename.o -o $path/$filename.wasm`)
     joinpath(abspath(path), filename * ".wasm")
 end
 
@@ -702,8 +702,8 @@ function generate_obj(funcs::Union{Array,Tuple}, external::Bool, path::String = 
     f, tt = funcs[1]
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
-    fakejob, kwargs = native_job(f, tt, external; kwargs...)
     mod = native_llvm_module(funcs; demangle, kwargs...)
+    fakejob, _ = native_job(f, tt, external; kwargs...)
     obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
     open(obj_path, "w") do io
         write(io, obj)
