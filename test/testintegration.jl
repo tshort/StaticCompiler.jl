@@ -36,7 +36,7 @@ cd(scratch)
         @test isa(status, Base.Process)
         @test isa(status, Base.Process) && status.exitcode == 0
         # Test ascii output
-        @test parsedlm(Int, c"table.tsv", '\t') == (1:5)*(1:5)' broken=Sys.ARCH===:aarch64
+        @test parsedlm(Int, c"table.tsv", '\t') == (1:5)*(1:5)' broken=Sys.isapple()
         # Test binary output
         @test fread!(szeros(Int, 5,5), c"table.b") == (1:5)*(1:5)'
     end
@@ -181,7 +181,7 @@ cd(scratch)
         @test isa(status, Base.Process) && status.exitcode == 0
         A = (1:10) * (1:5)'
         # Check ascii output
-        @test parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.ARCH===:aarch64
+        @test parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.isapple()
         # Check binary output
         @test fread!(szeros(5,5), c"table.b") == A' * A
     end
@@ -211,7 +211,7 @@ cd(scratch)
         @test isa(status, Base.Process)
         @test isa(status, Base.Process) && status.exitcode == 0
         A = (1:10) * (1:5)'
-        @test parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.ARCH===:aarch64
+        @test parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.isapple()
     end
 
 
