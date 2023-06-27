@@ -255,9 +255,8 @@ const activefns = Set{String}((
 ))
 
 function annotate!(mod)
-    ctx = context(mod)
-    inactive = LLVM.StringAttribute("enzyme_inactive", ""; ctx)
-    active = LLVM.StringAttribute("enzyme_active", ""; ctx)
+    inactive = LLVM.StringAttribute("enzyme_inactive", "")
+    active = LLVM.StringAttribute("enzyme_active", "")
     fns = functions(mod)
 
     for inactivefn in inactivefns
@@ -277,8 +276,8 @@ function annotate!(mod)
     for fname in ("julia.typeof",)
         if haskey(fns, fname)
             fn = fns[fname]
-            push!(function_attributes(fn), LLVM.EnumAttribute("readnone", 0; ctx))
-            push!(function_attributes(fn), LLVM.StringAttribute("enzyme_shouldrecompute"; ctx))
+            push!(function_attributes(fn), LLVM.EnumAttribute("readnone", 0))
+            push!(function_attributes(fn), LLVM.StringAttribute("enzyme_shouldrecompute"))
         end
     end
 
@@ -286,44 +285,44 @@ function annotate!(mod)
         if haskey(fns, fname)
             fn = fns[fname]
             # TODO per discussion w keno perhaps this should change to readonly / inaccessiblememonly
-            push!(function_attributes(fn), LLVM.EnumAttribute("readnone", 0; ctx))
+            push!(function_attributes(fn), LLVM.EnumAttribute("readnone", 0))
         end
     end
 
     for fname in ("julia.pointer_from_objref",)
         if haskey(fns, fname)
             fn = fns[fname]
-            push!(function_attributes(fn), LLVM.EnumAttribute("readnone", 0; ctx))
+            push!(function_attributes(fn), LLVM.EnumAttribute("readnone", 0))
         end
     end
 
     for boxfn in ("jl_box_float32", "jl_box_float64", "jl_box_int32", "jl_box_int64", "julia.gc_alloc_obj", "jl_alloc_array_1d", "jl_alloc_array_2d", "jl_alloc_array_3d")
         if haskey(fns, boxfn)
             fn = fns[boxfn]
-            push!(return_attributes(fn), LLVM.EnumAttribute("noalias", 0; ctx))
-            push!(function_attributes(fn), LLVM.EnumAttribute("inaccessiblememonly", 0; ctx))
+            push!(return_attributes(fn), LLVM.EnumAttribute("noalias", 0))
+            push!(function_attributes(fn), LLVM.EnumAttribute("inaccessiblememonly", 0))
         end
     end
 
     for gc in ("llvm.julia.gc_preserve_begin", "llvm.julia.gc_preserve_end")
         if haskey(fns, gc)
             fn = fns[gc]
-            push!(function_attributes(fn), LLVM.EnumAttribute("inaccessiblememonly", 0; ctx))
+            push!(function_attributes(fn), LLVM.EnumAttribute("inaccessiblememonly", 0))
         end
     end
 
     for rfn in ("jl_object_id_", "jl_object_id")
         if haskey(fns, rfn)
             fn = fns[rfn]
-            push!(function_attributes(fn), LLVM.EnumAttribute("readonly", 0; ctx))
+            push!(function_attributes(fn), LLVM.EnumAttribute("readonly", 0))
         end
     end
 
     for rfn in ("jl_in_threaded_region_", "jl_in_threaded_region")
         if haskey(fns, rfn)
             fn = fns[rfn]
-            push!(function_attributes(fn), LLVM.EnumAttribute("readonly", 0; ctx))
-            push!(function_attributes(fn), LLVM.EnumAttribute("inaccessiblememonly", 0; ctx))
+            push!(function_attributes(fn), LLVM.EnumAttribute("readonly", 0))
+            push!(function_attributes(fn), LLVM.EnumAttribute("inaccessiblememonly", 0))
         end
     end
 end

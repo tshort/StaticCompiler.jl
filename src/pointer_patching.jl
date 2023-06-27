@@ -1,5 +1,5 @@
 function relocation_table!(mod)
-    i64 = LLVM.IntType(64; ctx=LLVM.context(mod))
+    i64 = LLVM.IntType(64)
     d = IdDict{Any, Tuple{String, LLVM.GlobalVariable}}()
 
     for func ∈ LLVM.functions(mod), bb ∈ LLVM.blocks(func), inst ∈ LLVM.instructions(bb)
@@ -120,7 +120,7 @@ function relocation_table!(mod)
 end
 
 function get_pointers!(d, mod, inst)
-    jl_t = (LLVM.StructType(LLVM.LLVMType[]; ctx=LLVM.context(mod)))
+    jl_t = (LLVM.StructType(LLVM.LLVMType[]))
     for (i, arg) ∈ enumerate(LLVM.operands(inst))
         if occursin("inttoptr", string(arg)) && arg isa LLVM.ConstantExpr
             op1 = LLVM.Value(LLVM.API.LLVMGetOperand(arg, 0))
@@ -160,7 +160,7 @@ function pointer_patching_diff(f, tt, path1=tempname(), path2=tempname(); show_r
     job, kwargs = native_job(f, tt, false; name=fix_name(string(nameof(f))))
     #Get LLVM to generated a module of code for us. We don't want GPUCompiler's optimization passes.
     mod, meta = GPUCompiler.JuliaContext() do context
-        GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, optimize=false, ctx=context)
+        GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, optimize=false)
     end
     # Use Enzyme's annotation and optimization pipeline
     annotate!(mod)
