@@ -595,7 +595,6 @@ end
 #Return an LLVM module for multiple functions
 function native_llvm_module(funcs::Union{Array,Tuple}; demangle=true, kwargs...)
     f,tt = funcs[1]
-    #mod = native_llvm_module(f,tt; demangle, kwargs...)
     tsctx = GPUCompiler.ThreadSafeContext()
     ctx = GPUCompiler.context(tsctx)
     GPUCompiler.activate(ctx)
@@ -608,7 +607,6 @@ function native_llvm_module(funcs::Union{Array,Tuple}; demangle=true, kwargs...)
     if length(funcs) > 1
         for func in funcs[2:end]
             f,tt = func
-            #tmod = native_llvm_module(f,tt; demangle, kwargs...)
             name_f = fix_name(f)
             if !demangle
                 name_f = "julia_"*name_f
