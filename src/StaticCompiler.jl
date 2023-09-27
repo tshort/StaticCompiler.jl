@@ -598,22 +598,22 @@ function native_llvm_module(funcs::Union{Array,Tuple}; demangle=true, kwargs...)
     #mod = native_llvm_module(f,tt; demangle, kwargs...)
     tsctx = GPUCompiler.ThreadSafeContext()
     ctx = GPUCompiler.context(tsctx)
-    name1 = fix_name(f)
     GPUCompiler.activate(ctx)
+    name_f = fix_name(f)
     if !demangle
-        name1 = "julia_"*name1
+        name_f = "julia_"*name_f
     end
-    job, kwargs = native_job(f, tt, true; name1, kwargs...)
+    job, kwargs = native_job(f, tt, true; name = name_f, kwargs...)
     mod,_ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false)
     if length(funcs) > 1
         for func in funcs[2:end]
             f,tt = func
             #tmod = native_llvm_module(f,tt; demangle, kwargs...)
-            name = fix_name(f)
+            name_f = fix_name(f)
             if !demangle
-                name = "julia_"*name
+                name_f = "julia_"*name_f
             end
-            job, kwargs = native_job(f, tt, true; name, kwargs...)
+            job, kwargs = native_job(f, tt, true; name = name_f, kwargs...)
             tmod,_ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false)
             link!(mod,tmod)
         end
