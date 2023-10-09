@@ -595,29 +595,27 @@ end
 #Return an LLVM module for multiple functions
 function native_llvm_module(funcs::Union{Array,Tuple}; demangle=true, kwargs...)
     f,tt = funcs[1]
-    tsctx = GPUCompiler.ThreadSafeContext()
-    ctx = GPUCompiler.context(tsctx)
-    GPUCompiler.activate(ctx)
-    name_f = fix_name(f)
-    if !demangle
-        name_f = "julia_"*name_f
+    mod = GPUCompiler.JuliaContext() do context
+      name_f = fix_name(f)
+      if !demangle
+          name_f = "julia_"*name_f
+      end
+      job, kwargs = native_job(f, tt, true; name = name_f, kwargs...)
+      mod,_ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false)
+      if length(funcs) > 1
+          for func in funcs[2:end]
+              f,tt = func
+              name_f = fix_name(f)
+              if !demangle
+                  name_f = "julia_"*name_f
+              end
+              job, kwargs = native_job(f, tt, true; name = name_f, kwargs...)
+              tmod,_ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false)
+              link!(mod,tmod)
+          end
+      end
+      mod
     end
-    job, kwargs = native_job(f, tt, true; name = name_f, kwargs...)
-    mod,_ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false)
-    if length(funcs) > 1
-        for func in funcs[2:end]
-            f,tt = func
-            name_f = fix_name(f)
-            if !demangle
-                name_f = "julia_"*name_f
-            end
-            job, kwargs = native_job(f, tt, true; name = name_f, kwargs...)
-            tmod,_ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false)
-            link!(mod,tmod)
-        end
-    end
-    GPUCompiler.deactivate(ctx)
-    GPUCompiler.dispose(tsctx)
     # Just to be sure
     for (modfunc, func) in zip(functions(mod), funcs)
         fname = name(modfunc)
