@@ -92,6 +92,8 @@ To enable code to be statically compiled, consider the following:
 
 * Use context variables to store program state, inputs, and outputs. Parameterize these typese as needed, so your code can handle normal types (Arrays) and static-friendly types (StaticArrays, MallocArrays, or StrideArrays). The SciML ecosystem does this well ([example](https://github.com/SciML/OrdinaryDiffEq.jl/blob/e7f045950615352ddfcb126d13d92afd2bad05e4/src/integrators/type.jl#L82)). Use of these context variables also enables allocations and initialization to be centralized, so these could be managed by the calling routines in Julia, Python, JavaScript, or other language.
 
+* Arguments and returned values from `compile_shlib` must be native objects such as `Int`, `Float64`, or `Ptr`. They cannot be things like `Tuple{Int, Int}` because that is not natively sized. Such objects need to be passed by reference instead of by value.
+
 * If your code needs an array as a workspace, instead of directly creating it, create it as a function argument (where it could default to a standard array creation). That code could be statically compiled if that function argument is changed to a MallocArray or another static-friendly alternative. 
 
 ## Guide for Statically Compiling Code
