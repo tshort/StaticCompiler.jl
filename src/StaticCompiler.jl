@@ -129,6 +129,8 @@ compile_shlib(funcs::Array, [path::String="./"]; filename="libfoo", demangle=tru
 ```
 As `compile_executable`, but compiling to a standalone `.dylib`/`.so` shared library.
 
+Arguments and returned values from `compile_shlib` must be native objects such as `Int`, `Float64`, or `Ptr`. They cannot be things like `Tuple{Int, Int}` because that is not natively sized. Such objects need to be passed by reference instead of by value.
+
 If `demangle` is set to `false`, compiled function names are prepended with "julia_".
 
 ### Examples
