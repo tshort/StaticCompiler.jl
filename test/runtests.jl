@@ -10,16 +10,17 @@ using StrideArraysCore
 using CodeInfoTools
 using MacroTools
 using LLD_jll
+using Bumper
 
 addprocs(1)
 @everywhere using StaticCompiler, StrideArraysCore
 
 const GROUP = get(ENV, "GROUP", "All")
 
-@static if GROUP == "Core" || GROUP == "All"
+if GROUP == "Core" || GROUP == "All"
     include("testcore.jl")
 end
 
-@static if GROUP == "Integration" || GROUP == "All"
+if GROUP == "Integration" || GROUP == "All"
     include("testintegration.jl")
 end

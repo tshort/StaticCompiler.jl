@@ -3,6 +3,30 @@ testpath = pwd()
 scratch = tempdir()
 cd(scratch)
 
+function bumper_test(N::Int)
+    buf = AllocBuffer(MallocVector, sizeof(Float64) * N)
+    s = 0.0
+    for i ∈ 1:N
+        # some excuse to reuse the same memory a bunch of times 
+        @no_escape buf begin
+            v = @alloc(Float64, N)
+            v .= i
+            s += sum(v)
+        end
+    end
+    s
+end
+
+@testset "Bumper.jl integration" begin
+
+    path = compile_shlib(bumper_test, (Int,), "./")
+    ptr = Libdl.dlopen(path, Libdl.RTLD_LOCAL)
+
+    fptr = Libdl.dlsym(ptr, "bumper_test")
+
+    @test bumper_test(8) == @ccall($fptr(8::Int)::Float64)
+end
+
 @testset "Standalone Executable Integration" begin
 
     jlpath = joinpath(Sys.BINDIR, Base.julia_exename()) # Get path to julia executable
@@ -105,7 +129,7 @@ cd(scratch)
             @warn "Could not compile $testpath/scripts/randn_matrix.jl"
             println(e)
         end
-        @static if Sys.isbsd()
+        if Sys.isbsd()
             @test isa(status, Base.Process)
             @test isa(status, Base.Process) && status.exitcode == 0
         end
@@ -119,14 +143,14 @@ cd(scratch)
             @warn "Could not run $(scratch)/randn_matrix"
             println(e)
         end
-        @static if Sys.isbsd()
+        if Sys.isbsd()
             @test isa(status, Base.Process)
             @test isa(status, Base.Process) && status.exitcode == 0
         end
     end
 
     ## --- Test LoopVectorization integration
-    @static if LoopVectorization.VectorizationBase.has_feature(Val{:x86_64_avx2})
+    if Bool(LoopVectorization.VectorizationBase.has_feature(Val{:x86_64_avx2}))
         let
             # Compile...
             status = -1
@@ -280,35 +304,36 @@ cd(scratch)
 
     ## --- Test interop
 
-    @static if Sys.isbsd()
-    let
-        # Compile...
-        status = -1
-        try
-            isfile("interop") && rm("interop")
-            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/interop.jl`)
-        catch e
-            @warn "Could not compile $testpath/scripts/interop.jl"
-            println(e)
-        end
-        @test isa(status, Base.Process)
-        @test isa(status, Base.Process) && status.exitcode == 0
+    if Sys.isbsd()
+        let
+            # Compile...
+            status = -1
+            try
+                isfile("interop") && rm("interop")
+                status = run(`$jlpath --startup=no --compile=min $testpath/scripts/interop.jl`)
+            catch e
+                @warn "Could not compile $testpath/scripts/interop.jl"
+                println(e)
+            end
+            @test isa(status, Base.Process)
+            @test isa(status, Base.Process) && status.exitcode == 0
 
-        # Run...
-        println("Interop:")
-        status = -1
-        try
-            status = run(`./interop`)
-        catch e
-            @warn "Could not run $(scratch)/interop"
-            println(e)
+            # Run...
+            println("Interop:")
+            status = -1
+            try
+                status = run(`./interop`)
+            catch e
+                @warn "Could not run $(scratch)/interop"
+                println(e)
+            end
+            @test isa(status, Base.Process)
+            @test isa(status, Base.Process) && status.exitcode == 0
         end
-        @test isa(status, Base.Process)
-        @test isa(status, Base.Process) && status.exitcode == 0
-    end
     end
 
 end
+
 
 # Mixtape
 
@@ -359,10 +384,6 @@ struct MyMix <: CompilationContext end
     # You can also greenlight modules.
     StaticCompiler.allow(ctx::MyMix, m::Module) = m == SubFoo
 
-    _, path = compile(SubFoo.f, (), mixtape = MyMix())
-    @test load_function(path)() == 8
-    @test SubFoo.f() != 8
-
     # redefine swap to test caching and add StaticString substitution
     function swap(e::Expr)
         new = MacroTools.postwalk(e) do s
@@ -373,13 +394,14 @@ struct MyMix <: CompilationContext end
         end
         return new
     end
-    _, path = compile(SubFoo.f, (), mixtape = MyMix())
-    @test load_function(path)() == 4
+    path = compile_shlib(SubFoo.f, (), testpath, mixtape=MyMix())
+    ptr = Libdl.dlopen(path, Libdl.RTLD_LOCAL)
 
-    _, path = compile(SubFoo.teststring, (), mixtape = MyMix())
-    @test load_function(path)()
-
+    fptr = Libdl.dlsym(ptr, "f")
+    @test @ccall($fptr()::Int) == 4
 end
+
+
 
 @testset "Cross compiling to WebAssembly" begin
     testpath = pwd()

@@ -4,7 +4,6 @@ else
     const method_table = nothing
 end
 
-const overrides = quote end
 
 """
 ```julia
@@ -25,14 +24,9 @@ macro device_override(ex)
         error()
     end
     code = quote
-        $GPUCompiler.@override(StaticCompiler.method_table, $ex)
+        $Base.Experimental.@overlay($StaticCompiler.method_table, $ex)
     end
-    if isdefined(Base.Experimental, Symbol("@overlay"))
-        return esc(code)
-    else
-        push!(overrides, code)
-        return
-    end
+    return esc(code)
 end
 
 Base.@kwdef struct NativeCompilerTarget <: GPUCompiler.AbstractCompilerTarget
