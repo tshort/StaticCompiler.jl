@@ -3,7 +3,7 @@ testpath = pwd()
 scratch = tempdir()
 cd(scratch)
 
-if VERSION >= 1.9
+if VERSION >= v"1.9"
     # Bumper uses PackageExtensions to work with StaticCompiler, so let's just skip this test on 1.8
     function bumper_test(N::Int)
         buf = AllocBuffer(MallocVector, sizeof(Float64) * N)
