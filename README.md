@@ -54,7 +54,7 @@ julia> f(1) # Gives the expected answer in regular julia
 
 julia> dlopen(compile_shlib(f, (Int,), "./")) do lib
            fptr = dlsym(lib, "f")
-           # Now use the compiled version where + is replaced with -
+           # Now use the compiled version where g(x) = 2x is replaced with g(x) = x - 10
            @ccall $fptr(1::Int)::Int 
        end
 -8
