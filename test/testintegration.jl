@@ -3,28 +3,32 @@ testpath = pwd()
 scratch = tempdir()
 cd(scratch)
 
-function bumper_test(N::Int)
-    buf = AllocBuffer(MallocVector, sizeof(Float64) * N)
-    s = 0.0
-    for i ∈ 1:N
-        # some excuse to reuse the same memory a bunch of times 
-        @no_escape buf begin
-            v = @alloc(Float64, N)
-            v .= i
-            s += sum(v)
+if VERSION >= 1.9
+    # Bumper uses PackageExtensions to work with StaticCompiler, so let's just skip this test on 1.8
+    function bumper_test(N::Int)
+        buf = AllocBuffer(MallocVector, sizeof(Float64) * N)
+        s = 0.0
+        for i ∈ 1:N
+            # some excuse to reuse the same memory a bunch of times 
+            @no_escape buf begin
+                v = @alloc(Float64, N)
+                v .= i
+                s += sum(v)
+            end
         end
+        free(buf)
+        s
     end
-    s
-end
 
-@testset "Bumper.jl integration" begin
+    @testset "Bumper.jl integration" begin
 
-    path = compile_shlib(bumper_test, (Int,), "./")
-    ptr = Libdl.dlopen(path, Libdl.RTLD_LOCAL)
+        path = compile_shlib(bumper_test, (Int,), "./")
+        ptr = Libdl.dlopen(path, Libdl.RTLD_LOCAL)
+        
+        fptr = Libdl.dlsym(ptr, "bumper_test")
 
-    fptr = Libdl.dlsym(ptr, "bumper_test")
-
-    @test bumper_test(8) == @ccall($fptr(8::Int)::Float64)
+        @test bumper_test(8) == @ccall($fptr(8::Int)::Float64)
+    end
 end
 
 @testset "Standalone Executable Integration" begin
