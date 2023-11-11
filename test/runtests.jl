@@ -7,7 +7,6 @@ using ManualMemory
 using Distributed
 using StaticTools
 using StrideArraysCore
-using CodeInfoTools
 using MacroTools
 using LLD_jll
 using Bumper

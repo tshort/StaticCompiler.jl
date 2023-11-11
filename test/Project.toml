@@ -1,5 +1,4 @@
 [deps]
-CodeInfoTools = "bc773b8a-8374-437a-b9f2-0e9785855863"
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 Formatting = "59287772-0a20-5a39-b81b-1366585eb4c0"
 GPUCompiler = "61eb1bfa-7361-4325-ad38-22787b887f55"

@@ -29,16 +29,18 @@ macro device_override(ex)
     return esc(code)
 end
 
-Base.@kwdef struct NativeCompilerTarget <: GPUCompiler.AbstractCompilerTarget
+Base.@kwdef struct NativeCompilerTarget{MT} <: GPUCompiler.AbstractCompilerTarget
     triple::String=Sys.MACHINE
     cpu::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUName())
     features::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUFeatures())
+    method_table::MT = method_table
 end
 
-Base.@kwdef struct ExternalNativeCompilerTarget <: GPUCompiler.AbstractCompilerTarget
+Base.@kwdef struct ExternalNativeCompilerTarget{MT} <: GPUCompiler.AbstractCompilerTarget
     triple::String=Sys.MACHINE
     cpu::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUName())
     features::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUFeatures())
+    method_table::MT = method_table
 end
 
 module StaticRuntime
@@ -66,44 +68,43 @@ for target in (:NativeCompilerTarget, :ExternalNativeCompilerTarget)
             return tm
         end
 
-        GPUCompiler.runtime_slug(job::GPUCompiler.CompilerJob{$target}) = "native_$(job.config.target.cpu)-$(hash(job.config.target.features))"
+        GPUCompiler.runtime_slug(job::GPUCompiler.CompilerJob{<:$target}) = "native_$(job.config.target.cpu)-$(hash(job.config.target.features))"
 
-        GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{$target}) = StaticRuntime
-        GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{$target, StaticCompilerParams}) = StaticRuntime
+        GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:$target}) = StaticRuntime
+        GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:$target, StaticCompilerParams}) = StaticRuntime
 
 
-        GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{$target, StaticCompilerParams}) = true
-        GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{$target}) = true
+        GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:$target, StaticCompilerParams}) = true
+        GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:$target}) = true
 
-        GPUCompiler.get_interpreter(job::GPUCompiler.CompilerJob{$target, StaticCompilerParams}) =
+        GPUCompiler.get_interpreter(job::GPUCompiler.CompilerJob{<:$target, StaticCompilerParams}) =
             StaticInterpreter(job.config.params.cache, GPUCompiler.method_table(job), job.world,
-                              GPUCompiler.inference_params(job), GPUCompiler.optimization_params(job),
-                              job.config.params.mixtape)
-        GPUCompiler.ci_cache(job::GPUCompiler.CompilerJob{$target, StaticCompilerParams}) = job.config.params.cache
+                              GPUCompiler.inference_params(job), GPUCompiler.optimization_params(job))
+        GPUCompiler.ci_cache(job::GPUCompiler.CompilerJob{<:$target, StaticCompilerParams}) = job.config.params.cache
+        GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{<:$target})) = job.config.target.method_table
     end
 end
 
-GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{ExternalNativeCompilerTarget})) = method_table
-GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{ExternalNativeCompilerTarget, StaticCompilerParams})) = method_table
-
 function native_job(@nospecialize(func::Function), @nospecialize(types::Type), external::Bool;
-        mixtape = NoContext(),
         name = fix_name(func),
         kernel::Bool = false,
-        target = (),
+        target = (;),
+        method_table=method_table,
         kwargs...
     )
+    target = merge(target, (;method_table))
     source = methodinstance(typeof(func), Base.to_tuple_type(types))
     target = external ? ExternalNativeCompilerTarget(;target...) : NativeCompilerTarget(;target...)
-    params = StaticCompilerParams(mixtape = mixtape)
+    params = StaticCompilerParams()
     config = GPUCompiler.CompilerConfig(target, params, name = name, kernel = kernel)
     StaticCompiler.CompilerJob(source, config), kwargs
 end
 
-function native_job(@nospecialize(func), @nospecialize(types), external; mixtape = NoContext(), kernel::Bool=false, name=fix_name(repr(func)), target = (), kwargs...)
+function native_job(@nospecialize(func), @nospecialize(types), external; kernel::Bool=false, name=fix_name(repr(func)), target = (;), method_table=method_table, kwargs...)
+    target = merge(target, (; method_table))
     source = methodinstance(typeof(func), Base.to_tuple_type(types))
     target = external ? ExternalNativeCompilerTarget(;target...) : NativeCompilerTarget(;target...)
-    params = StaticCompilerParams(mixtape = mixtape)
+    params = StaticCompilerParams()
     config = GPUCompiler.CompilerConfig(target, params, name = name, kernel = kernel)
     GPUCompiler.CompilerJob(source, config), kwargs
 end

@@ -7,7 +7,7 @@ using GPUCompiler:
 using CodeInfoTools
 using CodeInfoTools: resolve
 
-struct StaticInterpreter{M} <: AbstractInterpreter
+struct StaticInterpreter <: AbstractInterpreter
     global_cache::CodeCache
     method_table::Union{Nothing,Core.MethodTable}
 
@@ -20,13 +20,10 @@ struct StaticInterpreter{M} <: AbstractInterpreter
     inf_params::InferenceParams
     opt_params::OptimizationParams
 
-    # Mixtape context
-    mixtape::M
-
-    function StaticInterpreter(cache::CodeCache, mt::Union{Nothing,Core.MethodTable}, world::UInt, ip::InferenceParams, op::OptimizationParams, mixtape::CompilationContext)
+    function StaticInterpreter(cache::CodeCache, mt::Union{Nothing,Core.MethodTable}, world::UInt, ip::InferenceParams, op::OptimizationParams)
         @assert world <= Base.get_world_counter()
 
-        return new{typeof(mixtape)}(
+        return new(
             cache,
             mt,
 
@@ -38,10 +35,7 @@ struct StaticInterpreter{M} <: AbstractInterpreter
 
             # parameters for inference and optimization
             ip,
-            op,
-
-            # Mixtape context
-            mixtape
+            op
         )
     end
 end
@@ -79,9 +73,6 @@ function custom_pass!(interp::StaticInterpreter, result::InferenceResult, mi::Co
     mi.specTypes isa UnionAll && return src
     sig = Tuple(mi.specTypes.parameters)
     as = map(resolve_generic, sig)
-    if allow(interp.mixtape, mi.def.module, as...)
-        src = transform(interp.mixtape, src, sig)
-    end
     return src
 end
 
@@ -102,22 +93,21 @@ end
 Core.Compiler.may_optimize(interp::StaticInterpreter) = true
 Core.Compiler.may_compress(interp::StaticInterpreter) = true
 Core.Compiler.may_discard_trees(interp::StaticInterpreter) = true
-if VERSION >= v"1.7.0-DEV.577"
 Core.Compiler.verbose_stmt_info(interp::StaticInterpreter) = false
-end
+
 
 if isdefined(Base.Experimental, Symbol("@overlay"))
-using Core.Compiler: OverlayMethodTable
-if v"1.8-beta2" <= VERSION < v"1.9-" || VERSION >= v"1.9.0-DEV.120"
-Core.Compiler.method_table(interp::StaticInterpreter) =
-    OverlayMethodTable(interp.world, interp.method_table)
+    using Core.Compiler: OverlayMethodTable
+    if v"1.8-beta2" <= VERSION < v"1.9-" || VERSION >= v"1.9.0-DEV.120"
+        Core.Compiler.method_table(interp::StaticInterpreter) =
+            OverlayMethodTable(interp.world, interp.method_table)
+    else
+        Core.Compiler.method_table(interp::StaticInterpreter, sv::InferenceState) =
+            OverlayMethodTable(interp.world, interp.method_table)
+    end
 else
-Core.Compiler.method_table(interp::StaticInterpreter, sv::InferenceState) =
-    OverlayMethodTable(interp.world, interp.method_table)
-end
-else
-Core.Compiler.method_table(interp::StaticInterpreter, sv::InferenceState) =
-    WorldOverlayMethodTable(interp.world)
+    Core.Compiler.method_table(interp::StaticInterpreter, sv::InferenceState) =
+        WorldOverlayMethodTable(interp.world)
 end
 
 # semi-concrete interepretation is broken with overlays (JuliaLang/julia#47349)
@@ -134,13 +124,11 @@ end
 struct StaticCompilerParams <: AbstractCompilerParams
     opt::Bool
     optlevel::Int
-    mixtape::CompilationContext
     cache::CodeCache
 end
 
 function StaticCompilerParams(; opt = false,
         optlevel = Base.JLOptions().opt_level,
-        mixtape = NoContext(),
         cache = CodeCache())
-    return StaticCompilerParams(opt, optlevel, mixtape, cache)
+    return StaticCompilerParams(opt, optlevel, cache)
 end

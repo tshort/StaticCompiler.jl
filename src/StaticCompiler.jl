@@ -11,13 +11,12 @@ using Clang_jll: clang
 using LLD_jll: lld
 using StaticTools
 using StaticTools: @symbolcall, @c_str, println
-
+using Core: MethodTable
 
 export load_function, compile_shlib, compile_executable, compile_wasm
 export native_code_llvm, native_code_typed, native_llvm_module, native_code_native
 export @device_override, @print_and_throw
 
-include("mixtape.jl")
 include("interpreter.jl")
 include("target.jl")
 include("pointer_warning.jl")
@@ -33,6 +32,7 @@ compile_executable(f::Function, types::Tuple, path::String, [name::String=string
     filename::String=name,
     cflags=``, # Specify libraries you would like to link against, and other compiler options here
     also_expose=[],
+    method_table=StaticCompiler.method_table,
     kwargs...
 )
 ```
@@ -124,8 +124,18 @@ end
 
 """
 ```julia
-compile_shlib(f::Function, types::Tuple, [path::String="./"], [name::String=string(nameof(f))]; filename::String=name, cflags=``, kwargs...)
-compile_shlib(funcs::Array, [path::String="./"]; filename="libfoo", demangle=true, cflags=``, kwargs...)
+compile_shlib(f::Function, types::Tuple, [path::String="./"], [name::String=string(nameof(f))];
+    filename::String=name,
+    cflags=``,
+    method_table=StaticCompiler.method_table,
+    kwargs...)
+
+compile_shlib(funcs::Array, [path::String="./"];
+    filename="libfoo",
+    demangle=true,
+    cflags=``,
+    method_table=StaticCompiler.method_table,
+    kwargs...)
 ```
 As `compile_executable`, but compiling to a standalone `.dylib`/`.so` shared library.
 
@@ -184,38 +194,7 @@ function compile_shlib(funcs::Union{Array,Tuple}, path::String="./";
 
     joinpath(abspath(path), filename * "." * Libdl.dlext)
 end
-
-"""
-```julia
-compile_wasm(f::Function, types::Tuple, [path::String="./"], [name::String=string(nameof(f))]; filename::String=name, flags=``, kwargs...)
-compile_wasm(funcs::Union{Array,Tuple}, [path::String="./"]; filename="libfoo", demangle=true, flags=``, kwargs...)
-```
-As `compile_shlib`, but compiling to a WebAssembly library.
-
-If `demangle` is set to `false`, compiled function names are prepended with "julia_".
-```
-"""
-function compile_wasm(f::Function, types=();
-        path::String = "./",
-        filename = fix_name(f),
-        flags = ``,
-        kwargs...
-    )
-    tt = Base.to_tuple_type(types)
-    obj_path, name = generate_obj(f, tt, true, path, filename; target = (triple = "wasm32-unknown-wasi", cpu = "", features = ""), remove_julia_addrspaces = true, kwargs...)
-    run(`$(lld()) -flavor wasm --no-entry --export-all $flags $obj_path/obj.o -o $path/$name.wasm`)
-    joinpath(abspath(path), filename * ".wasm")
-end
-function compile_wasm(funcs::Union{Array,Tuple};
-        path::String="./",
-        filename="libfoo",
-        flags=``,
-        kwargs...
-    )
-    obj_path, name = generate_obj(funcs, true, path, filename; target = (triple = "wasm32-unknown-wasi", cpu = "", features = ""), remove_julia_addrspaces = true, kwargs...)
-    run(`$(lld()) -flavor wasm --no-entry --export-all $flags $obj_path/$filename.o -o $path/$filename.wasm`)
-    joinpath(abspath(path), filename * ".wasm")
-end
+ 
 
 """
 ```julia
@@ -260,6 +239,7 @@ function generate_shlib_fptr(path::String, name, filename::String=name)
     @assert fptr != C_NULL
     fptr
 end
+
 # As above, but also compile (maybe remove this method in the future?)
 function generate_shlib_fptr(f, tt, path::String=tempname(), name=fix_name(f), filename::String=name;
                             temp::Bool=true,
@@ -478,7 +458,6 @@ end
 """
 ```julia
 generate_obj(f, tt, external::Bool, path::String = tempname(), filenamebase::String="obj";
-             mixtape = NoContext(),
              target = (),
              demangle = true,
              strip_llvm = false,
@@ -489,9 +468,6 @@ generate_obj(f, tt, external::Bool, path::String = tempname(), filenamebase::Str
 Low level interface for compiling object code (`.o`) for for function `f` given
 a tuple type `tt` characterizing the types of the arguments for which the
 function will be compiled.
-
-`mixtape` defines a context that can be used to transform IR prior to compilation using
-[Mixtape](https://github.com/JuliaCompilerPlugins/Mixtape.jl) features.
 
 `target` can be used to change the output target. This is useful for compiling to WebAssembly and embedded targets.
 This is a named tuple with fields `triple`, `cpu`, and `features` (each of these are strings).
@@ -522,7 +498,6 @@ end
 """
 ```julia
 generate_obj(funcs::Union{Array,Tuple}, external::Bool, path::String = tempname(), filenamebase::String="obj";
-             mixtape = NoContext(),
              target = (),
              demangle =false,
              strip_llvm = false,
@@ -533,9 +508,6 @@ generate_obj(funcs::Union{Array,Tuple}, external::Bool, path::String = tempname(
 Low level interface for compiling object code (`.o`) for an array of Tuples
 (f, tt) where each function `f` and tuple type `tt` determine the set of methods
 which will be compiled.
-
-`mixtape` defines a context that can be used to transform IR prior to compilation using
-[Mixtape](https://github.com/JuliaCompilerPlugins/Mixtape.jl) features.
 
 `target` can be used to change the output target. This is useful for compiling to WebAssembly and embedded targets.
 This is a named tuple with fields `triple`, `cpu`, and `features` (each of these are strings).

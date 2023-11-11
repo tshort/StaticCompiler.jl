@@ -43,26 +43,30 @@ Sometimes, a julia function you want to statically compile will do things (such 
 ```julia
 julia> using Libdl, StaticCompiler
 
-julia> f(x) = x + 1;
+julia> f(x) = g(x) + 1;
 
-julia> @device_override Base.:(+)(x::Int, y::Int) = x - y
+julia> g(x) = 2x
+
+julia> @device_override g(x::Int) = x - 10
 
 julia> f(1) # Gives the expected answer in regular julia
-2
+3
 
 julia> dlopen(compile_shlib(f, (Int,), "./")) do lib
            fptr = dlsym(lib, "f")
            # Now use the compiled version where + is replaced with -
            @ccall $fptr(1::Int)::Int 
        end
-0
+-8
 ```
-Typically, errors should be overrided and replaced with `@print_and_throw`, which is StaticCompiler friendle, i.e.
+Typically, errors should be overrided and replaced with `@print_and_throw`, which is StaticCompiler friendly, i.e.
 we define overrides such as
 ``` julia
 @device_override @noinline Base.Math.throw_complex_domainerror(f::Symbol, x) =
     @print_and_throw c"This operation requires a complex input to return a complex result"
 ```
+
+If for some reason, you wish to use a different method table (defined with `Base.Experimental.@MethodTable` and `Base.Experimental.@overlay`) than the default one provided by StaticCompiler.jl, you can provide it to `compile_executable` and `compile_shlib` via a keyword argument `method_table`.
 
 
 ## Approach
@@ -98,7 +102,7 @@ To enable code to be statically compiled, consider the following:
 
 ## Guide for Statically Compiling Code
 
-If you're trying to statically compile generic code, you may run into issues if that code uses features not supported by StaticCompiler. One option is to change the code you're calling using the tips above. If that is not easy, you may by able to compile it anyway. One option is to use method overrides to change what methods are called. Another option is to use the Mixtape feature to change problematic code as part of compilation. For example, you could convert all Strings to StaticStrings.
+If you're trying to statically compile generic code, you may run into issues if that code uses features not supported by StaticCompiler. One option is to change the code you're calling using the tips above. If that is not easy, you may by able to compile it anyway. One option is to use method overlays to change what methods are called.
 
 [Cthulhu](https://github.com/JuliaDebug/Cthulhu.jl) is a great help in digging into code, finding type instabilities, and finding other sources of code that may break static compilation.
 
@@ -106,9 +110,4 @@ If you're trying to statically compile generic code, you may run into issues if 
 
 Because Julia objects follow C memory layouts, compiled libraries should be usable from most languages that can interface with C. For example, results should be usable with Python's [CFFI](https://cffi.readthedocs.io/en/latest/) package.
 
-For WebAssembly, interface helpers are available at [WebAssemblyInterfaces](https://github.com/tshort/WebAssemblyInterfaces.jl).
-
-
-
-
-
+For WebAssembly, interface helpers are available at [WebAssemblyInterfaces](https://github.com/tshort/WebAssemblyInterfaces.jl), and users should also see [WebAssemblyCompiler](https://github.com/tshort/WebAssemblyCompiler.jl) for a package more focused on compilation of WebAssebly in general.

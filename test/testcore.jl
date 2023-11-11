@@ -124,3 +124,35 @@ end
     @test ccall(fptr, Float64, (Float64,), 10.) == squaresquaresquare(10.)
     #Compile dylib
 end
+
+
+# Overlays
+
+module SubFoo
+
+rand(args...) = Base.rand(args...)
+
+function f()
+    x = rand()
+    y = rand()
+    return x + y
+end
+
+end
+
+@device_override SubFoo.rand() = 2
+
+# Lets test having another method table around
+Base.Experimental.@MethodTable AnotherTable
+Base.Experimental.@overlay AnotherTable SubFoo.rand() = 3
+
+@testset "Overlays" begin
+    Libdl.dlopen(compile_shlib(SubFoo.f, (), workdir)) do lib
+        fptr = Libdl.dlsym(lib, "f")
+        @test @ccall($fptr()::Int) == 4
+    end
+    Libdl.dlopen(compile_shlib(SubFoo.f, (), workdir; method_table=AnotherTable)) do lib
+        fptr = Libdl.dlsym(lib, "f")
+        @test @ccall($fptr()::Int) == 6
+    end
+end
