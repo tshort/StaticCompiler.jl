@@ -98,6 +98,7 @@ Hello, world!
 function compile_executable(f::Function, types=(), path::String="./", name=fix_name(f);
                             also_expose=Tuple{Function, Tuple{DataType}}[],
                             kwargs...)
+    
     compile_executable(vcat([(f, types)], also_expose), path, name; kwargs...)
 end
 
