@@ -2,7 +2,7 @@ libcexit(x::Int32) =  @symbolcall exit(x::Int32)::Nothing
 macro print_and_throw(err)
     quote
         println($err)
-        libcexit(Int32(1))
+        libcexit(Int32(1))::Union{}
     end
 end
 
