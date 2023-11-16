@@ -44,3 +44,15 @@ end
 # trig.jl
 @device_override @noinline Base.Math.sincos_domain_error(x) =
     @print_and_throw c"sincos(x) is only defined for finite x."
+
+@static if isdefined(StaticTools, :Bumper)
+    Bumper = StaticTools.Bumper
+    @device_override @noinline Bumper.AllocBufferImpl.oom_error() =
+        @print_and_throw c"alloc: Buffer out of memory. This might be a sign of a memory leak."
+    @device_override @noinline Bumper.Internals.esc_err() =
+        @print_and_throw c"Tried to return a PtrArray from a `no_escape` block. If you really want to do this, evaluate Bumper.allow_ptrarray_to_escape() = true"
+
+    # Just to make the compiler's life a little easier, let's not make it fetch and elide the current task
+    # since tasks don't actually exist on-device.
+    @device_override Bumper.Internals.get_task() = 0
+end
