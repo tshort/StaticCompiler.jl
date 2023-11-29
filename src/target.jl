@@ -24,7 +24,7 @@ struct StaticTarget
     tm::LLVM.TargetMachine
 end
 
-clean_triple(platform::Platform) = arch(platform) * "-" * os(platform) * libc_str(platform)
+clean_triple(platform::Platform) = arch(platform) * os_str(platform) * libc_str(platform)
 StaticTarget() = StaticTarget(HostPlatform(), unsafe_string(LLVM.API.LLVMGetHostCPUName()), unsafe_string(LLVM.API.LLVMGetHostCPUFeatures()))
 StaticTarget(platform::Platform) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform)))
 StaticTarget(platform::Platform, cpu::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform), cpu))

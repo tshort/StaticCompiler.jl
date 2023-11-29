@@ -12,7 +12,7 @@ using LLD_jll: lld
 using StaticTools
 using StaticTools: @symbolcall, @c_str, println
 using Core: MethodTable
-using Base:BinaryPlatforms.Platform, BinaryPlatforms.HostPlatform, BinaryPlatforms.arch, BinaryPlatforms.os, BinaryPlatforms.libc_str
+using Base:BinaryPlatforms.Platform, BinaryPlatforms.HostPlatform, BinaryPlatforms.arch, BinaryPlatforms.os_str, BinaryPlatforms.libc_str
 
 export load_function, compile_shlib, compile_executable
 export static_code_llvm, static_code_typed, static_llvm_module, static_code_native
@@ -399,7 +399,7 @@ function static_code_native(@nospecialize(f), @nospecialize(tt), fname=fix_name(
 end
 
 # Return an LLVM module
-function static_llvm_module(f, tt, name=fix_name(f); demangle, target::StaticTarget=StaticTarget(), kwargs...)
+function static_llvm_module(f, tt, name=fix_name(f); demangle=true, target::StaticTarget=StaticTarget(), kwargs...)
     if !demangle
         name = "julia_"*name
     end
