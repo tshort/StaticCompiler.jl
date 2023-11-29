@@ -17,6 +17,7 @@ using Base:BinaryPlatforms.Platform, BinaryPlatforms.HostPlatform, BinaryPlatfor
 export load_function, compile_shlib, compile_executable
 export static_code_llvm, static_code_typed, static_llvm_module, static_code_native
 export @device_override, @print_and_throw
+export StaticTarget
 
 include("interpreter.jl")
 include("target.jl")
@@ -465,7 +466,7 @@ end
 """
 ```julia
 generate_obj(f, tt, path::String = tempname(), filenamebase::String="obj";
-             target = (),
+             target::StaticTarget=StaticTarget(),
              demangle = true,
              strip_llvm = false,
              strip_asm  = true,
@@ -477,7 +478,7 @@ a tuple type `tt` characterizing the types of the arguments for which the
 function will be compiled.
 
 `target` can be used to change the output target. This is useful for compiling to WebAssembly and embedded targets.
-This is a named tuple with fields `triple`, `cpu`, and `features` (each of these are strings).
+This is a struct of the type StaticTarget()
 The defaults compile to the native target.
 
 If `demangle` is set to `false`, compiled function names are prepended with "julia_".
@@ -487,7 +488,7 @@ If `demangle` is set to `false`, compiled function names are prepended with "jul
 julia> fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
 fib (generic function with 1 method)
 
-julia> path, name, table = StaticCompiler.generate_obj_for_compile(fib, Tuple{Int64}, "./test")
+julia> path, name, table = StaticCompiler.generate_obj(fib, Tuple{Int64}, "./test")
 ("./test", "fib", IdDict{Any, String}())
 
 shell> tree \$path
@@ -505,7 +506,7 @@ end
 """
 ```julia
 generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), filenamebase::String="obj";
-             target = (),
+             target::StaticTarget=StaticTarget(),
              demangle =false,
              strip_llvm = false,
              strip_asm  = true,
@@ -517,7 +518,7 @@ Low level interface for compiling object code (`.o`) for an array of Tuples
 which will be compiled.
 
 `target` can be used to change the output target. This is useful for compiling to WebAssembly and embedded targets.
-This is a named tuple with fields `triple`, `cpu`, and `features` (each of these are strings).
+This is a struct of the type StaticTarget()
 The defaults compile to the native target.
 """
 function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), filenamebase::String="obj";

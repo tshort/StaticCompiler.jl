@@ -20,7 +20,7 @@ does not behave as expected.
 By default `StaticTarget()` is the native target.
 """
 struct StaticTarget
-    platform::Platform
+    platform::Union{Platform,Nothing}
     tm::LLVM.TargetMachine
 end
 
@@ -29,6 +29,7 @@ StaticTarget() = StaticTarget(HostPlatform(), unsafe_string(LLVM.API.LLVMGetHost
 StaticTarget(platform::Platform) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform)))
 StaticTarget(platform::Platform, cpu::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform), cpu))
 StaticTarget(platform::Platform, cpu::String, features::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform), cpu, features))
+StaticTarget(triple::String, cpu::String, features::String) = StaticTarget(nothing, LLVM.TargetMachine(LLVM.Target(triple = triple), triple, cpu, features))
 
 """
 ```julia
