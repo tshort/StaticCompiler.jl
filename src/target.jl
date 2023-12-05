@@ -29,13 +29,14 @@ mutable struct StaticTarget
     platform::Union{Platform,Nothing}
     tm::LLVM.TargetMachine
     compiler::Union{String,Nothing}
+    julia_runtime::Bool
 end
 
 clean_triple(platform::Platform) = arch(platform) * os_str(platform) * libc_str(platform)
 StaticTarget() = StaticTarget(HostPlatform(), unsafe_string(LLVM.API.LLVMGetHostCPUName()), unsafe_string(LLVM.API.LLVMGetHostCPUFeatures()))
-StaticTarget(platform::Platform) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform)), nothing)
-StaticTarget(platform::Platform, cpu::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform), cpu), nothing)
-StaticTarget(platform::Platform, cpu::String, features::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform), cpu, features), nothing)
+StaticTarget(platform::Platform) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform)), nothing, false)
+StaticTarget(platform::Platform, cpu::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform), cpu), nothing, false)
+StaticTarget(platform::Platform, cpu::String, features::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform), cpu, features), nothing, false)
 
 function StaticTarget(triple::String, cpu::String, features::String)
     platform = tryparse(Platform, triple)
@@ -49,6 +50,9 @@ Set the compiler for cross compilation
 ```
 """
 set_compiler!(target::StaticTarget, compiler::String) = (target.compiler = compiler)
+
+
+set_runtime!(target::StaticTarget, julia_runtime::Bool) = (target.julia_runtime = julia_runtime)
 
 """
 ```julia
@@ -79,6 +83,7 @@ struct StaticCompilerTarget{MT} <: GPUCompiler.AbstractCompilerTarget
     triple::String
     cpu::String
     features::String
+    julia_runtime::Bool
     method_table::MT
 end
 
@@ -115,6 +120,7 @@ GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:StaticCompilerTarget, Sta
 GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) = true
 GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = true
 
+GPUCompiler.uses_julia_runtime(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = job.config.target.julia_runtime
 GPUCompiler.get_interpreter(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) =
     StaticInterpreter(job.config.params.cache, GPUCompiler.method_table(job), job.world,
                         GPUCompiler.inference_params(job), GPUCompiler.optimization_params(job))
@@ -131,7 +137,7 @@ function static_job(@nospecialize(func::Function), @nospecialize(types::Type);
     )
     source = methodinstance(typeof(func), Base.to_tuple_type(types))
     tm = target.tm
-    gputarget = StaticCompilerTarget(LLVM.triple(tm), LLVM.cpu(tm), LLVM.features(tm), method_table)
+    gputarget = StaticCompilerTarget(LLVM.triple(tm), LLVM.cpu(tm), LLVM.features(tm), target.julia_runtime, method_table)
     params = StaticCompilerParams()
     config = GPUCompiler.CompilerConfig(gputarget, params, name = name, kernel = kernel)
     StaticCompiler.CompilerJob(source, config), kwargs
@@ -145,7 +151,7 @@ function static_job(@nospecialize(func), @nospecialize(types);
 )
     source = methodinstance(typeof(func), Base.to_tuple_type(types))
     tm = target.tm
-    gputarget = StaticCompilerTarget(LLVM.triple(tm), LLVM.cpu(tm), LLVM.features(tm), method_table)
+    gputarget = StaticCompilerTarget(LLVM.triple(tm), LLVM.cpu(tm), LLVM.features(tm), target.julia_runtime, method_table)
     params = StaticCompilerParams()
     config = GPUCompiler.CompilerConfig(gputarget, params, name = name, kernel = kernel)
     StaticCompiler.CompilerJob(source, config), kwargs

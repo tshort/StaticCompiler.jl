@@ -398,7 +398,7 @@ end
 
 function static_code_llvm(@nospecialize(func), @nospecialize(types); target::StaticTarget=StaticTarget(), kwargs...)
     job, kwargs = static_job(func, types; target, kwargs...)
-    GPUCompiler.code_llvm(stdout, job; kwargs...)
+    GPUCompiler.code_llvm(stdout, job; libraries=false, kwargs...)
 end
 
 function static_code_typed(@nospecialize(func), @nospecialize(types); target::StaticTarget=StaticTarget(), kwargs...)
@@ -408,7 +408,7 @@ end
 
 function static_code_native(@nospecialize(f), @nospecialize(tt), fname=fix_name(f); target::StaticTarget=StaticTarget(), kwargs...)
     job, kwargs = static_job(f, tt; fname, target, kwargs...)
-    GPUCompiler.code_native(stdout, job; kwargs...)
+    GPUCompiler.code_native(stdout, job; libraries=false, kwargs...)
 end
 
 # Return an LLVM module
@@ -418,7 +418,7 @@ function static_llvm_module(f, tt, name=fix_name(f); demangle=true, target::Stat
     end
     job, kwargs = static_job(f, tt; name, target, kwargs...)
     m = GPUCompiler.JuliaContext() do context
-        m, _ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false)
+        m, _ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, libraries=false)
         locate_pointers_and_runtime_calls(m)
         m
     end
@@ -434,7 +434,7 @@ function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::St
             name_f = "julia_"*name_f
         end
         job, kwargs = static_job(f, tt; name = name_f, target, kwargs...)
-        mod,_ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false)
+        mod,_ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, libraries=false)
         if length(funcs) > 1
             for func in funcs[2:end]
                 f,tt = func
@@ -443,7 +443,7 @@ function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::St
                     name_f = "julia_"*name_f
                 end
                 job, kwargs = static_job(f, tt; name = name_f, target, kwargs...)
-                tmod,_ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false)
+                tmod,_ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, libraries=false)
                 link!(mod,tmod)
             end
         end
