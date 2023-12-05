@@ -18,18 +18,37 @@ Beware that currently the compilation assumes that the code is on the host so pl
 ```
 does not behave as expected.
 By default `StaticTarget()` is the native target.
+
+For cross-compilation of executables and shared libraries, one also needs to call `set_compiler!` with the path to a valid C compiler
+for the target platform. For example, to cross-compile for aarch64 using a compiler from homebrew, one can use:
+```julia
+    set_compiler!(StaticTarget(parse(Platform,"aarch64-gnu-linux")), "/opt/homebrew/bin/aarch64-unknown-linux-gnu-gcc")
+```
 """
-struct StaticTarget
+mutable struct StaticTarget
     platform::Union{Platform,Nothing}
     tm::LLVM.TargetMachine
+    compiler::Union{String,Nothing}
 end
 
 clean_triple(platform::Platform) = arch(platform) * os_str(platform) * libc_str(platform)
 StaticTarget() = StaticTarget(HostPlatform(), unsafe_string(LLVM.API.LLVMGetHostCPUName()), unsafe_string(LLVM.API.LLVMGetHostCPUFeatures()))
-StaticTarget(platform::Platform) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform)))
-StaticTarget(platform::Platform, cpu::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform), cpu))
-StaticTarget(platform::Platform, cpu::String, features::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform), cpu, features))
-StaticTarget(triple::String, cpu::String, features::String) = StaticTarget(nothing, LLVM.TargetMachine(LLVM.Target(triple = triple), triple, cpu, features))
+StaticTarget(platform::Platform) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform)), nothing)
+StaticTarget(platform::Platform, cpu::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform), cpu), nothing)
+StaticTarget(platform::Platform, cpu::String, features::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform), cpu, features), nothing)
+
+function StaticTarget(triple::String, cpu::String, features::String)
+    platform = tryparse(Platform, triple)
+    StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = triple), triple, cpu, features), nothing)
+end
+
+"""
+Set the compiler for cross compilation
+    ```julia
+    set_compiler!(StaticTarget(parse(Platform,"aarch64-gnu-linux")), "/opt/homebrew/bin/aarch64-elf-gcc")
+```
+"""
+set_compiler!(target::StaticTarget, compiler::String) = (target.compiler = compiler)
 
 """
 ```julia

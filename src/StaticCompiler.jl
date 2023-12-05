@@ -13,7 +13,7 @@ using StaticTools
 using StaticTools: @symbolcall, @c_str, println
 using Core: MethodTable
 using Base:BinaryPlatforms.Platform, BinaryPlatforms.HostPlatform, BinaryPlatforms.arch, BinaryPlatforms.os_str, BinaryPlatforms.libc_str
-
+using Base:BinaryPlatforms.platform_dlext
 export load_function, compile_shlib, compile_executable
 export static_code_llvm, static_code_typed, static_llvm_module, static_code_native
 export @device_override, @print_and_throw
@@ -294,7 +294,12 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
     exec_path = joinpath(path, filename)
     _, obj_path = generate_obj(funcs, path, filename; demangle, target, kwargs...)
     # Pick a compiler
-    cc = Sys.isapple() ? `cc` : clang()
+    if !isnothing(target.compiler)
+        cc = `$(target.compiler)`
+    else
+        cc = Sys.isapple() ? `cc` : clang()
+    end
+
     # Compile!
     if Sys.isapple()
         # Apple no longer uses _start, so we can just specify a custom entry
@@ -372,12 +377,19 @@ function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), file
         target::StaticTarget=StaticTarget(),
         kwargs...
     )
-
-    lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
+    if !isnothing(target.platform)
+        lib_path = joinpath(path, "$filename.$(platform_dlext(target.platform))")
+    else
+        lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
+    end
 
     _, obj_path = generate_obj(funcs, path, filename; target, demangle, kwargs...)
     # Pick a Clang
-    cc = Sys.isapple() ? `cc` : clang()
+    if !isnothing(target.compiler)
+        cc = `$(target.compiler)`
+    else
+        cc = Sys.isapple() ? `cc` : clang()
+    end
     # Compile!
     run(`$cc -shared $cflags $obj_path -o $lib_path `)
 

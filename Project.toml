@@ -1,7 +1,7 @@
 name = "StaticCompiler"
 uuid = "81625895-6c0f-48fc-b932-11a18313743c"
 authors = ["Tom Short and contributors"]
-version = "0.6.2"
+version = "0.7.0"
 
 [deps]
 Clang_jll = "0ee61d77-7f21-5576-8119-9fcc46b10100"
