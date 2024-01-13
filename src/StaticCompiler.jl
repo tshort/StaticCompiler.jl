@@ -308,9 +308,20 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
             return 0;
         }""")
         close(f)
+        # adaption to Windows: use clang (llc) to generate an executable from the LLVM IR
+        if !Sys.iswindows()
+        ir_path = joinpath(path, "$filename.ll")
+        run(`cmd /c clang -Wno-override-module $wrapper_path $ir_path -o $exec_path`)
+        else 
         run(`$cc $wrapper_path $cflags $obj_path -o $exec_path`)
+        end # if
         # Clean up
+        # adaption to Windows:
+        if !Sys.iswindows()
         run(`rm $wrapper_path`)
+        else
+        run(`cmd /c del $wrapper_path`)    
+        end # if
     end
     path, name
 end
@@ -524,6 +535,8 @@ function generate_obj(funcs::Union{Array,Tuple}, external::Bool, path::String = 
     mkpath(path)
     obj_path = joinpath(path, "$filenamebase.o")
     mod = native_llvm_module(funcs; demangle, kwargs...)
+    # adaption to Windows
+    if !Sys.iswindows()      
     obj = GPUCompiler.JuliaContext() do ctx
         fakejob, _ = native_job(f, tt, external; kwargs...)
         obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
@@ -532,6 +545,14 @@ function generate_obj(funcs::Union{Array,Tuple}, external::Bool, path::String = 
     open(obj_path, "w") do io
         write(io, obj)
     end
+    else
+    ir_path = joinpath(path, "$filenamebase.ll")
+    open(ir_path, "w") do io
+    write(io, string(mod))
+    end
+    # could apply llc, but meanwhile llc is integrated in clang
+    #run(`cmd /c llc  -filetype=obj -mtriple=x86_64-w64-windows-gnu $ir_path -o $obj_path`)
+    end # if
     path, obj_path
 end
 
