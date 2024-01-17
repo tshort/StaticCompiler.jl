@@ -313,7 +313,7 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
         run(`$cc $wrapper_path $cflags $obj_path -o $exec_path`)
         else 
         ir_path = joinpath(path, "$filename.ll")
-        run(`cmd /c clang -Wno-override-module -O3 $wrapper_path $ir_path -o $exec_path`)
+        run(`cmd /c clang -Wno-override-module $wrapper_path $ir_path -o $exec_path`)
         end # if
         # Clean up
         # adaption to Windows:
