@@ -316,7 +316,7 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
         run(`cmd /c clang -Wno-override-module $wrapper_path $ir_path -o $exec_path`)
         end # if
         # Clean up
-        # adaption to Windows:
+        # adaption to Windows: use cmd
         if !Sys.iswindows()
         run(`rm $wrapper_path`)
         else
