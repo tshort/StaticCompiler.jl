@@ -4,6 +4,55 @@ else
     const method_table = nothing
 end
 
+"""
+```julia
+    StaticTarget() # Native target
+    StaticTarget(platform::Base.BinaryPlatforms.Platform) # Specific target with generic CPU
+    StaticTarget(platform::Platform, cpu::String) # Specific target with specific CPU
+    StaticTarget(platform::Platform, cpu::String, features::String) # Specific target with specific CPU and features
+```
+Struct that defines a target for the compilation
+Beware that currently the compilation assumes that the code is on the host so platform specific code like:
+```julia
+    Sys.isapple() ...
+```
+does not behave as expected.
+By default `StaticTarget()` is the native target.
+
+For cross-compilation of executables and shared libraries, one also needs to call `set_compiler!` with the path to a valid C compiler
+for the target platform. For example, to cross-compile for aarch64 using a compiler from homebrew, one can use:
+```julia
+    set_compiler!(StaticTarget(parse(Platform,"aarch64-gnu-linux")), "/opt/homebrew/bin/aarch64-unknown-linux-gnu-gcc")
+```
+"""
+mutable struct StaticTarget
+    platform::Union{Platform,Nothing}
+    tm::LLVM.TargetMachine
+    compiler::Union{String,Nothing}
+    julia_runtime::Bool
+end
+
+clean_triple(platform::Platform) = arch(platform) * os_str(platform) * libc_str(platform)
+StaticTarget() = StaticTarget(HostPlatform(), unsafe_string(LLVM.API.LLVMGetHostCPUName()), unsafe_string(LLVM.API.LLVMGetHostCPUFeatures()))
+StaticTarget(platform::Platform) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform)), nothing, false)
+StaticTarget(platform::Platform, cpu::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform), cpu), nothing, false)
+StaticTarget(platform::Platform, cpu::String, features::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform), cpu, features), nothing, false)
+
+function StaticTarget(triple::String, cpu::String, features::String)
+    platform = tryparse(Platform, triple)
+    StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = triple), triple, cpu, features), nothing)
+end
+
+"""
+Set the compiler for cross compilation
+    ```julia
+    set_compiler!(StaticTarget(parse(Platform,"aarch64-gnu-linux")), "/opt/homebrew/bin/aarch64-elf-gcc")
+```
+"""
+set_compiler!(target::StaticTarget, compiler::String) = (target.compiler = compiler)
+
+
+set_runtime!(target::StaticTarget, julia_runtime::Bool) = (target.julia_runtime = julia_runtime)
 
 """
 ```julia
@@ -29,18 +78,13 @@ macro device_override(ex)
     return esc(code)
 end
 
-Base.@kwdef struct NativeCompilerTarget{MT} <: GPUCompiler.AbstractCompilerTarget
-    triple::String=Sys.MACHINE
-    cpu::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUName())
-    features::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUFeatures())
-    method_table::MT = method_table
-end
-
-Base.@kwdef struct ExternalNativeCompilerTarget{MT} <: GPUCompiler.AbstractCompilerTarget
-    triple::String=Sys.MACHINE
-    cpu::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUName())
-    features::String=(LLVM.version() < v"8") ? "" : unsafe_string(LLVM.API.LLVMGetHostCPUFeatures())
-    method_table::MT = method_table
+# Default to native
+struct StaticCompilerTarget{MT} <: GPUCompiler.AbstractCompilerTarget
+    triple::String
+    cpu::String
+    features::String
+    julia_runtime::Bool
+    method_table::MT
 end
 
 module StaticRuntime
@@ -53,58 +97,62 @@ module StaticRuntime
     report_exception_frame(idx, func, file, line) = return
 end
 
-for target in (:NativeCompilerTarget, :ExternalNativeCompilerTarget)
-    @eval begin
-        GPUCompiler.llvm_triple(target::$target) = target.triple
 
-        function GPUCompiler.llvm_machine(target::$target)
-            triple = GPUCompiler.llvm_triple(target)
+GPUCompiler.llvm_triple(target::StaticCompilerTarget) = target.triple
 
-            t = LLVM.Target(triple=triple)
+function GPUCompiler.llvm_machine(target::StaticCompilerTarget)
+    triple = GPUCompiler.llvm_triple(target)
 
-            tm = LLVM.TargetMachine(t, triple, target.cpu, target.features, reloc=LLVM.API.LLVMRelocPIC)
-            GPUCompiler.asm_verbosity!(tm, true)
+    t = LLVM.Target(triple=triple)
 
-            return tm
-        end
+    tm = LLVM.TargetMachine(t, triple, target.cpu, target.features, reloc=LLVM.API.LLVMRelocPIC)
+    GPUCompiler.asm_verbosity!(tm, true)
 
-        GPUCompiler.runtime_slug(job::GPUCompiler.CompilerJob{<:$target}) = "native_$(job.config.target.cpu)-$(hash(job.config.target.features))"
-
-        GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:$target}) = StaticRuntime
-        GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:$target, StaticCompilerParams}) = StaticRuntime
-
-
-        GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:$target, StaticCompilerParams}) = true
-        GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:$target}) = true
-
-        GPUCompiler.get_interpreter(job::GPUCompiler.CompilerJob{<:$target, StaticCompilerParams}) =
-            StaticInterpreter(job.config.params.cache, GPUCompiler.method_table(job), job.world,
-                              GPUCompiler.inference_params(job), GPUCompiler.optimization_params(job))
-        GPUCompiler.ci_cache(job::GPUCompiler.CompilerJob{<:$target, StaticCompilerParams}) = job.config.params.cache
-        GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{<:$target})) = job.config.target.method_table
-    end
+    return tm
 end
 
-function native_job(@nospecialize(func::Function), @nospecialize(types::Type), external::Bool;
+GPUCompiler.runtime_slug(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = "static_$(job.config.target.cpu)-$(hash(job.config.target.features))"
+
+GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = StaticRuntime
+GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) = StaticRuntime
+
+
+GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) = true
+GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = true
+
+GPUCompiler.uses_julia_runtime(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = job.config.target.julia_runtime
+GPUCompiler.get_interpreter(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) =
+    StaticInterpreter(job.config.params.cache, GPUCompiler.method_table(job), job.world,
+                        GPUCompiler.inference_params(job), GPUCompiler.optimization_params(job))
+GPUCompiler.ci_cache(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) = job.config.params.cache
+GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget})) = job.config.target.method_table
+
+
+function static_job(@nospecialize(func::Function), @nospecialize(types::Type);
         name = fix_name(func),
         kernel::Bool = false,
-        target = (;),
+        target::StaticTarget = StaticTarget(),
         method_table=method_table,
         kwargs...
     )
-    target = merge(target, (;method_table))
     source = methodinstance(typeof(func), Base.to_tuple_type(types))
-    target = external ? ExternalNativeCompilerTarget(;target...) : NativeCompilerTarget(;target...)
+    tm = target.tm
+    gputarget = StaticCompilerTarget(LLVM.triple(tm), LLVM.cpu(tm), LLVM.features(tm), target.julia_runtime, method_table)
     params = StaticCompilerParams()
-    config = GPUCompiler.CompilerConfig(target, params, name = name, kernel = kernel)
+    config = GPUCompiler.CompilerConfig(gputarget, params, name = name, kernel = kernel)
     StaticCompiler.CompilerJob(source, config), kwargs
 end
-
-function native_job(@nospecialize(func), @nospecialize(types), external; kernel::Bool=false, name=fix_name(repr(func)), target = (;), method_table=method_table, kwargs...)
-    target = merge(target, (; method_table))
+function static_job(@nospecialize(func), @nospecialize(types);
+    name = fix_name(func),
+    kernel::Bool = false,
+    target::StaticTarget = StaticTarget(),
+    method_table=method_table,
+    kwargs...
+)
     source = methodinstance(typeof(func), Base.to_tuple_type(types))
-    target = external ? ExternalNativeCompilerTarget(;target...) : NativeCompilerTarget(;target...)
+    tm = target.tm
+    gputarget = StaticCompilerTarget(LLVM.triple(tm), LLVM.cpu(tm), LLVM.features(tm), target.julia_runtime, method_table)
     params = StaticCompilerParams()
-    config = GPUCompiler.CompilerConfig(target, params, name = name, kernel = kernel)
-    GPUCompiler.CompilerJob(source, config), kwargs
+    config = GPUCompiler.CompilerConfig(gputarget, params, name = name, kernel = kernel)
+    StaticCompiler.CompilerJob(source, config), kwargs
 end

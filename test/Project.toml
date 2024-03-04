@@ -16,4 +16,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Bumper = "8ce10254-0962-460f-a3d8-1f77fea1446e"
 
 [compat]
-Bumper = "0.5.1"
+Bumper = "0.6"
