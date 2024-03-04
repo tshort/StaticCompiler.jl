@@ -322,11 +322,8 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
         close(f)
         if llvm_to_clang # (required on Windows)
             # Use clang (llc) to generate an executable from the LLVM IR
-            if Sys.iswindows()
-              run(`cmd \c clang -Wno-override-module $wrapper_path $obj_or_ir_path -o $exec_path`)      
-            else
-              run(`$(clang()) -Wno-override-module $wrapper_path $obj_or_ir_path -o $exec_path`)      
-            end
+            cclang = Sys.iswindows() ? `cmd \c clang` : clang() # This could be removed if clang_jll reliably works on windows
+            run(`$cclang -Wno-override-module $wrapper_path $obj_or_ir_path -o $exec_path`)      
         else
             run(`$cc $wrapper_path $cflags $obj_or_ir_path -o $exec_path`)
         end
