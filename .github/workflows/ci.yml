@@ -20,7 +20,7 @@ jobs:
         version:
           - '1.8'
           - '1.9'
-          - '1.10.0-rc1'
+          - '1.10'
         os:
           - ubuntu-latest
           - macOS-latest

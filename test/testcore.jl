@@ -50,6 +50,11 @@ end
     @test isa(r, Base.Process)
     @test r.exitcode == 0
 
+    filepath = compile_executable(foo, (), workdir, llvm_to_clang=true)
+    r = run(`$filepath`);
+    @test isa(r, Base.Process)
+    @test r.exitcode == 0
+
 
     @inline function _puts(s::Ptr{UInt8}) # Can't use Base.println because it allocates
         Base.llvmcall(("""
@@ -81,6 +86,11 @@ end
     @test r.exitcode == 0
 
     filepath = compile_executable(print_args, (Int, Ptr{Ptr{UInt8}}), workdir, demangle=true)
+    r = run(`$filepath Hello, world!`);
+    @test isa(r, Base.Process)
+    @test r.exitcode == 0
+
+    filepath = compile_executable(print_args, (Int, Ptr{Ptr{UInt8}}), workdir, llvm_to_clang=true)
     r = run(`$filepath Hello, world!`);
     @test isa(r, Base.Process)
     @test r.exitcode == 0

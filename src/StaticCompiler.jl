@@ -35,6 +35,7 @@ compile_executable(f::Function, types::Tuple, path::String, [name::String=string
     cflags=``, # Specify libraries you would like to link against, and other compiler options here
     also_expose=[],
     target::StaticTarget=StaticTarget(),
+    llvm_to_clang = Sys.iswindows(),
     method_table=StaticCompiler.method_table,
     kwargs...
 )
@@ -98,17 +99,18 @@ shell> ./hello
 Hello, world!
 ```
 """
-function compile_executable(f::Function, types=(), path::String="./", name=fix_name(f);
+function compile_executable(f::Function, types=(), path::String=pwd(), name=fix_name(f);
                             also_expose=Tuple{Function, Tuple{DataType}}[], target::StaticTarget=StaticTarget(),
                             kwargs...)
     compile_executable(vcat([(f, types)], also_expose), path, name; target, kwargs...)
 end
 
-function compile_executable(funcs::Union{Array,Tuple}, path::String="./", name=fix_name(first(first(funcs)));
+function compile_executable(funcs::Union{Array,Tuple}, path::String=pwd(), name=fix_name(first(first(funcs)));
         filename = name,
         demangle = true,
         cflags = ``,
         target::StaticTarget=StaticTarget(),
+        llvm_to_clang = Sys.iswindows(),
         kwargs...
     )
 
@@ -122,20 +124,20 @@ function compile_executable(funcs::Union{Array,Tuple}, path::String="./", name=f
     nativetype = isprimitivetype(rt) || isa(rt, Ptr)
     nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
 
-    generate_executable(funcs, path, name, filename; demangle, cflags, target, kwargs...)
+    generate_executable(funcs, path, name, filename; demangle, cflags, target, llvm_to_clang, kwargs...)
     joinpath(abspath(path), filename)
 end
 
 """
 ```julia
-compile_shlib(f::Function, types::Tuple, [path::String="./"], [name::String=string(nameof(f))];
+compile_shlib(f::Function, types::Tuple, [path::String=pwd()], [name::String=string(nameof(f))];
     filename::String=name,
     cflags=``,
     method_table=StaticCompiler.method_table,
     target::StaticTarget=StaticTarget(),
     kwargs...)
 
-compile_shlib(funcs::Array, [path::String="./"];
+compile_shlib(funcs::Array, [path::String=pwd()];
     filename="libfoo",
     demangle=true,
     cflags=``,
@@ -172,7 +174,7 @@ julia> ccall(("test", "test.dylib"), Float64, (Int64,), 100_000)
 5.2564961094956075
 ```
 """
-function compile_shlib(f::Function, types=(), path::String="./", name=fix_name(f);
+function compile_shlib(f::Function, types=(), path::String=pwd(), name=fix_name(f);
         filename=name,
         target::StaticTarget=StaticTarget(),
         kwargs...
@@ -180,7 +182,7 @@ function compile_shlib(f::Function, types=(), path::String="./", name=fix_name(f
     compile_shlib(((f, types),), path; filename, target, kwargs...)
 end
 # As above, but taking an array of functions and returning a single shlib
-function compile_shlib(funcs::Union{Array,Tuple}, path::String="./";
+function compile_shlib(funcs::Union{Array,Tuple}, path::String=pwd();
         filename = "libfoo",
         demangle = true,
         cflags = ``,
@@ -289,10 +291,11 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
                              demangle = true,
                              cflags = ``,
                              target::StaticTarget=StaticTarget(),
+                             llvm_to_clang::Bool = Sys.iswindows(),
                              kwargs...
                              )
     exec_path = joinpath(path, filename)
-    _, obj_path = generate_obj(funcs, path, filename; demangle, target, kwargs...)
+    _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, emit_llvm_only=llvm_to_clang, kwargs...)
     # Pick a compiler
     if !isnothing(target.compiler)
         cc = `$(target.compiler)`
@@ -301,10 +304,10 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
     end
 
     # Compile!
-    if Sys.isapple()
+    if Sys.isapple() && !llvm_to_clang
         # Apple no longer uses _start, so we can just specify a custom entry
         entry = demangle ? "_$name" : "_julia_$name"
-        run(`$cc -e $entry $cflags $obj_path -o $exec_path`)
+        run(`$cc -e $entry $cflags $obj_or_ir_path -o $exec_path`)
     else
         fn = demangle ? "$name" : "julia_$name"
         # Write a minimal wrapper to avoid having to specify a custom entry
@@ -319,9 +322,22 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
             return 0;
         }""")
         close(f)
-        run(`$cc $wrapper_path $cflags $obj_path -o $exec_path`)
+        if llvm_to_clang # (required on Windows)
+            # Use clang (llc) to generate an executable from the LLVM IR
+            cclang = if Sys.iswindows()
+                `cmd \c clang` # Not clear if the `cmd \c` is necessary
+            elseif Sys.isapple()
+                `clang`
+            else
+                clang()
+            end
+            run(`$cclang -Wno-override-module $wrapper_path $obj_or_ir_path -o $exec_path`)      
+        else
+            run(`$cc $wrapper_path $cflags $obj_or_ir_path -o $exec_path`)
+        end
+            
         # Clean up
-        run(`rm $wrapper_path`)
+        rm(wrapper_path)
     end
     path, name
 end
@@ -482,7 +498,6 @@ generate_obj(f, tt, path::String = tempname(), filenamebase::String="obj";
              demangle = true,
              strip_llvm = false,
              strip_asm  = true,
-             opt_level = 3,
              kwargs...)
 ```
 Low level interface for compiling object code (`.o`) for for function `f` given
@@ -519,10 +534,10 @@ end
 ```julia
 generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), filenamebase::String="obj";
              target::StaticTarget=StaticTarget(),
-             demangle =false,
+             demangle = false,
+             emit_llvm_only = false,
              strip_llvm = false,
              strip_asm  = true,
-             opt_level=3,
              kwargs...)
 ```
 Low level interface for compiling object code (`.o`) for an array of Tuples
@@ -534,25 +549,34 @@ This is a struct of the type StaticTarget()
 The defaults compile to the native target.
 """
 function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), filenamebase::String="obj";
+                        target::StaticTarget=StaticTarget(),
                         demangle = true,
+                        emit_llvm_only = false,
                         strip_llvm = false,
                         strip_asm = true,
-                        opt_level = 3,
-                        target::StaticTarget=StaticTarget(),
                         kwargs...)
     f, tt = funcs[1]
     mkpath(path)
-    obj_path = joinpath(path, "$filenamebase.o")
     mod = static_llvm_module(funcs; demangle, kwargs...)
-    obj = GPUCompiler.JuliaContext() do ctx
+
+    if emit_llvm_only # (Required on Windows)
+      ir_path = joinpath(path, "$filenamebase.ll")
+      open(ir_path, "w") do io
+        write(io, string(mod))
+      end
+      return path, ir_path
+    else
+      obj_path = joinpath(path, "$filenamebase.o")
+      obj = GPUCompiler.JuliaContext() do ctx
         fakejob, _ = static_job(f, tt; target, kwargs...)
         obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
         obj
+      end
+      open(obj_path, "w") do io
+          write(io, obj)
+      end
+      return path, obj_path
     end
-    open(obj_path, "w") do io
-        write(io, obj)
-    end
-    path, obj_path
 end
 
 end # module
