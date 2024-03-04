@@ -35,6 +35,7 @@ compile_executable(f::Function, types::Tuple, path::String, [name::String=string
     cflags=``, # Specify libraries you would like to link against, and other compiler options here
     also_expose=[],
     target::StaticTarget=StaticTarget(),
+    llvm_to_clang = Sys.iswindows(),
     method_table=StaticCompiler.method_table,
     kwargs...
 )
@@ -109,6 +110,7 @@ function compile_executable(funcs::Union{Array,Tuple}, path::String=pwd(), name=
         demangle = true,
         cflags = ``,
         target::StaticTarget=StaticTarget(),
+        llvm_to_clang = Sys.iswindows(),
         kwargs...
     )
 
@@ -122,7 +124,7 @@ function compile_executable(funcs::Union{Array,Tuple}, path::String=pwd(), name=
     nativetype = isprimitivetype(rt) || isa(rt, Ptr)
     nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
 
-    generate_executable(funcs, path, name, filename; demangle, cflags, target, kwargs...)
+    generate_executable(funcs, path, name, filename; demangle, cflags, target, llvm_to_clang, kwargs...)
     joinpath(abspath(path), filename)
 end
 
@@ -293,8 +295,7 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
                              kwargs...
                              )
     exec_path = joinpath(path, filename)
-    llvm_only = llvm_to_clang
-    _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, llvm_only, kwargs...)
+    _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, llvm_only=llvm_to_clang, kwargs...)
     # Pick a compiler
     if !isnothing(target.compiler)
         cc = `$(target.compiler)`
