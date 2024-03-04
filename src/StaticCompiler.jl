@@ -289,11 +289,12 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
                              demangle = true,
                              cflags = ``,
                              target::StaticTarget=StaticTarget(),
-                             llvm_to_clang = Sys.iswindows(),
+                             llvm_to_clang::Bool = Sys.iswindows(),
                              kwargs...
                              )
     exec_path = joinpath(path, filename)
-    _, obj_or_ir_path = generate_obj(funcs, path, filename; emit_llvm_only=llvm_to_clang, demangle, target, kwargs...)
+    llvm_only = llvm_to_clang
+    _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, llvm_only, kwargs...)
     # Pick a compiler
     if !isnothing(target.compiler)
         cc = `$(target.compiler)`
@@ -490,7 +491,6 @@ generate_obj(f, tt, path::String = tempname(), filenamebase::String="obj";
              demangle = true,
              strip_llvm = false,
              strip_asm  = true,
-             opt_level = 3,
              kwargs...)
 ```
 Low level interface for compiling object code (`.o`) for for function `f` given
@@ -527,10 +527,10 @@ end
 ```julia
 generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), filenamebase::String="obj";
              target::StaticTarget=StaticTarget(),
-             demangle =false,
+             demangle = false,
+             generate_llvm_only = false,
              strip_llvm = false,
              strip_asm  = true,
-             opt_level=3,
              kwargs...)
 ```
 Low level interface for compiling object code (`.o`) for an array of Tuples
@@ -542,18 +542,17 @@ This is a struct of the type StaticTarget()
 The defaults compile to the native target.
 """
 function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), filenamebase::String="obj";
+                        target::StaticTarget=StaticTarget(),
                         demangle = true,
+                        llvm_only = false,
                         strip_llvm = false,
                         strip_asm = true,
-                        opt_level = 3,
-                        target::StaticTarget=StaticTarget(),
-                        emit_llvm_only = Sys.iswindows(),
                         kwargs...)
     f, tt = funcs[1]
     mkpath(path)
     mod = static_llvm_module(funcs; demangle, kwargs...)
 
-    if emit_llvm_only # (Required on Windows)
+    if llvm_only # (Required on Windows)
       ir_path = joinpath(path, "$filenamebase.ll")
       open(ir_path, "w") do io
         write(io, string(mod))
@@ -562,9 +561,9 @@ function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), file
     else
       obj_path = joinpath(path, "$filenamebase.o")
       obj = GPUCompiler.JuliaContext() do ctx
-          fakejob, _ = static_job(f, tt; target, kwargs...)
-          obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
-          obj
+        fakejob, _ = static_job(f, tt; target, kwargs...)
+        obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
+        obj
       end
       open(obj_path, "w") do io
           write(io, obj)
