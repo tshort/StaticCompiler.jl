@@ -1,7 +1,7 @@
 name = "StaticCompiler"
 uuid = "81625895-6c0f-48fc-b932-11a18313743c"
 authors = ["Tom Short and contributors"]
-version = "0.6.2"
+version = "0.6.3"
 
 [deps]
 Clang_jll = "0ee61d77-7f21-5576-8119-9fcc46b10100"
@@ -17,7 +17,7 @@ StaticTools = "86c06d3c-3f03-46de-9781-57580aa96d0a"
 
 [compat]
 CodeInfoTools = "0.3"
-GPUCompiler = "0.21, 0.22, 0.23, 0.24, 0.25"
+GPUCompiler = "0.21, 0.22, 0.23, 0.24, 0.25, 0.26"
 LLVM = "6"
 MacroTools = "0.5"
 StaticTools = "0.8"
