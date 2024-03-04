@@ -295,7 +295,7 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
                              kwargs...
                              )
     exec_path = joinpath(path, filename)
-    _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, llvm_only=llvm_to_clang, kwargs...)
+    _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, emit_llvm_only=llvm_to_clang, kwargs...)
     # Pick a compiler
     if !isnothing(target.compiler)
         cc = `$(target.compiler)`
@@ -535,7 +535,7 @@ end
 generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), filenamebase::String="obj";
              target::StaticTarget=StaticTarget(),
              demangle = false,
-             generate_llvm_only = false,
+             emit_llvm_only = false,
              strip_llvm = false,
              strip_asm  = true,
              kwargs...)
@@ -551,7 +551,7 @@ The defaults compile to the native target.
 function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), filenamebase::String="obj";
                         target::StaticTarget=StaticTarget(),
                         demangle = true,
-                        llvm_only = false,
+                        emit_llvm_only = false,
                         strip_llvm = false,
                         strip_asm = true,
                         kwargs...)
@@ -559,7 +559,7 @@ function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), file
     mkpath(path)
     mod = static_llvm_module(funcs; demangle, kwargs...)
 
-    if llvm_only # (Required on Windows)
+    if emit_llvm_only # (Required on Windows)
       ir_path = joinpath(path, "$filenamebase.ll")
       open(ir_path, "w") do io
         write(io, string(mod))
