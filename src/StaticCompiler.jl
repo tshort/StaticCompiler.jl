@@ -554,7 +554,7 @@ function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), file
                         kwargs...)
     f, tt = funcs[1]
     mkpath(path)
-    mod = native_llvm_module(funcs; demangle, kwargs...)
+    mod = static_llvm_module(funcs; demangle, kwargs...)
 
     if emit_llvm_only # (Required on Windows)
       ir_path = joinpath(path, "$filenamebase.ll")
