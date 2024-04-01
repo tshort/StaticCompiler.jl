@@ -25,7 +25,7 @@ end
 # checked.jl
 @device_override @noinline Base.Checked.throw_overflowerr_binaryop(op, x, y) =
     @print_and_throw c"Binary operation overflowed"
-@device_override @noinline Base.Checked.throw_overflowerr_negation(op, x, y) =
+@device_override @noinline Base.Checked.throw_overflowerr_negation(x) =
     @print_and_throw c"Negation overflowed"
 @device_override function Base.Checked.checked_abs(x::Base.Checked.SignedInt)
     r = ifelse(x < 0, -x, x)
