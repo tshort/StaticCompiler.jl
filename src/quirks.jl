@@ -9,7 +9,7 @@ end
 # math.jl
 @device_override @noinline Base.Math.throw_complex_domainerror(f::Symbol, x) =
     @print_and_throw c"This operation requires a complex input to return a complex result"
-@device_override @noinline Base.Math.throw_exp_domainerror(f::Symbol, x) =
+@device_override @noinline Base.Math.throw_exp_domainerror(x) =
     @print_and_throw c"Exponentiation yielding a complex result requires a complex argument"
 
 # intfuncs.jl
@@ -25,7 +25,7 @@ end
 # checked.jl
 @device_override @noinline Base.Checked.throw_overflowerr_binaryop(op, x, y) =
     @print_and_throw c"Binary operation overflowed"
-@device_override @noinline Base.Checked.throw_overflowerr_negation(op, x, y) =
+@device_override @noinline Base.Checked.throw_overflowerr_negation(x) =
     @print_and_throw c"Negation overflowed"
 @device_override function Base.Checked.checked_abs(x::Base.Checked.SignedInt)
     r = ifelse(x < 0, -x, x)
