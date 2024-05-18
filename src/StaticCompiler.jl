@@ -23,6 +23,7 @@ include("interpreter.jl")
 include("target.jl")
 include("pointer_warning.jl")
 include("quirks.jl")
+include("dllexport.jl")
 
 fix_name(f::Function) = fix_name(string(nameof(f)))
 fix_name(s) = String(GPUCompiler.safe_name(s))
@@ -125,6 +126,7 @@ function compile_executable(funcs::Union{Array,Tuple}, path::String=pwd(), name=
     nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
 
     generate_executable(funcs, path, name, filename; demangle, cflags, target, llvm_to_clang, kwargs...)
+    Sys.iswindows() && (filename *= ".exe")
     joinpath(abspath(path), filename)
 end
 
@@ -187,6 +189,7 @@ function compile_shlib(funcs::Union{Array,Tuple}, path::String=pwd();
         demangle = true,
         cflags = ``,
         target::StaticTarget=StaticTarget(),
+        llvm_to_clang = Sys.iswindows(),
         kwargs...
     )
     for func in funcs
@@ -200,7 +203,7 @@ function compile_shlib(funcs::Union{Array,Tuple}, path::String=pwd();
         nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
     end
 
-    generate_shlib(funcs, path, filename; demangle, cflags, target, kwargs...)
+    generate_shlib(funcs, path, filename; demangle, cflags, target, llvm_to_clang, kwargs...)
 
     joinpath(abspath(path), filename * "." * Libdl.dlext)
 end
@@ -325,17 +328,18 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
         if llvm_to_clang # (required on Windows)
             # Use clang (llc) to generate an executable from the LLVM IR
             cclang = if Sys.iswindows()
-                `cmd \c clang` # Not clear if the `cmd \c` is necessary
+                exec_path *= ".exe"
+                `clang`
             elseif Sys.isapple()
                 `clang`
             else
                 clang()
             end
-            run(`$cclang -Wno-override-module $wrapper_path $obj_or_ir_path -o $exec_path`)      
+            run(`$cclang -Wno-override-module $wrapper_path $obj_or_ir_path -o $exec_path`)
         else
             run(`$cc $wrapper_path $cflags $obj_or_ir_path -o $exec_path`)
         end
-            
+
         # Clean up
         rm(wrapper_path)
     end
@@ -391,6 +395,7 @@ function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), file
         demangle = true,
         cflags = ``,
         target::StaticTarget=StaticTarget(),
+        llvm_to_clang::Bool = Sys.iswindows(),
         kwargs...
     )
     if !isnothing(target.platform)
@@ -399,7 +404,7 @@ function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), file
         lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
     end
 
-    _, obj_path = generate_obj(funcs, path, filename; target, demangle, kwargs...)
+    _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, emit_llvm_only=llvm_to_clang, kwargs...)
     # Pick a Clang
     if !isnothing(target.compiler)
         cc = `$(target.compiler)`
@@ -407,7 +412,20 @@ function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), file
         cc = Sys.isapple() ? `cc` : clang()
     end
     # Compile!
-    run(`$cc -shared $cflags $obj_path -o $lib_path `)
+    if llvm_to_clang # (required on Windows)
+        # Use clang (llc) to generate an executable from the LLVM IR
+        cclang = if Sys.iswindows()
+            add_dllexport(funcs, obj_or_ir_path; demangle)
+            `clang`
+        elseif Sys.isapple()
+            `clang`
+        else
+            clang()
+        end
+        run(`$cclang -shared -Wno-override-module $obj_or_ir_path -o $lib_path`)
+    else
+        run(`$cc -shared $cflags $obj_or_ir_path -o $lib_path `)
+    end
 
     path, name
 end
