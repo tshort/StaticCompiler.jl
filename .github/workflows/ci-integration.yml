@@ -24,12 +24,17 @@ jobs:
         os:
           - ubuntu-latest
           - macOS-latest
+          - windows-latest
         arch:
           - x64
         group:
           - Integration
     steps:
       - uses: actions/checkout@v2
+      - uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "17"
+        if: matrix.os == 'windows-latest'
       - uses: julia-actions/setup-julia@latest
         with:
           version: ${{ matrix.version }}
