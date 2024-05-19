@@ -304,7 +304,7 @@ end
             @info "maybe_throw: task failed sucessfully!"
         end
         if Sys.iswindows()
-            @info "maybe_throw: task doesn't fail in Windows."
+            @info "maybe_throw: task doesn't fail on Windows."
             @test status.exitcode == 0
         else
             @test status === -1

@@ -1,4 +1,4 @@
-# Currently, `StaticTools.stderrp()` used in `test/scripts` doesn't work in Windows.
+# Currently, `StaticTools.stderrp()` used in `test/scripts` doesn't work on Windows.
 # This temporary file deletes `stderrp()` and run tests.
 
 mkpath("scripts_windows")
