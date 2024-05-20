@@ -21,9 +21,5 @@ if GROUP == "Core" || GROUP == "All"
 end
 
 if GROUP == "Integration" || GROUP == "All"
-    if Sys.iswindows()
-        include("testintegration_windows.jl")
-    else
-        include("testintegration.jl")
-    end
+    include("testintegration.jl")
 end
