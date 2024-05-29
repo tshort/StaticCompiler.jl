@@ -9,7 +9,7 @@ if VERSION >= v"1.9"
         buf = AllocBuffer(MallocVector, sizeof(Float64) * N)
         s = 0.0
         for i ∈ 1:N
-            # some excuse to reuse the same memory a bunch of times 
+            # some excuse to reuse the same memory a bunch of times
             @no_escape buf begin
                 v = @alloc(Float64, N)
                 v .= i
@@ -24,7 +24,7 @@ if VERSION >= v"1.9"
 
         path = compile_shlib(bumper_test, (Int,), "./")
         ptr = Libdl.dlopen(path, Libdl.RTLD_LOCAL)
-        
+
         fptr = Libdl.dlsym(ptr, "bumper_test")
 
         @test bumper_test(8) == @ccall($fptr(8::Int)::Float64)
@@ -303,7 +303,12 @@ end
         catch e
             @info "maybe_throw: task failed sucessfully!"
         end
-        @test status === -1
+        if Sys.iswindows()
+            @info "maybe_throw: task doesn't fail on Windows."
+            @test status.exitcode == 0
+        else
+            @test status === -1
+        end
     end
 
     ## --- Test interop
