@@ -78,7 +78,7 @@ This package uses the [GPUCompiler package](https://github.com/JuliaGPU/GPUCompi
 * GC-tracked allocations and global variables do *not* work with `compile_executable` or `compile_shlib`. This has some interesting consequences, including that all functions _within_ the function you want to compile must either be inlined or return only native types (otherwise Julia would have to allocate a place to put the results, which will fail).
 * Since error handling relies on libjulia, you can only throw errors from standalone-compiled (`compile_executable` / `compile_shlib`) code if an explicit overload has been defined for that particular error with `@device_override` (see [quirks.jl](src/quirks.jl)).
 * Type instability. Type unstable code cannot currently be statically compiled via this package.
-* Doesn't work on Windows (but works in WSL on Windows 10+). PRs welcome.
+* Extra experimental on Windows (PRs welcome if you encounter issues). Should work in WSL on Windows 10+. 
 
 ## Guide for Package Authors
 
