@@ -46,7 +46,6 @@ end
 
 Core.Compiler.InferenceParams(interp::StaticInterpreter) = interp.inf_params
 Core.Compiler.OptimizationParams(interp::StaticInterpreter) = interp.opt_params
-Core.Compiler.get_world_counter(interp::StaticInterpreter) = interp.world
 GPUCompiler.get_inference_world(interp::StaticInterpreter) = interp.world
 Core.Compiler.get_inference_cache(interp::StaticInterpreter) = interp.local_cache
 @static if HAS_INTEGRATED_CACHE
