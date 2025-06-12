@@ -17,7 +17,7 @@ addprocs(1)
 const GROUP = get(ENV, "GROUP", "All")
 
 if GROUP == "Core" || GROUP == "All"
-    include("testcore.jl")
+   include("testcore.jl")
 end
 
 if GROUP == "Integration" || GROUP == "All"
