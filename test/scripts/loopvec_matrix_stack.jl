@@ -3,9 +3,12 @@ using StaticTools
 using LoopVectorization
 
 @inline function mul!(C::StackArray, A::StackArray, B::StackArray)
-    @turbo for n ∈ indices((C,B), 2), m ∈ indices((C,A), 1)
+    # error since Julia v1.11
+    #@turbo for n ∈ indices((C,B), 2), m ∈ indices((C,A), 1) 
+    @turbo for n ∈ indices(C, 2), m ∈ indices(C, 1)
         Cmn = zero(eltype(C))
-        for k ∈ indices((A,B), (2,1))
+        # for k ∈ indices((A,B), (2,1))
+        for k ∈ indices(A, 2)
             Cmn += A[m,k] * B[k,n]
         end
         C[m,n] = Cmn
@@ -38,6 +41,7 @@ function loopvec_matrix_stack()
     mul!(C, B, A)
 
     # Print to stdout
+    printf(c"C matric = \n")
     printf(C)
     # Also print to file
     fp = fopen(c"table.tsv",c"w")

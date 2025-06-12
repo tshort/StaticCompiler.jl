@@ -1,9 +1,3 @@
-@static if isdefined(Base.Experimental, Symbol("@overlay"))
-    Base.Experimental.@MethodTable(method_table)
-else
-    const method_table = nothing
-end
-
 """
 ```julia
     StaticTarget() # Native target
@@ -54,30 +48,6 @@ set_compiler!(target::StaticTarget, compiler::String) = (target.compiler = compi
 
 set_runtime!(target::StaticTarget, julia_runtime::Bool) = (target.julia_runtime = julia_runtime)
 
-"""
-```julia
-@device_override old_bad_method(arg1::Type1, arg2::Type2) = new_good_method(arg1, arg2)
-```
-Override a non-static-compilable method (e.g. `old_bad_method(::Type1, ::Type2)`)
-with a more compileable replacement.
-### Examples
-```
-@device_override @noinline Core.throw_inexacterror(f::Symbol, ::Type{T}, val) where {T} =
-    @print_and_throw c"Inexact conversion"
-```
-"""
-macro device_override(ex)
-    ex = macroexpand(__module__, ex)
-    if Meta.isexpr(ex, :call)
-        @show ex = eval(ex)
-        error()
-    end
-    code = quote
-        $Base.Experimental.@overlay($StaticCompiler.method_table, $ex)
-    end
-    return esc(code)
-end
-
 # Default to native
 struct StaticCompilerTarget{MT} <: GPUCompiler.AbstractCompilerTarget
     triple::String
@@ -121,10 +91,14 @@ GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, Stati
 GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = true
 
 GPUCompiler.uses_julia_runtime(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = job.config.target.julia_runtime
-GPUCompiler.get_interpreter(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) =
-    StaticInterpreter(job.config.params.cache, GPUCompiler.method_table(job), job.world,
-                        GPUCompiler.inference_params(job), GPUCompiler.optimization_params(job))
-GPUCompiler.ci_cache(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) = job.config.params.cache
+@static if HAS_INTEGRATED_CACHE
+    GPUCompiler.get_interpreter(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) =
+        StaticInterpreter(job.world, GPUCompiler.method_table(job), GPUCompiler.ci_cache_token(job), inference_params(job), optimization_params(job))
+else
+    GPUCompiler.ci_cache(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) = job.config.params.cache
+    GPUCompiler.get_interpreter(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) =
+        StaticInterpreter(job.world, GPUCompiler.method_table(job), job.config.params.cache, inference_params(job), optimization_params(job))
+end
 GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget})) = job.config.target.method_table
 
 
