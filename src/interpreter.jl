@@ -1,9 +1,9 @@
 ## interpreter
 
 using Core.Compiler:
-    AbstractInterpreter, InferenceResult, InferenceParams, InferenceState, MethodInstance, OptimizationParams, WorldView, get_world_counter
+    AbstractInterpreter, InferenceResult, InferenceParams, InferenceState, MethodInstance, OptimizationParams, WorldView
 using GPUCompiler:
-    @safe_debug, AbstractCompilerParams, CompilerJob, methodinstance, CodeInstance, inference_params, optimization_params
+    @safe_debug, AbstractCompilerParams, CompilerJob, methodinstance, CodeInstance, inference_params, optimization_params, get_inference_world
 using CodeInfoTools
 using CodeInfoTools: resolve
 
@@ -46,6 +46,7 @@ end
 
 Core.Compiler.InferenceParams(interp::StaticInterpreter) = interp.inf_params
 Core.Compiler.OptimizationParams(interp::StaticInterpreter) = interp.opt_params
+# Core.Compiler.get_world_counter(interp::StaticInterpreter) = interp.world
 GPUCompiler.get_inference_world(interp::StaticInterpreter) = interp.world
 Core.Compiler.get_inference_cache(interp::StaticInterpreter) = interp.local_cache
 @static if HAS_INTEGRATED_CACHE
@@ -83,7 +84,7 @@ function custom_pass!(interp::StaticInterpreter, result::InferenceResult, mi::Co
 end
 
 function Core.Compiler.InferenceState(result::InferenceResult, cache::Symbol, interp::StaticInterpreter)
-    world = get_world_counter(interp)
+    world = get_inference_world(interp)
     src = @static if VERSION >= v"1.10.0-DEV.873"
         Core.Compiler.retrieve_code_info(result.linfo, world)
     else
