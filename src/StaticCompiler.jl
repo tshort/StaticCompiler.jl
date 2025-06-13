@@ -452,9 +452,9 @@ function static_llvm_module(f, tt, name=fix_name(f); demangle=true, target::Stat
     if !demangle
         name = "julia_"*name
     end
-    job, kwargs = static_job(f, tt; name, target, kwargs...)
+    job, kwargs = static_job(f, tt; name, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
     m = GPUCompiler.JuliaContext() do context
-        m, _ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, libraries=false)
+        m, _ = GPUCompiler.compile(:llvm, job; kwargs...)
         locate_pointers_and_runtime_calls(m)
         m
     end
@@ -469,8 +469,8 @@ function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::St
         if !demangle
             name_f = "julia_"*name_f
         end
-        job, kwargs = static_job(f, tt; name = name_f, target, kwargs...)
-        mod,_ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, libraries=false)
+        job, kwargs = static_job(f, tt; name = name_f, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
+        mod,_ = GPUCompiler.compile(:llvm, job; kwargs...)
         if length(funcs) > 1
             for func in funcs[2:end]
                 f,tt = func
@@ -478,8 +478,8 @@ function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::St
                 if !demangle
                     name_f = "julia_"*name_f
                 end
-                job, kwargs = static_job(f, tt; name = name_f, target, kwargs...)
-                tmod,_ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, libraries=false)
+                job, kwargs = static_job(f, tt; name = name_f, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
+                tmod,_ = GPUCompiler.compile(:llvm, job; kwargs...)
                 link!(mod,tmod)
             end
         end

@@ -93,9 +93,9 @@ function Core.Compiler.InferenceState(result::InferenceResult, cache::Symbol, in
     mi = result.linfo
     src = custom_pass!(interp, result, mi, src)
     src === nothing && return @static if VERSION < v"1.11"
-        Core.Compiler.maybe_validate_code(result.linfo, src, "lowered")
-    else
         Core.Compiler.validate_code_in_debug_mode(result.linfo, src, "lowered")
+    else
+        Core.Compiler.maybe_validate_code(result.linfo, src, "lowered")
     end
     return InferenceState(result, src, cache, interp)
 end

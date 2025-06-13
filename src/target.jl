@@ -102,20 +102,6 @@ end
 GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget})) = job.config.target.method_table
 
 
-function static_job(@nospecialize(func::Function), @nospecialize(types::Type);
-        name = fix_name(func),
-        kernel::Bool = false,
-        target::StaticTarget = StaticTarget(),
-        method_table=method_table,
-        kwargs...
-    )
-    source = methodinstance(typeof(func), Base.to_tuple_type(types))
-    tm = target.tm
-    gputarget = StaticCompilerTarget(LLVM.triple(tm), LLVM.cpu(tm), LLVM.features(tm), target.julia_runtime, method_table)
-    params = StaticCompilerParams()
-    config = GPUCompiler.CompilerConfig(gputarget, params, name = name, kernel = kernel)
-    StaticCompiler.CompilerJob(source, config), kwargs
-end
 function static_job(@nospecialize(func), @nospecialize(types);
     name = fix_name(func),
     kernel::Bool = false,
@@ -127,6 +113,11 @@ function static_job(@nospecialize(func), @nospecialize(types);
     tm = target.tm
     gputarget = StaticCompilerTarget(LLVM.triple(tm), LLVM.cpu(tm), LLVM.features(tm), target.julia_runtime, method_table)
     params = StaticCompilerParams()
-    config = GPUCompiler.CompilerConfig(gputarget, params, name = name, kernel = kernel)
-    StaticCompiler.CompilerJob(source, config), kwargs
+    @static if pkgversion(GPUCompiler) < v"1"
+        config = GPUCompiler.CompilerConfig(gputarget, params; name = name, kernel = kernel)
+        return StaticCompiler.CompilerJob(source, config), kwargs
+    else
+        config = GPUCompiler.CompilerConfig(gputarget, params; name = name, kernel = kernel, kwargs...)
+        return StaticCompiler.CompilerJob(source, config), Dict{}()
+    end
 end
