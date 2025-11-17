@@ -66,6 +66,19 @@ Demonstrates:
 
 Run this to learn how to analyze an entire project and prioritize fixes.
 
+### 05_quick_check.jl
+
+**What it teaches**: Using the quick_check convenience function
+
+Demonstrates:
+- Single-function analysis with `quick_check()`
+- Automatic readiness scoring
+- Formatted report printing
+- Batch analysis with `batch_check()`
+- Integration with compilation workflow
+
+Run this to learn the fastest way to check compilation readiness.
+
 ## Quick Start
 
 If you're new to static compilation with Julia, follow this path:

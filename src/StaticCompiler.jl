@@ -29,6 +29,8 @@ export analyze_devirtualization, DevirtualizationReport, CallSiteInfo
 export analyze_constants, ConstantPropagationReport, ConstantInfo
 export analyze_lifetimes, LifetimeAnalysisReport, AllocationSite
 export suggest_lifetime_improvements, insert_auto_frees
+export quick_check, CompilationReadinessReport
+export print_readiness_report, batch_check, print_batch_summary
 
 include("interpreter.jl")
 include("target.jl")

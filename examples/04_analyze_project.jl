@@ -174,7 +174,8 @@ for (i, r) in enumerate(sorted_results)
     status = r.ready ? "✅" : "❌"
     bar_len = div(r.score, 2)  # Scale to 50 chars
     bar = "█"^bar_len * "░"^(50-bar_len)
-    println("$i. $status $(rpad(r.name, 20)) │$bar│ $(r.score)/100")
+    separator = "│"
+    println("$i. $status $(rpad(r.name, 20)) $separator$bar$separator $(r.score)/100")
 end
 println()
 
