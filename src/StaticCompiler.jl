@@ -49,6 +49,8 @@ export AnalysisSession
 export generate_c_header, julia_to_c_type
 export get_template, list_templates, show_template, show_all_templates
 export apply_template, compile_with_template, BUILTIN_TEMPLATES
+export compile_package, compile_package_exports, @compile_package
+export infer_common_signatures, FunctionSignature, @compile_signature
 
 include("interpreter.jl")
 include("target.jl")
@@ -57,6 +59,7 @@ include("quirks.jl")
 include("dllexport.jl")
 include("header_generation.jl")
 include("templates.jl")
+include("package_compilation.jl")
 
 fix_name(f::Function) = fix_name(string(nameof(f)))
 fix_name(s) = String(GPUCompiler.safe_name(s))
