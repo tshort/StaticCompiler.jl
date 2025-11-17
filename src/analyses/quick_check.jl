@@ -1,6 +1,9 @@
 # Quick Analysis Utilities
 # Convenience functions for running multiple analyses at once
 
+using Dates
+import JSON
+
 """
     CompilationReadinessReport
 
@@ -231,6 +234,214 @@ function print_batch_summary(results::Dict{Symbol, CompilationReadinessReport})
     println("="^70)
 end
 
+"""
+    verify_compilation_readiness(f::Function, types::Tuple; threshold::Int=80, verbose::Bool=true) -> Bool
+
+Check if a function is ready for compilation and warn if not.
+
+Returns `true` if the function is ready (score >= threshold), `false` otherwise.
+If `verbose=true`, prints warnings about issues found.
+
+# Example
+```julia
+julia> if verify_compilation_readiness(my_func, (Int,))
+           compile_shlib(my_func, (Int,), "./")
+       end
+```
+"""
+function verify_compilation_readiness(f::Function, types::Tuple; threshold::Int=80, verbose::Bool=true)
+    report = quick_check(f, types)
+
+    if report.score >= threshold
+        verbose && println("✅ $(report.function_name) is ready for compilation (score: $(report.score)/100)")
+        return true
+    else
+        if verbose
+            println("⚠️  $(report.function_name) may not compile successfully (score: $(report.score)/100)")
+            println("   Issues found:")
+            for issue in report.issues
+                println("     • $issue")
+            end
+            println("   Use quick_check() for detailed analysis or force=true to compile anyway")
+        end
+        return false
+    end
+end
+
+"""
+    compare_reports(old::CompilationReadinessReport, new::CompilationReadinessReport)
+
+Compare two compilation readiness reports and show improvements or regressions.
+
+# Example
+```julia
+julia> old_report = quick_check(my_func, (Int,))
+julia> # ... make improvements ...
+julia> new_report = quick_check(my_func, (Int,))
+julia> compare_reports(old_report, new_report)
+```
+"""
+function compare_reports(old::CompilationReadinessReport, new::CompilationReadinessReport)
+    println("="^70)
+    println("COMPILATION READINESS COMPARISON: $(new.function_name)")
+    println("="^70)
+    println()
+
+    # Score comparison
+    score_diff = new.score - old.score
+    score_arrow = score_diff > 0 ? "⬆" : score_diff < 0 ? "⬇" : "➡"
+    score_color = score_diff > 0 ? "✅" : score_diff < 0 ? "❌" : "➡️"
+
+    println("Score Change: $(old.score)/100 → $(new.score)/100 ($score_arrow $(abs(score_diff)))")
+    println("Status: $score_color")
+    println()
+
+    # Readiness status
+    if !old.ready_for_compilation && new.ready_for_compilation
+        println("🎉 Function is now ready for compilation!")
+    elseif old.ready_for_compilation && !new.ready_for_compilation
+        println("⚠️  Function was ready but now has issues")
+    end
+    println()
+
+    # Issue comparison
+    println("Issue Changes:")
+    old_issues = Set(old.issues)
+    new_issues = Set(new.issues)
+
+    fixed_issues = setdiff(old_issues, new_issues)
+    new_problems = setdiff(new_issues, old_issues)
+    remaining = intersect(old_issues, new_issues)
+
+    if !isempty(fixed_issues)
+        println("  ✅ Fixed:")
+        for issue in fixed_issues
+            println("     • $issue")
+        end
+    end
+
+    if !isempty(new_problems)
+        println("  ❌ New problems:")
+        for issue in new_problems
+            println("     • $issue")
+        end
+    end
+
+    if !isempty(remaining)
+        println("  ⚠️  Still present:")
+        for issue in remaining
+            println("     • $issue")
+        end
+    end
+
+    if isempty(old_issues) && isempty(new_issues)
+        println("  No issues in either version ✅")
+    end
+
+    println()
+
+    # Detailed metric changes
+    println("Detailed Changes:")
+
+    # Monomorphization
+    if old.monomorphization.has_abstract_types != new.monomorphization.has_abstract_types
+        status = new.monomorphization.has_abstract_types ? "❌ Introduced" : "✅ Removed"
+        println("  Abstract types: $status")
+    end
+
+    # Allocations
+    old_allocs = length(old.escape_analysis.allocations)
+    new_allocs = length(new.escape_analysis.allocations)
+    if old_allocs != new_allocs
+        diff = new_allocs - old_allocs
+        symbol = diff > 0 ? "❌ +" : "✅ "
+        println("  Allocations: $old_allocs → $new_allocs ($symbol$diff)")
+    end
+
+    # Dynamic calls
+    old_calls = old.devirtualization.total_dynamic_calls
+    new_calls = new.devirtualization.total_dynamic_calls
+    if old_calls != new_calls
+        diff = new_calls - old_calls
+        symbol = diff > 0 ? "❌ +" : "✅ "
+        println("  Dynamic calls: $old_calls → $new_calls ($symbol$diff)")
+    end
+
+    # Memory leaks
+    old_leaks = old.lifetime_analysis.potential_leaks
+    new_leaks = new.lifetime_analysis.potential_leaks
+    if old_leaks != new_leaks
+        diff = new_leaks - old_leaks
+        symbol = diff > 0 ? "❌ +" : "✅ "
+        println("  Memory leaks: $old_leaks → $new_leaks ($symbol$diff)")
+    end
+
+    println()
+    println("="^70)
+end
+
+"""
+    export_report(report::CompilationReadinessReport, filename::String)
+
+Export a compilation readiness report to a JSON file for later comparison.
+
+# Example
+```julia
+julia> report = quick_check(my_func, (Int,))
+julia> export_report(report, "baseline_report.json")
+```
+"""
+function export_report(report::CompilationReadinessReport, filename::String)
+    # Create a serializable dictionary
+    data = Dict(
+        "function_name" => string(report.function_name),
+        "ready_for_compilation" => report.ready_for_compilation,
+        "score" => report.score,
+        "issues" => report.issues,
+        "timestamp" => string(now()),
+        "metrics" => Dict(
+            "has_abstract_types" => report.monomorphization.has_abstract_types,
+            "specialization_factor" => report.monomorphization.specialization_factor,
+            "allocations" => length(report.escape_analysis.allocations),
+            "promotable_allocations" => report.escape_analysis.promotable_allocations,
+            "dynamic_calls" => report.devirtualization.total_dynamic_calls,
+            "devirtualizable_calls" => report.devirtualization.devirtualizable_calls,
+            "foldable_expressions" => report.constant_propagation.foldable_expressions,
+            "potential_leaks" => report.lifetime_analysis.potential_leaks,
+            "proper_frees" => report.lifetime_analysis.proper_frees
+        )
+    )
+
+    # Write to JSON file
+    open(filename, "w") do io
+        JSON.print(io, data, 2)
+    end
+
+    println("✅ Report exported to $filename")
+end
+
+"""
+    import_report_summary(filename::String) -> Dict
+
+Import a previously exported compilation readiness report summary.
+
+Returns a dictionary with the report data. Use this for comparison or tracking progress.
+
+# Example
+```julia
+julia> old_data = import_report_summary("baseline_report.json")
+julia> new_report = quick_check(my_func, (Int,))
+julia> println("Score improved by: ", new_report.score - old_data["score"])
+```
+"""
+function import_report_summary(filename::String)
+    data = JSON.parsefile(filename)
+    println("✅ Loaded report for $(data["function_name"]) (score: $(data["score"])/100)")
+    return data
+end
+
 # Export new functions
 export quick_check, CompilationReadinessReport
 export print_readiness_report, batch_check, print_batch_summary
+export verify_compilation_readiness, compare_reports
+export export_report, import_report_summary

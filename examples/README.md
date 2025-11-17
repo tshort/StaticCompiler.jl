@@ -79,6 +79,19 @@ Demonstrates:
 
 Run this to learn the fastest way to check compilation readiness.
 
+### 06_advanced_workflow.jl
+
+**What it teaches**: Advanced analysis features for production workflows
+
+Demonstrates:
+- Pre-compilation verification with `verify_compilation_readiness()`
+- Exporting analysis reports to JSON with `export_report()`
+- Comparing multiple versions with `compare_reports()`
+- Importing saved reports with `import_report_summary()`
+- Tracking optimization progress over time
+
+Run this to learn how to integrate analysis into your development workflow.
+
 ## Quick Start
 
 If you're new to static compilation with Julia, follow this path:
