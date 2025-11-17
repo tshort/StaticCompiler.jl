@@ -68,6 +68,51 @@ we define overrides such as
 
 If for some reason, you wish to use a different method table (defined with `Base.Experimental.@MethodTable` and `Base.Experimental.@overlay`) than the default one provided by StaticCompiler.jl, you can provide it to `compile_executable` and `compile_shlib` via a keyword argument `method_table`.
 
+### Compiler Analysis Tools
+
+StaticCompiler.jl provides analysis functions to help identify potential issues before static compilation:
+
+```julia
+julia> using StaticCompiler
+
+julia> function example(x::Number)
+           return x * 2 + [1, 2, 3]  # Abstract type + allocation
+       end
+
+julia> # Analyze monomorphization opportunities
+julia> report = analyze_monomorphization(example, (Number,))
+julia> report.has_abstract_types
+true
+
+julia> # Analyze heap allocations
+julia> report = analyze_escapes(example, (Number,))
+julia> length(report.allocations)
+1
+
+julia> # Analyze dynamic dispatch
+julia> report = analyze_devirtualization(example, (Number,))
+julia> report.total_dynamic_calls
+8
+
+julia> # Analyze constant propagation
+julia> report = analyze_constants(example, (Number,))
+julia> report.foldable_expressions
+0
+
+julia> # Analyze memory lifetime
+julia> report = analyze_lifetimes(example, (Number,))
+julia> report.potential_leaks
+1
+```
+
+Available analysis functions:
+* `analyze_escapes(f, types)` - Identifies heap allocations and stack promotion opportunities
+* `analyze_monomorphization(f, types)` - Detects abstract types needing specialization
+* `analyze_devirtualization(f, types)` - Finds dynamic dispatch sites that could be optimized
+* `analyze_constants(f, types)` - Identifies constant propagation and dead code elimination opportunities
+* `analyze_lifetimes(f, types)` - Tracks memory allocations and potential leaks
+
+These tools help diagnose why a function might not compile statically and guide optimization efforts.
 
 ## Approach
 

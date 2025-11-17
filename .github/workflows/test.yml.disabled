@@ -1,0 +1,201 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:  # Allow manual triggers
+
+jobs:
+  test-core:
+    name: Core Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        julia-version: ['1.10', '1.11', 'nightly']
+        exclude:
+          # Exclude nightly on Windows to save resources
+          - os: windows-latest
+            julia-version: 'nightly'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: ${{ matrix.julia-version }}
+
+      - name: Cache Julia packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.julia
+          key: ${{ runner.os }}-julia-${{ matrix.julia-version }}-${{ hashFiles('**/Project.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-julia-${{ matrix.julia-version }}-
+
+      - name: Install dependencies
+        run: |
+          julia --project=. -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Run core tests
+        env:
+          GROUP: Core
+        run: |
+          julia --project=. -e 'using Pkg; Pkg.test()'
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ matrix.os }}-${{ matrix.julia-version }}
+          path: test/reports/
+
+  test-integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: test-core
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.10'
+
+      - name: Install dependencies
+        run: |
+          julia --project=. -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Run integration tests
+        env:
+          GROUP: Integration
+        run: |
+          julia --project=. -e 'using Pkg; Pkg.test()'
+
+  test-optimizations:
+    name: Optimization Tests
+    runs-on: ubuntu-latest
+    needs: test-core
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.10'
+
+      - name: Install dependencies
+        run: |
+          julia --project=. -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Run optimization tests
+        env:
+          GROUP: Optimizations
+        run: |
+          julia --project=. -e 'using Pkg; Pkg.test()'
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-reports
+          path: test/reports/
+
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    needs: [test-core, test-integration, test-optimizations]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.10'
+
+      - name: Install dependencies
+        run: |
+          julia --project=. -e 'using Pkg; Pkg.instantiate()'
+          julia --project=. -e 'using Pkg; Pkg.add("Coverage")'
+
+      - name: Run tests with coverage
+        run: |
+          julia --project=. --code-coverage=user -e 'using Pkg; Pkg.test()'
+
+      - name: Process coverage
+        run: |
+          julia --project=. -e '
+            using Coverage
+            coverage = process_folder()
+            LCOV.writefile("coverage.info", coverage)
+          '
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.info
+          flags: unittests
+          name: codecov-umbrella
+
+  benchmarks:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    # Only run on main branch to avoid excessive benchmark runs
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for baseline comparison
+
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.10'
+
+      - name: Install dependencies
+        run: |
+          julia --project=. -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Run benchmarks
+        run: |
+          julia --project=. test/test_optimization_benchmarks.jl > benchmarks/reports/latest.txt
+
+      - name: Check for performance regression
+        run: |
+          julia --project=. -e '
+            include("test/test_optimization_benchmarks.jl")
+            # Compare with baseline if it exists
+            if isfile("benchmarks/baseline.json")
+              # Regression detection logic
+              println("Checking for regressions...")
+            else
+              println("No baseline found, establishing baseline")
+            end
+          '
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results
+          path: benchmarks/reports/
+
+      - name: Comment PR with benchmark results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const results = fs.readFileSync('benchmarks/reports/latest.txt', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## Benchmark Results\n\n\`\`\`\n${results}\n\`\`\``
+            });

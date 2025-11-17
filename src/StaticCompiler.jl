@@ -19,6 +19,17 @@ export static_code_llvm, static_code_typed, static_llvm_module, static_code_nati
 export @device_override, @print_and_throw
 export StaticTarget
 
+# Include analysis infrastructure
+include("analyses/analyses.jl")
+using .Analyses
+export analyze_escapes, EscapeAnalysisReport, AllocationInfo
+export suggest_stack_promotion
+export analyze_monomorphization, MonomorphizationReport, AbstractParameterInfo
+export analyze_devirtualization, DevirtualizationReport, CallSiteInfo
+export analyze_constants, ConstantPropagationReport, ConstantInfo
+export analyze_lifetimes, LifetimeAnalysisReport, AllocationSite
+export suggest_lifetime_improvements, insert_auto_frees
+
 include("interpreter.jl")
 include("target.jl")
 include("pointer_warning.jl")
