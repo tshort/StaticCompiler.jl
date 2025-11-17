@@ -33,6 +33,9 @@ export quick_check, CompilationReadinessReport
 export print_readiness_report, batch_check, print_batch_summary
 export verify_compilation_readiness, compare_reports
 export export_report, import_report_summary
+export suggest_optimizations, suggest_optimizations_batch
+export safe_compile_shlib, safe_compile_executable
+export @analyze, @check_ready, @quick_check, @suggest_fixes
 
 include("interpreter.jl")
 include("target.jl")
@@ -611,5 +614,8 @@ function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), file
       return path, obj_path
     end
 end
+
+# Include safe compilation integration (after compile functions are defined)
+include("safe_compile_integration.jl")
 
 end # module

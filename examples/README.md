@@ -92,6 +92,21 @@ Demonstrates:
 
 Run this to learn how to integrate analysis into your development workflow.
 
+### 07_macros_and_suggestions.jl
+
+**What it teaches**: Convenience macros and automatic optimization suggestions
+
+Demonstrates:
+- `@analyze` macro for inline analysis
+- `@check_ready` macro for quick verification
+- `@quick_check` macro for silent analysis
+- `@suggest_fixes` macro for optimization suggestions
+- `suggest_optimizations()` for detailed fix recommendations
+- `safe_compile_shlib()` for verified compilation
+- Quality thresholds and force compilation
+
+Run this to learn the fastest ways to analyze and get actionable fix suggestions.
+
 ## Quick Start
 
 If you're new to static compilation with Julia, follow this path:
