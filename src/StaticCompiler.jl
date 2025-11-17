@@ -36,6 +36,12 @@ export export_report, import_report_summary
 export suggest_optimizations, suggest_optimizations_batch
 export safe_compile_shlib, safe_compile_executable
 export @analyze, @check_ready, @quick_check, @suggest_fixes
+export generate_ci_report, check_quality_gate
+export generate_github_actions_summary, annotate_github_actions
+export scan_module, scan_module_with_types
+export analyze_module, compare_modules
+export quick_check_cached, batch_check_cached
+export clear_analysis_cache!, cache_stats, prune_cache!, with_cache
 
 include("interpreter.jl")
 include("target.jl")

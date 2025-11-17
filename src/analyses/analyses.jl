@@ -12,6 +12,9 @@ include("lifetime_analysis.jl")
 include("quick_check.jl")
 include("suggestions.jl")
 include("macros.jl")
+include("ci_integration.jl")
+include("project_scanner.jl")
+include("caching.jl")
 
 # Re-export all analysis functions and types
 export analyze_escapes, EscapeAnalysisReport, AllocationInfo
@@ -31,5 +34,18 @@ export suggest_optimizations, suggest_optimizations_batch
 
 # Re-export macros
 export @analyze, @check_ready, @quick_check, @suggest_fixes
+
+# Re-export CI/CD integration
+export generate_ci_report, check_quality_gate
+export generate_github_actions_summary, annotate_github_actions
+
+# Re-export project scanning
+export scan_module, scan_module_with_types
+export analyze_module, compare_modules
+
+# Re-export caching
+export quick_check_cached, batch_check_cached
+export clear_analysis_cache!, cache_stats, prune_cache!
+export with_cache
 
 end # module

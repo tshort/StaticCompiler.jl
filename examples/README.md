@@ -107,6 +107,23 @@ Demonstrates:
 
 Run this to learn the fastest ways to analyze and get actionable fix suggestions.
 
+### 08_ci_and_project_tools.jl
+
+**What it teaches**: CI/CD integration, caching, and project-wide analysis
+
+Demonstrates:
+- `quick_check_cached()` for faster repeated analysis
+- `batch_check_cached()` with caching support
+- `generate_ci_report()` for Markdown and JSON reports
+- `check_quality_gate()` for enforcing quality standards
+- `generate_github_actions_summary()` for GitHub Actions integration
+- `annotate_github_actions()` for creating annotations
+- `scan_module()` to find all functions in a module
+- `analyze_module()` for project-wide analysis
+- Cache management and statistics
+
+Run this to learn how to integrate analysis into CI/CD pipelines and analyze entire projects.
+
 ## Quick Start
 
 If you're new to static compilation with Julia, follow this path:
