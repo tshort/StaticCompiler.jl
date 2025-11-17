@@ -47,6 +47,8 @@ export track_quality_over_time, plot_quality_history, BenchmarkResult
 export start_interactive, interactive_analyze, interactive_suggest, interactive_compare
 export AnalysisSession
 export generate_c_header, julia_to_c_type
+export get_template, list_templates, show_template, show_all_templates
+export apply_template, compile_with_template, BUILTIN_TEMPLATES
 
 include("interpreter.jl")
 include("target.jl")
@@ -54,6 +56,7 @@ include("pointer_warning.jl")
 include("quirks.jl")
 include("dllexport.jl")
 include("header_generation.jl")
+include("templates.jl")
 
 fix_name(f::Function) = fix_name(string(nameof(f)))
 fix_name(s) = String(GPUCompiler.safe_name(s))
@@ -257,6 +260,7 @@ compile_shlib(f::Function, types::Tuple, [path::String=pwd()], [name::String=str
     cflags=``,
     method_table=StaticCompiler.method_table,
     target::StaticTarget=StaticTarget(),
+    template::Union{Symbol,Nothing}=nothing,
     verify::Bool=false,
     min_score::Int=80,
     suggest_fixes::Bool=true,
@@ -270,6 +274,7 @@ compile_shlib(funcs::Array, [path::String=pwd()];
     cflags=``,
     method_table=StaticCompiler.method_table,
     target::StaticTarget=StaticTarget(),
+    template::Union{Symbol,Nothing}=nothing,
     verify::Bool=false,
     min_score::Int=80,
     suggest_fixes::Bool=true,
@@ -282,6 +287,18 @@ As `compile_executable`, but compiling to a standalone `.dylib`/`.so` shared lib
 Arguments and returned values from `compile_shlib` must be native objects such as `Int`, `Float64`, or `Ptr`. They cannot be things like `Tuple{Int, Int}` because that is not natively sized. Such objects need to be passed by reference instead of by value.
 
 If `demangle` is set to `false`, compiled function names are prepended with "julia_".
+
+## Compilation Templates
+
+Use pre-configured settings for common scenarios with `template=:name`:
+- `:embedded` - IoT/embedded: minimal size, strict verification
+- `:performance` - Maximum speed: aggressive optimization
+- `:portable` - Broad compatibility: conservative settings
+- `:debugging` - Development: helpful diagnostics, low threshold
+- `:production` - Deployment: strict verification, full docs
+- `:default` - Balanced: standard behavior
+
+Template parameters can be overridden by explicitly passing them.
 
 ## Pre-Compilation Analysis
 
@@ -335,11 +352,23 @@ Generated C header: ./test.h
 
 julia> # The generated test.h contains:
 julia> # double test(int64_t arg0);
+
+# With compilation template:
+julia> compile_shlib(test, (Int,), "./", "test", template=:embedded)
+Using template: :embedded
+  Embedded/IoT systems: minimal size, no stdlib
+
+Running pre-compilation analysis...
+  [1/1] Analyzing test... ✅ (score: 95/100)
+✅ All functions passed verification (min score: 90)
+Generated C header: ./test.h
+"/Users/user/test.dylib"
 ```
 """
 function compile_shlib(f::Function, types=(), path::String=pwd(), name=fix_name(f);
         filename=name,
         target::StaticTarget=StaticTarget(),
+        template::Union{Symbol,Nothing}=nothing,
         verify::Bool=false,
         min_score::Int=80,
         suggest_fixes::Bool=true,
@@ -347,7 +376,7 @@ function compile_shlib(f::Function, types=(), path::String=pwd(), name=fix_name(
         generate_header::Bool=false,
         kwargs...
     )
-    compile_shlib(((f, types),), path; filename, target, verify, min_score, suggest_fixes, export_analysis, generate_header, kwargs...)
+    compile_shlib(((f, types),), path; filename, target, template, verify, min_score, suggest_fixes, export_analysis, generate_header, kwargs...)
 end
 # As above, but taking an array of functions and returning a single shlib
 function compile_shlib(funcs::Union{Array,Tuple}, path::String=pwd();
@@ -356,6 +385,7 @@ function compile_shlib(funcs::Union{Array,Tuple}, path::String=pwd();
         cflags = ``,
         target::StaticTarget=StaticTarget(),
         llvm_to_clang = Sys.iswindows(),
+        template::Union{Symbol,Nothing}=nothing,
         verify::Bool=false,
         min_score::Int=80,
         suggest_fixes::Bool=true,
@@ -363,6 +393,22 @@ function compile_shlib(funcs::Union{Array,Tuple}, path::String=pwd();
         generate_header::Bool=false,
         kwargs...
     )
+
+    # Apply template if specified
+    if !isnothing(template)
+        template_obj = get_template(template)
+        println("Using template: :$(template)")
+        println("  ", template_obj.description)
+        println()
+
+        # Apply template parameters (explicit params override template)
+        template_params = template_obj.params
+        verify = get(kwargs, :verify, template_params.verify)
+        min_score = get(kwargs, :min_score, template_params.min_score)
+        suggest_fixes = get(kwargs, :suggest_fixes, template_params.suggest_fixes)
+        export_analysis = get(kwargs, :export_analysis, template_params.export_analysis)
+        generate_header = get(kwargs, :generate_header, template_params.generate_header)
+    end
 
     # Pre-compilation analysis if requested
     if verify
