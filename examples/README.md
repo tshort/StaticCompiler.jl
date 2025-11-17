@@ -53,6 +53,19 @@ Demonstrates:
 
 Run this to see the complete process from analysis to working compiled code.
 
+### 04_analyze_project.jl
+
+**What it teaches**: Analyzing multiple functions systematically
+
+Demonstrates:
+- Batch analysis of multiple functions
+- Scoring compilation readiness
+- Generating summary reports
+- Prioritizing which functions to fix first
+- Issue breakdown and recommendations
+
+Run this to learn how to analyze an entire project and prioritize fixes.
+
 ## Quick Start
 
 If you're new to static compilation with Julia, follow this path:
@@ -65,9 +78,14 @@ If you're new to static compilation with Julia, follow this path:
    - See how to fix common problems
    - Learn the patterns for static-friendly code
 
-3. **Finally run**: `03_complete_workflow.jl`
+3. **Then run**: `03_complete_workflow.jl`
    - See the complete compilation process
    - Test a real compiled function
+
+4. **For projects**: `04_analyze_project.jl`
+   - Analyze multiple functions at once
+   - Get prioritized recommendations
+   - See which functions are ready to compile
 
 ## Common Patterns
 
