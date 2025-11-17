@@ -1,0 +1,110 @@
+#!/usr/bin/env julia
+
+# Pre-commit hook for StaticCompiler.jl compiler analysis
+# Install: cp hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+using Pkg
+Pkg.activate(".")
+
+using StaticCompiler
+
+println("🔍 Running compiler analysis pre-commit check...")
+println()
+
+# Configuration (customize for your project)
+const MIN_SCORE = 70           # Minimum acceptable score
+const MIN_READY_PERCENT = 60   # Minimum % of functions that must be ready
+const STRICT_MODE = false      # Set to true to block commits on any failure
+
+# Functions to analyze (customize this list)
+# This is just an example - replace with your actual functions
+functions_to_check = [
+    # (my_function, (Int, Float64)),
+    # (another_function, (String,)),
+]
+
+# Auto-discover functions if list is empty
+if isempty(functions_to_check)
+    println("ℹ️  No functions specified in pre-commit hook")
+    println("   Edit hooks/pre-commit to add functions to analyze")
+    println()
+    exit(0)  # Allow commit if no functions configured
+end
+
+# Run analysis with caching for speed
+println("Analyzing $(length(functions_to_check)) function(s)...")
+results = batch_check_cached(functions_to_check)
+
+# Calculate statistics
+total = length(results)
+ready = count(r -> r.ready_for_compilation, values(results))
+avg_score = round(Int, sum(r.score for r in values(results)) / total)
+ready_percent = round(Int, ready / total * 100)
+
+# Display results
+println()
+println("="^70)
+println("PRE-COMMIT ANALYSIS RESULTS")
+println("="^70)
+println()
+println("Total functions:  $total")
+println("Ready:            $ready/$total ($ready_percent%)")
+println("Average score:    $avg_score/100")
+println()
+
+# Check if any function is critically bad
+critical_failures = [(name, report) for (name, report) in results if report.score < 50]
+
+if !isempty(critical_failures)
+    println("❌ CRITICAL ISSUES:")
+    for (name, report) in critical_failures
+        println("   $name: $(report.score)/100")
+        for issue in report.issues
+            println("     • $issue")
+        end
+    end
+    println()
+end
+
+# Quality gate check
+passed = true
+
+if avg_score < MIN_SCORE
+    println("⚠️  Average score ($avg_score) below minimum ($MIN_SCORE)")
+    passed = false
+end
+
+if ready_percent < MIN_READY_PERCENT
+    println("⚠️  Ready percentage ($ready_percent%) below minimum ($MIN_READY_PERCENT%)")
+    passed = false
+end
+
+println("="^70)
+println()
+
+if passed
+    println("✅ Pre-commit check PASSED")
+    println()
+    exit(0)
+else
+    if STRICT_MODE
+        println("❌ Pre-commit check FAILED - commit blocked")
+        println()
+        println("To bypass (not recommended):")
+        println("  git commit --no-verify")
+        println()
+        println("To fix:")
+        println("  1. Run: julia -e 'using StaticCompiler; suggest_optimizations(my_func, types)'")
+        println("  2. Fix the issues")
+        println("  3. Try commit again")
+        println()
+        exit(1)
+    else
+        println("⚠️  Pre-commit check FAILED - allowing commit (strict mode off)")
+        println()
+        println("To enable strict mode:")
+        println("  Edit hooks/pre-commit and set STRICT_MODE = true")
+        println()
+        exit(0)
+    end
+end

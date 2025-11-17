@@ -42,6 +42,10 @@ export scan_module, scan_module_with_types
 export analyze_module, compare_modules
 export quick_check_cached, batch_check_cached
 export clear_analysis_cache!, cache_stats, prune_cache!, with_cache
+export benchmark_analysis, benchmark_compilation, compare_performance
+export track_quality_over_time, plot_quality_history, BenchmarkResult
+export start_interactive, interactive_analyze, interactive_suggest, interactive_compare
+export AnalysisSession
 
 include("interpreter.jl")
 include("target.jl")

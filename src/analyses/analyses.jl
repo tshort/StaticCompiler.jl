@@ -15,6 +15,8 @@ include("macros.jl")
 include("ci_integration.jl")
 include("project_scanner.jl")
 include("caching.jl")
+include("benchmarking.jl")
+include("interactive.jl")
 
 # Re-export all analysis functions and types
 export analyze_escapes, EscapeAnalysisReport, AllocationInfo
@@ -47,5 +49,14 @@ export analyze_module, compare_modules
 export quick_check_cached, batch_check_cached
 export clear_analysis_cache!, cache_stats, prune_cache!
 export with_cache
+
+# Re-export benchmarking
+export benchmark_analysis, benchmark_compilation, compare_performance
+export track_quality_over_time, plot_quality_history
+export BenchmarkResult
+
+# Re-export interactive
+export start_interactive, interactive_analyze, interactive_suggest, interactive_compare
+export AnalysisSession
 
 end # module
