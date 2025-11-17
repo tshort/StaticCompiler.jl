@@ -1,0 +1,80 @@
+name: Compiler Analysis
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Julia
+      uses: julia-actions/setup-julia@v1
+      with:
+        version: '1.10'
+
+    - name: Install dependencies
+      run: |
+        julia --project=. -e 'using Pkg; Pkg.instantiate()'
+
+    - name: Run compiler analysis
+      id: analysis
+      run: |
+        julia --project=. << 'EOF'
+        using StaticCompiler
+
+        # Define functions to analyze (customize for your project)
+        functions_to_analyze = [
+            (my_function1, (Int, Int)),
+            (my_function2, (Float64,)),
+            # Add your functions here
+        ]
+
+        println("🔍 Running compiler analysis...")
+        results = batch_check_cached(functions_to_analyze)
+
+        # Generate CI reports
+        generate_ci_report(results, "analysis_report")
+
+        # Generate GitHub Actions summary
+        generate_github_actions_summary(results)
+
+        # Create annotations for problematic functions
+        annotate_github_actions(results, error_threshold=50, warning_threshold=80)
+
+        # Check quality gate
+        passed = check_quality_gate(results,
+                                    min_ready_percent=80,
+                                    min_avg_score=70,
+                                    exit_on_fail=true)
+
+        EOF
+
+    - name: Upload analysis report
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: analysis-report
+        path: |
+          analysis_report.md
+          analysis_report.json
+
+    - name: Comment PR with results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const report = fs.readFileSync('analysis_report.md', 'utf8');
+
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: report
+          });
