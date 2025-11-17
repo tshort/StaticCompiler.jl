@@ -1,0 +1,216 @@
+#!/usr/bin/env julia
+
+# StaticCompiler Analysis CLI
+# Command-line interface for compiler analysis
+
+using ArgParse
+using Pkg
+Pkg.activate(".")
+using StaticCompiler
+
+function parse_commandline()
+    s = ArgParseSettings(
+        prog = "analyze",
+        description = "StaticCompiler.jl compiler analysis tool",
+        version = "1.0.0",
+        add_version = true
+    )
+
+    @add_arg_table! s begin
+        "command"
+            help = "Command to run: analyze, scan, benchmark, quality-gate"
+            required = true
+
+        "--module", "-m"
+            help = "Module to analyze"
+            arg_type = String
+
+        "--function", "-f"
+            help = "Function to analyze"
+            arg_type = String
+
+        "--types", "-t"
+            help = "Argument types (comma-separated)"
+            arg_type = String
+
+        "--threshold"
+            help = "Quality threshold (0-100)"
+            arg_type = Int
+            default = 80
+
+        "--output", "-o"
+            help = "Output file for report"
+            arg_type = String
+
+        "--format"
+            help = "Output format: text, json, markdown"
+            arg_type = String
+            default = "text"
+
+        "--verbose", "-v"
+            help = "Verbose output"
+            action = :store_true
+
+        "--cached"
+            help = "Use cached analysis results"
+            action = :store_true
+
+        "--samples"
+            help = "Number of samples for benchmarking"
+            arg_type = Int
+            default = 5
+    end
+
+    return parse_args(s)
+end
+
+function run_analyze(args)
+    if args["module"] === nothing
+        println("Error: --module required for analyze command")
+        exit(1)
+    end
+
+    # Load module
+    mod_name = Symbol(args["module"])
+
+    println("Analyzing module: $mod_name")
+    println()
+
+    # Analyze entire module
+    analysis = analyze_module(eval(mod_name),
+                             threshold=args["threshold"],
+                             verbose=args["verbose"])
+
+    # Generate output
+    results = analysis[:results]
+
+    if args["output"] !== nothing
+        output_file = args["output"]
+
+        if args["format"] == "json"
+            # Export JSON
+            generate_ci_report(results, output_file)
+            println("Report saved to: $(output_file).json")
+        elseif args["format"] == "markdown"
+            generate_ci_report(results, output_file)
+            println("Report saved to: $(output_file).md")
+        else
+            # Text format
+            open(output_file, "w") do io
+                redirect_stdout(io) do
+                    print_batch_summary(results)
+                end
+            end
+            println("Report saved to: $output_file")
+        end
+    end
+
+    # Return exit code based on quality
+    summary = analysis[:summary]
+    if summary[:average_score] >= args["threshold"]
+        exit(0)
+    else
+        exit(1)
+    end
+end
+
+function run_scan(args)
+    if args["module"] === nothing
+        println("Error: --module required for scan command")
+        exit(1)
+    end
+
+    mod_name = Symbol(args["module"])
+
+    println("Scanning module: $mod_name")
+    println()
+
+    # Scan for functions
+    functions = scan_module(eval(mod_name))
+
+    println("Found $(length(functions)) functions:")
+    for func in functions
+        println("  - $(nameof(func))")
+    end
+
+    exit(0)
+end
+
+function run_benchmark(args)
+    if args["function"] === nothing
+        println("Error: --function required for benchmark command")
+        exit(1)
+    end
+
+    println("Benchmarking analysis performance...")
+    println()
+
+    # Would need function reference
+    # This is simplified - in practice would need function loading
+    println("Function: $(args["function"])")
+    println("Samples: $(args["samples"])")
+    println()
+    println("Note: Function must be in scope")
+
+    exit(0)
+end
+
+function run_quality_gate(args)
+    if args["module"] === nothing
+        println("Error: --module required for quality-gate command")
+        exit(1)
+    end
+
+    mod_name = Symbol(args["module"])
+
+    println("Running quality gate for: $mod_name")
+    println()
+
+    # Analyze module
+    analysis = analyze_module(eval(mod_name),
+                             threshold=args["threshold"],
+                             verbose=false)
+
+    results = analysis[:results]
+
+    # Check quality gate
+    passed = check_quality_gate(results,
+                                min_ready_percent=args["threshold"],
+                                min_avg_score=args["threshold"],
+                                exit_on_fail=false)
+
+    if passed
+        println()
+        println("✅ Quality gate PASSED")
+        exit(0)
+    else
+        println()
+        println("❌ Quality gate FAILED")
+        exit(1)
+    end
+end
+
+function main()
+    args = parse_commandline()
+
+    command = args["command"]
+
+    if command == "analyze"
+        run_analyze(args)
+    elseif command == "scan"
+        run_scan(args)
+    elseif command == "benchmark"
+        run_benchmark(args)
+    elseif command == "quality-gate"
+        run_quality_gate(args)
+    else
+        println("Unknown command: $command")
+        println("Available commands: analyze, scan, benchmark, quality-gate")
+        exit(1)
+    end
+end
+
+# Run if executed directly
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end
