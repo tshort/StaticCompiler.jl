@@ -1,0 +1,44 @@
+{
+  "defaults": {
+    "path": "./build",
+    "template": "production",
+    "verify": true,
+    "generate_header": true
+  },
+  "functions": [
+    {
+      "source": "examples/01_hello_world.jl",
+      "function": "hello",
+      "output": "hello",
+      "template": "embedded",
+      "comment": "Embedded hello world with size optimization"
+    },
+    {
+      "source": "examples/02_math_operations.jl",
+      "function": "add",
+      "types": ["Int", "Int"],
+      "output": "math_add",
+      "shlib": true,
+      "comment": "Math operations as shared library"
+    },
+    {
+      "source": "examples/03_string_processing.jl",
+      "function": "count_chars",
+      "types": ["Ptr{UInt8}", "Int"],
+      "output": "string_proc",
+      "shlib": true,
+      "template": "performance",
+      "comment": "String processing for performance"
+    },
+    {
+      "source": "examples/04_array_processing.jl",
+      "function": "sum_array",
+      "types": ["Ptr{Float64}", "Int"],
+      "output": "array_sum",
+      "shlib": true,
+      "verify": true,
+      "min_score": 90,
+      "comment": "Array processing with strict verification"
+    }
+  ]
+}

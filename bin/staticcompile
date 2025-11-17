@@ -1,0 +1,428 @@
+#!/usr/bin/env julia
+
+"""
+StaticCompiler.jl Command-Line Interface
+
+A user-friendly CLI for compiling Julia functions to standalone binaries
+and shared libraries.
+
+Usage:
+    staticcompile [options] <source.jl> <function_name>
+    staticcompile --help
+    staticcompile --version
+    staticcompile --list-templates
+
+Examples:
+    # Basic executable compilation
+    staticcompile hello.jl main
+
+    # Shared library with verification
+    staticcompile --shlib --verify hello.jl greet
+
+    # Embedded system with size optimization
+    staticcompile --template embedded --output sensor hello.jl sensor_read
+
+    # With custom compiler flags
+    staticcompile --cflags="-Os -flto" hello.jl main
+
+    # Package compilation
+    staticcompile --package MyModule signatures.json --output mylib
+"""
+
+using ArgParse
+using StaticCompiler
+using JSON
+
+const VERSION = "1.0.0"
+
+function parse_commandline()
+    s = ArgParseSettings(
+        prog = "staticcompile",
+        description = "StaticCompiler.jl - Compile Julia to standalone binaries",
+        version = VERSION,
+        add_version = true
+    )
+
+    @add_arg_table! s begin
+        "source"
+            help = "Julia source file containing the function to compile"
+            required = false
+
+        "function"
+            help = "Name of the function to compile (default: main)"
+            required = false
+            default = "main"
+
+        "--shlib", "-s"
+            help = "Compile to shared library instead of executable"
+            action = :store_true
+
+        "--output", "-o"
+            help = "Output name (without extension)"
+            arg_type = String
+            default = nothing
+
+        "--path", "-p"
+            help = "Output directory (default: current directory)"
+            arg_type = String
+            default = "."
+
+        "--template", "-t"
+            help = "Use compilation template (embedded, performance, portable, debugging, production, default)"
+            arg_type = Symbol
+            default = nothing
+
+        "--verify", "-v"
+            help = "Enable pre-compilation verification"
+            action = :store_true
+
+        "--min-score"
+            help = "Minimum verification score (0-100, default: 80)"
+            arg_type = Int
+            default = 80
+
+        "--generate-header", "-H"
+            help = "Generate C header file"
+            action = :store_true
+
+        "--export-analysis"
+            help = "Export detailed analysis report"
+            action = :store_true
+
+        "--cflags"
+            help = "Custom C compiler flags (e.g., \"-Os -flto\")"
+            arg_type = String
+            default = nothing
+
+        "--package"
+            help = "Compile entire package/module (requires signatures file)"
+            action = :store_true
+
+        "--signatures"
+            help = "JSON file with function signatures for package compilation"
+            arg_type = String
+            default = nothing
+
+        "--namespace"
+            help = "Custom namespace for package compilation"
+            arg_type = String
+            default = nothing
+
+        "--list-templates"
+            help = "List all available compilation templates"
+            action = :store_true
+
+        "--show-template"
+            help = "Show details for a specific template"
+            arg_type = Symbol
+            default = nothing
+
+        "--demangle"
+            help = "Demangle function names in generated header"
+            action = :store_true
+
+        "--strip"
+            help = "Strip debug symbols after compilation"
+            action = :store_true
+
+        "--quiet", "-q"
+            help = "Suppress output except errors"
+            action = :store_true
+
+        "--verbose"
+            help = "Show detailed compilation output"
+            action = :store_true
+    end
+
+    return parse_args(s)
+end
+
+function show_templates()
+    println("Available Compilation Templates")
+    println("=" ^ 70)
+    println()
+
+    for template_name in [:embedded, :performance, :portable, :debugging, :production, :default]
+        template = get_template(template_name)
+        println("  :$(template.name)")
+        println("    $(template.description)")
+        println("    Settings: verify=$(template.params.verify), " *
+                "min_score=$(get(template.params, :min_score, "N/A")), " *
+                "generate_header=$(template.params.generate_header)")
+        println()
+    end
+end
+
+function show_template_details(template_name::Symbol)
+    try
+        template = get_template(template_name)
+        println("Template: :$(template.name)")
+        println("=" ^ 70)
+        println()
+        println("Description:")
+        println("  $(template.description)")
+        println()
+        println("Parameters:")
+        for (key, value) in pairs(template.params)
+            println("  $key = $value")
+        end
+        println()
+    catch e
+        println("Error: Unknown template :$template_name")
+        println()
+        println("Available templates: :embedded, :performance, :portable, :debugging, :production, :default")
+        exit(1)
+    end
+end
+
+function load_signatures(filepath::String)
+    """
+    Load function signatures from JSON file.
+
+    Expected format:
+    {
+        "function_name": [
+            ["Int", "Int"],
+            ["Float64"]
+        ],
+        "another_function": [
+            ["Ptr{UInt8}", "Int"]
+        ]
+    }
+    """
+    data = JSON.parsefile(filepath)
+    signatures = Dict{Symbol, Vector{Tuple}}()
+
+    for (func_name, type_lists) in data
+        func_symbol = Symbol(func_name)
+        type_tuples = []
+
+        for type_list in type_lists
+            # Parse type strings to actual Julia types
+            types = []
+            for type_str in type_list
+                # Handle common types
+                jl_type = if type_str == "Int"
+                    Int
+                elseif type_str == "Int64"
+                    Int64
+                elseif type_str == "Int32"
+                    Int32
+                elseif type_str == "Float64"
+                    Float64
+                elseif type_str == "Float32"
+                    Float32
+                elseif startswith(type_str, "Ptr{")
+                    # Parse Ptr{T}
+                    inner = type_str[5:end-1]
+                    if inner == "UInt8"
+                        Ptr{UInt8}
+                    elseif inner == "Float64"
+                        Ptr{Float64}
+                    elseif inner == "Int"
+                        Ptr{Int}
+                    elseif inner == "Cvoid"
+                        Ptr{Cvoid}
+                    else
+                        error("Unknown pointer type: $type_str")
+                    end
+                else
+                    error("Unknown type: $type_str")
+                end
+                push!(types, jl_type)
+            end
+            push!(type_tuples, Tuple(types))
+        end
+
+        signatures[func_symbol] = type_tuples
+    end
+
+    return signatures
+end
+
+function compile_from_cli(args::Dict)
+    # Handle special commands
+    if args["list-templates"]
+        show_templates()
+        return
+    end
+
+    if !isnothing(args["show-template"])
+        show_template_details(args["show-template"])
+        return
+    end
+
+    # Validate required arguments
+    if isnothing(args["source"]) && !args["package"]
+        println("Error: source file required (or use --package mode)")
+        println("Run 'staticcompile --help' for usage information")
+        exit(1)
+    end
+
+    # Determine output name
+    output_name = if !isnothing(args["output"])
+        args["output"]
+    elseif !isnothing(args["source"])
+        # Use source filename without extension
+        splitext(basename(args["source"]))[1]
+    else
+        "output"
+    end
+
+    # Build compilation parameters
+    compile_params = Dict{Symbol, Any}()
+
+    # Template
+    if !isnothing(args["template"])
+        compile_params[:template] = args["template"]
+    end
+
+    # Verification
+    if args["verify"]
+        compile_params[:verify] = true
+        compile_params[:min_score] = args["min-score"]
+    end
+
+    # Header generation
+    if args["generate-header"]
+        compile_params[:generate_header] = true
+        compile_params[:demangle] = args["demangle"]
+    end
+
+    # Analysis export
+    if args["export-analysis"]
+        compile_params[:export_analysis] = true
+    end
+
+    # Compiler flags
+    if !isnothing(args["cflags"])
+        compile_params[:cflags] = `$(split(args["cflags"]))`
+    end
+
+    try
+        if args["package"]
+            # Package compilation mode
+            if isnothing(args["signatures"])
+                println("Error: --signatures required for package compilation")
+                exit(1)
+            end
+
+            if isnothing(args["source"])
+                println("Error: source file required (should define the module)")
+                exit(1)
+            end
+
+            # Load the module
+            include(args["source"])
+
+            # Get module name from source file
+            module_name = Symbol(splitext(basename(args["source"]))[1])
+            mod = getfield(Main, module_name)
+
+            # Load signatures
+            signatures = load_signatures(args["signatures"])
+
+            # Add namespace if specified
+            if !isnothing(args["namespace"])
+                compile_params[:namespace] = args["namespace"]
+            end
+
+            # Compile package
+            if !args["quiet"]
+                println("Compiling package: $module_name")
+                println("Output: $(args["path"])/$output_name")
+                println()
+            end
+
+            lib_path = compile_package(mod, signatures, args["path"], output_name; compile_params...)
+
+            if !args["quiet"]
+                println()
+                println("✅ Package compiled successfully!")
+                println("   Library: $lib_path")
+            end
+
+        else
+            # Function compilation mode
+            source_file = args["source"]
+            func_name = args["function"]
+
+            if !isfile(source_file)
+                println("Error: Source file not found: $source_file")
+                exit(1)
+            end
+
+            # Load the source file
+            include(source_file)
+
+            # Get the function
+            func_symbol = Symbol(func_name)
+            if !isdefined(Main, func_symbol)
+                println("Error: Function '$func_name' not found in $source_file")
+                exit(1)
+            end
+
+            func = getfield(Main, func_symbol)
+
+            # Infer types from function signature (simple case: no arguments)
+            # For more complex cases, users should specify signatures
+            types = ()
+
+            if !args["quiet"]
+                println("Compiling function: $func_name")
+                println("Output: $(args["path"])/$output_name")
+                println()
+            end
+
+            # Compile
+            if args["shlib"]
+                lib_path = compile_shlib(func, types, args["path"];
+                                        filename=output_name, compile_params...)
+                if !args["quiet"]
+                    println()
+                    println("✅ Shared library compiled successfully!")
+                    println("   Library: $lib_path")
+                end
+            else
+                exe_path = compile_executable(func, types, args["path"], output_name;
+                                             compile_params...)
+                if !args["quiet"]
+                    println()
+                    println("✅ Executable compiled successfully!")
+                    println("   Executable: $exe_path")
+                end
+
+                # Strip if requested
+                if args["strip"] && Sys.which("strip") !== nothing
+                    if !args["quiet"]
+                        println("   Stripping debug symbols...")
+                    end
+                    run(`strip $exe_path`)
+                    if !args["quiet"]
+                        println("   ✅ Stripped")
+                    end
+                end
+            end
+        end
+
+    catch e
+        println("Error during compilation:")
+        println(e)
+        if args["verbose"]
+            println()
+            println("Stack trace:")
+            showerror(stdout, e, catch_backtrace())
+        end
+        exit(1)
+    end
+end
+
+function main()
+    args = parse_commandline()
+    compile_from_cli(args)
+end
+
+# Run if executed as script
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end

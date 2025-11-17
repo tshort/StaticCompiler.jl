@@ -1,0 +1,224 @@
+#!/usr/bin/env julia
+
+"""
+Code Quality Analysis Tool for StaticCompiler.jl
+
+Analyzes Julia code before compilation to identify potential issues
+and optimization opportunities.
+
+Usage:
+    analyze-code <source.jl> <function_name> [types...]
+    analyze-code --help
+
+Examples:
+    analyze-code hello.jl main
+    analyze-code mylib.jl compute Int,Float64
+"""
+
+using StaticCompiler
+using ArgParse
+
+function parse_commandline()
+    s = ArgParseSettings(
+        prog = "analyze-code",
+        description = "Analyze Julia code quality before compilation"
+    )
+
+    @add_arg_table! s begin
+        "source"
+            help = "Julia source file"
+            required = true
+
+        "function"
+            help = "Function name to analyze"
+            required = true
+
+        "types"
+            help = "Comma-separated argument types (optional)"
+            required = false
+            default = ""
+
+        "--min-score"
+            help = "Minimum acceptable score (0-100)"
+            arg_type = Int
+            default = 80
+
+        "--export"
+            help = "Export analysis to JSON file"
+            arg_type = String
+            default = nothing
+
+        "--verbose", "-v"
+            help = "Show detailed analysis"
+            action = :store_true
+    end
+
+    return parse_args(s)
+end
+
+function parse_types(type_str::String)
+    if isempty(type_str)
+        return ()
+    end
+
+    parts = split(type_str, ',')
+    types = []
+
+    for part in parts
+        part = strip(part)
+        jl_type = if part == "Int"
+            Int
+        elseif part == "Int64"
+            Int64
+        elseif part == "Int32"
+            Int32
+        elseif part == "Float64"
+            Float64
+        elseif part == "Float32"
+            Float32
+        elseif startswith(part, "Ptr{")
+            inner = part[5:end-1]
+            if inner == "UInt8"
+                Ptr{UInt8}
+            elseif inner == "Float64"
+                Ptr{Float64}
+            else
+                error("Unknown pointer type: $part")
+            end
+        else
+            error("Unknown type: $part")
+        end
+        push!(types, jl_type)
+    end
+
+    return Tuple(types)
+end
+
+function main()
+    args = parse_commandline()
+
+    source_file = args["source"]
+    func_name = args["function"]
+
+    # Load source file
+    if !isfile(source_file)
+        println("Error: Source file not found: $source_file")
+        exit(1)
+    end
+
+    include(source_file)
+
+    # Get function
+    func_symbol = Symbol(func_name)
+    if !isdefined(Main, func_symbol)
+        println("Error: Function '$func_name' not found in $source_file")
+        exit(1)
+    end
+
+    func = getfield(Main, func_symbol)
+
+    # Parse types
+    types = try
+        parse_types(args["types"])
+    catch e
+        println("Error parsing types: $e")
+        exit(1)
+    end
+
+    println("=" ^ 70)
+    println("Code Quality Analysis")
+    println("=" ^ 70)
+    println()
+    println("Function: $func_name")
+    println("Types: $types")
+    println()
+
+    try
+        # Run analysis
+        result = analyze_function(func, types)
+
+        # Display results
+        println("Analysis Results:")
+        println("-" ^ 70)
+        println()
+
+        println("Overall Score: $(result.score)/100")
+        println("Status: $(result.score >= args["min-score"] ? "✅ PASS" : "❌ FAIL")")
+        println()
+
+        if !isempty(result.issues)
+            println("Issues Found:")
+            for (i, issue) in enumerate(result.issues)
+                println("  $i. [$(issue.category)] $(issue.message)")
+                if args["verbose"] && !isnothing(issue.suggestion)
+                    println("      Suggestion: $(issue.suggestion)")
+                end
+            end
+            println()
+        else
+            println("✅ No issues found!")
+            println()
+        end
+
+        if args["verbose"]
+            println("Detailed Analysis:")
+            println("-" ^ 70)
+            println()
+
+            println("Escape Analysis:")
+            println("  Heap allocations: $(length(result.escapes))")
+            if !isempty(result.escapes)
+                for esc in result.escapes
+                    println("    • $esc")
+                end
+            end
+            println()
+
+            println("Type Stability:")
+            println("  Monomorphic: $(result.type_stable ? "✅" : "❌")")
+            println()
+
+            println("Dynamic Dispatch:")
+            println("  Call sites: $(length(result.dynamic_calls))")
+            if !isempty(result.dynamic_calls)
+                for call in result.dynamic_calls
+                    println("    • $call")
+                end
+            end
+            println()
+        end
+
+        # Export if requested
+        if !isnothing(args["export"])
+            export_analysis(result, args["export"])
+            println("Analysis exported to: $(args["export"])")
+            println()
+        end
+
+        # Summary
+        println("=" ^ 70)
+        if result.score >= args["min-score"]
+            println("✅ Code quality acceptable for compilation")
+        else
+            println("❌ Code quality below threshold ($(args["min-score"]))")
+            println("   Consider addressing the issues above before compilation")
+        end
+        println("=" ^ 70)
+
+        # Exit with appropriate code
+        exit(result.score >= args["min-score"] ? 0 : 1)
+
+    catch e
+        println("Error during analysis:")
+        println(e)
+        if args["verbose"]
+            println()
+            showerror(stdout, e, catch_backtrace())
+        end
+        exit(1)
+    end
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end

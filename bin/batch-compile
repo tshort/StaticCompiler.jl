@@ -1,0 +1,247 @@
+#!/usr/bin/env julia
+
+"""
+Batch Compilation Tool
+
+Compile multiple Julia functions from a configuration file.
+
+Usage:
+    batch-compile <config.json>
+    batch-compile --help
+
+Config Format:
+{
+    "functions": [
+        {
+            "source": "math.jl",
+            "function": "add",
+            "types": ["Int", "Int"],
+            "output": "add",
+            "template": "performance"
+        },
+        {
+            "source": "io.jl",
+            "function": "process",
+            "output": "process",
+            "shlib": true
+        }
+    ],
+    "defaults": {
+        "template": "production",
+        "path": "./build",
+        "verify": true
+    }
+}
+
+Examples:
+    batch-compile build.json
+    batch-compile --dry-run build.json
+"""
+
+using ArgParse
+using JSON
+using StaticCompiler
+
+function parse_commandline()
+    s = ArgParseSettings(
+        prog = "batch-compile",
+        description = "Batch compilation from configuration file"
+    )
+
+    @add_arg_table! s begin
+        "config"
+            help = "JSON configuration file"
+            required = true
+
+        "--dry-run"
+            help = "Show what would be compiled without compiling"
+            action = :store_true
+
+        "--verbose", "-v"
+            help = "Show detailed output"
+            action = :store_true
+    end
+
+    return parse_args(s)
+end
+
+function parse_types(type_list::Vector)
+    types = []
+    for type_str in type_list
+        jl_type = if type_str == "Int"
+            Int
+        elseif type_str == "Int64"
+            Int64
+        elseif type_str == "Float64"
+            Float64
+        elseif type_str == "Float32"
+            Float32
+        elseif startswith(type_str, "Ptr{")
+            inner = type_str[5:end-1]
+            if inner == "UInt8"
+                Ptr{UInt8}
+            elseif inner == "Float64"
+                Ptr{Float64}
+            else
+                error("Unknown pointer type: $type_str")
+            end
+        else
+            error("Unknown type: $type_str")
+        end
+        push!(types, jl_type)
+    end
+    return Tuple(types)
+end
+
+function main()
+    args = parse_commandline()
+
+    config_file = args["config"]
+
+    if !isfile(config_file)
+        println("Error: Config file not found: $config_file")
+        exit(1)
+    end
+
+    # Load configuration
+    config = JSON.parsefile(config_file)
+
+    if !haskey(config, "functions")
+        println("Error: Config must have 'functions' array")
+        exit(1)
+    end
+
+    defaults = get(config, "defaults", Dict())
+    functions = config["functions"]
+
+    println("=" ^ 70)
+    println("Batch Compilation")
+    println("=" ^ 70)
+    println()
+    println("Config: $config_file")
+    println("Functions to compile: $(length(functions))")
+    println()
+
+    if args["dry-run"]
+        println("DRY RUN - No actual compilation")
+        println()
+    end
+
+    # Track results
+    success_count = 0
+    fail_count = 0
+    results = []
+
+    for (i, func_config) in enumerate(functions)
+        source = func_config["source"]
+        func_name = func_config["function"]
+
+        println("[$i/$(length(functions))] $func_name from $source")
+
+        if args["dry-run"]
+            output = get(func_config, "output", splitext(basename(source))[1])
+            template = get(func_config, "template", get(defaults, "template", nothing))
+            shlib = get(func_config, "shlib", false)
+
+            println("  Output: $output")
+            println("  Template: $template")
+            println("  Type: $(shlib ? "shared library" : "executable")")
+            println()
+            continue
+        end
+
+        try
+            # Load source
+            if !isfile(source)
+                error("Source file not found: $source")
+            end
+
+            include(source)
+
+            # Get function
+            func_symbol = Symbol(func_name)
+            if !isdefined(Main, func_symbol)
+                error("Function '$func_name' not found")
+            end
+
+            func = getfield(Main, func_symbol)
+
+            # Parse types
+            types = if haskey(func_config, "types")
+                parse_types(func_config["types"])
+            else
+                ()
+            end
+
+            # Build compile parameters
+            output_name = get(func_config, "output", splitext(basename(source))[1])
+            output_path = get(func_config, "path", get(defaults, "path", "."))
+            shlib = get(func_config, "shlib", false)
+
+            compile_params = Dict{Symbol, Any}()
+
+            # Apply defaults first
+            for (key, value) in defaults
+                if key ∉ ["path"]
+                    compile_params[Symbol(key)] = value
+                end
+            end
+
+            # Override with function-specific settings
+            for (key, value) in func_config
+                if key ∉ ["source", "function", "output", "path", "shlib", "types"]
+                    compile_params[Symbol(key)] = value
+                end
+            end
+
+            # Compile
+            if shlib
+                lib_path = compile_shlib(func, types, output_path;
+                                        filename=output_name, compile_params...)
+                push!(results, (func_name, "✅", lib_path))
+                println("  ✅ $lib_path")
+            else
+                exe_path = compile_executable(func, types, output_path, output_name;
+                                             compile_params...)
+                push!(results, (func_name, "✅", exe_path))
+                println("  ✅ $exe_path")
+            end
+
+            success_count += 1
+
+        catch e
+            println("  ❌ Error: $e")
+            push!(results, (func_name, "❌", string(e)))
+            fail_count += 1
+        end
+
+        println()
+    end
+
+    if !args["dry-run"]
+        println("=" ^ 70)
+        println("Batch Compilation Complete")
+        println("=" ^ 70)
+        println()
+        println("Summary:")
+        println("  ✅ Success: $success_count")
+        println("  ❌ Failed: $fail_count")
+        println()
+
+        if fail_count > 0
+            println("Failed functions:")
+            for (name, status, msg) in results
+                if status == "❌"
+                    println("  • $name: $msg")
+                end
+            end
+            println()
+        end
+
+        exit(fail_count > 0 ? 1 : 0)
+    end
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end

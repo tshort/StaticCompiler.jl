@@ -1,0 +1,270 @@
+#!/usr/bin/env julia
+
+"""
+Binary Size Optimization Tool
+
+Automatically compile and optimize Julia code for minimal binary size.
+Applies recommended optimization flags and post-processing steps.
+
+Usage:
+    optimize-binary [options] <source.jl> <function_name>
+    optimize-binary --help
+
+Examples:
+    # Basic optimization
+    optimize-binary hello.jl main
+
+    # With UPX compression
+    optimize-binary --upx hello.jl main
+
+    # Show size progression
+    optimize-binary --verbose hello.jl main
+
+    # Custom output
+    optimize-binary --output sensor hello.jl read_sensor
+"""
+
+using ArgParse
+using StaticCompiler
+
+function parse_commandline()
+    s = ArgParseSettings(
+        prog = "optimize-binary",
+        description = "Compile Julia code with size optimization"
+    )
+
+    @add_arg_table! s begin
+        "source"
+            help = "Julia source file"
+            required = true
+
+        "function"
+            help = "Function name to compile"
+            required = true
+
+        "--output", "-o"
+            help = "Output name (default: source filename)"
+            arg_type = String
+            default = nothing
+
+        "--path", "-p"
+            help = "Output directory"
+            arg_type = String
+            default = "."
+
+        "--upx"
+            help = "Apply UPX compression (requires upx)"
+            action = :store_true
+
+        "--no-strip"
+            help = "Don't strip debug symbols"
+            action = :store_true
+
+        "--level"
+            help = "Optimization level: basic, medium, aggressive (default: medium)"
+            arg_type = String
+            default = "medium"
+
+        "--verbose", "-v"
+            help = "Show size progression"
+            action = :store_true
+
+        "--quiet", "-q"
+            help = "Suppress output"
+            action = :store_true
+    end
+
+    return parse_args(s)
+end
+
+function get_cflags(level::String)
+    if level == "basic"
+        return `-Os`
+    elseif level == "medium"
+        return `-Os -flto`
+    elseif level == "aggressive"
+        return `-Os -flto -fdata-sections -ffunction-sections -Wl,--gc-sections`
+    else
+        error("Unknown optimization level: $level")
+    end
+end
+
+function format_size(bytes::Int)
+    kb = round(bytes / 1024, digits=1)
+    return "$kb KB ($bytes bytes)"
+end
+
+function main()
+    args = parse_commandline()
+
+    source_file = args["source"]
+    func_name = args["function"]
+
+    output_name = if !isnothing(args["output"])
+        args["output"]
+    else
+        splitext(basename(source_file))[1]
+    end
+
+    # Load source
+    if !isfile(source_file)
+        println("Error: Source file not found: $source_file")
+        exit(1)
+    end
+
+    include(source_file)
+
+    # Get function
+    func_symbol = Symbol(func_name)
+    if !isdefined(Main, func_symbol)
+        println("Error: Function '$func_name' not found")
+        exit(1)
+    end
+
+    func = getfield(Main, func_symbol)
+
+    if !args["quiet"]
+        println("=" ^ 70)
+        println("Binary Size Optimization")
+        println("=" ^ 70)
+        println()
+        println("Function: $func_name")
+        println("Optimization level: $(args["level"])")
+        println()
+    end
+
+    try
+        # Compile with optimization flags
+        cflags = get_cflags(args["level"])
+
+        if !args["quiet"]
+            println("Compiling with flags: $cflags")
+            println()
+        end
+
+        exe_path = compile_executable(func, (), args["path"], output_name,
+                                      template=:embedded,
+                                      cflags=cflags)
+
+        if !isfile(exe_path)
+            println("Error: Compilation failed")
+            exit(1)
+        end
+
+        # Track sizes
+        sizes = []
+
+        original_size = filesize(exe_path)
+        push!(sizes, ("Compiled", original_size))
+
+        if args["verbose"]
+            println("Size after compilation: $(format_size(original_size))")
+        end
+
+        # Strip debug symbols
+        if !args["no-strip"] && Sys.which("strip") !== nothing
+            if !args["quiet"]
+                println("Stripping debug symbols...")
+            end
+
+            run(`strip $exe_path`)
+            stripped_size = filesize(exe_path)
+            push!(sizes, ("Stripped", stripped_size))
+
+            if args["verbose"]
+                reduction = round((1 - stripped_size/original_size) * 100, digits=1)
+                println("Size after strip: $(format_size(stripped_size)) (-$reduction%)")
+            end
+        end
+
+        # UPX compression
+        if args["upx"]
+            if Sys.which("upx") !== nothing
+                if !args["quiet"]
+                    println("Applying UPX compression...")
+                end
+
+                try
+                    # Suppress UPX output unless verbose
+                    if args["verbose"]
+                        run(`upx --best $exe_path`)
+                    else
+                        run(pipeline(`upx --best $exe_path`, devnull))
+                    end
+
+                    compressed_size = filesize(exe_path)
+                    push!(sizes, ("UPX compressed", compressed_size))
+
+                    if args["verbose"]
+                        reduction = round((1 - compressed_size/original_size) * 100, digits=1)
+                        println("Size after UPX: $(format_size(compressed_size)) (-$reduction%)")
+                    end
+                catch e
+                    if !args["quiet"]
+                        println("Warning: UPX compression failed: $e")
+                    end
+                end
+            else
+                if !args["quiet"]
+                    println("Warning: UPX not found, skipping compression")
+                    println("Install UPX for further size reduction")
+                end
+            end
+        end
+
+        # Summary
+        if !args["quiet"]
+            println()
+            println("=" ^ 70)
+            println("Optimization Complete")
+            println("=" ^ 70)
+            println()
+            println("Output: $exe_path")
+            println()
+
+            if args["verbose"] && length(sizes) > 1
+                println("Size Progression:")
+                for (i, (step, size)) in enumerate(sizes)
+                    arrow = i < length(sizes) ? " →" : ""
+                    println("  $step: $(format_size(size))$arrow")
+                end
+                println()
+
+                final_size = sizes[end][2]
+                total_reduction = round((1 - final_size/original_size) * 100, digits=1)
+                println("Total reduction: $total_reduction%")
+                println()
+            else
+                final_size = sizes[end][2]
+                println("Final size: $(format_size(final_size))")
+                println()
+            end
+        end
+
+        if !args["quiet"]
+            println("✅ Optimization successful!")
+            println()
+            println("Suggestions for further reduction:")
+            println("  • Use StaticTools instead of Base functions")
+            println("  • Avoid heap allocations")
+            println("  • Use concrete types")
+            if !args["upx"] && Sys.which("upx") !== nothing
+                println("  • Run with --upx for compression")
+            end
+            println()
+        end
+
+    catch e
+        println("Error during optimization:")
+        println(e)
+        if args["verbose"]
+            println()
+            showerror(stdout, e, catch_backtrace())
+        end
+        exit(1)
+    end
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end

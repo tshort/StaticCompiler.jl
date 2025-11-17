@@ -1,0 +1,107 @@
+#!/usr/bin/env julia
+
+"""
+Quick Compile Tool
+
+Fast compilation for development and testing. Uses debugging template
+for quick iteration with helpful diagnostics.
+
+Usage:
+    quick-compile <source.jl> <function_name>
+    quick-compile --help
+
+Examples:
+    quick-compile test.jl main
+    quick-compile --shlib mylib.jl compute
+"""
+
+using ArgParse
+using StaticCompiler
+
+function parse_commandline()
+    s = ArgParseSettings(
+        prog = "quick-compile",
+        description = "Quick compilation for development"
+    )
+
+    @add_arg_table! s begin
+        "source"
+            help = "Julia source file"
+            required = true
+
+        "function"
+            help = "Function name"
+            required = true
+
+        "--shlib", "-s"
+            help = "Compile to shared library"
+            action = :store_true
+
+        "--output", "-o"
+            help = "Output name"
+            arg_type = String
+            default = nothing
+    end
+
+    return parse_args(s)
+end
+
+function main()
+    args = parse_commandline()
+
+    source_file = args["source"]
+    func_name = args["function"]
+
+    output_name = if !isnothing(args["output"])
+        args["output"]
+    else
+        splitext(basename(source_file))[1]
+    end
+
+    # Load source
+    if !isfile(source_file)
+        println("Error: Source file not found: $source_file")
+        exit(1)
+    end
+
+    include(source_file)
+
+    # Get function
+    func_symbol = Symbol(func_name)
+    if !isdefined(Main, func_symbol)
+        println("Error: Function '$func_name' not found")
+        exit(1)
+    end
+
+    func = getfield(Main, func_symbol)
+
+    println("Quick compiling: $func_name")
+    println()
+
+    try
+        if args["shlib"]
+            lib_path = compile_shlib(func, (), ".";
+                                    filename=output_name,
+                                    template=:debugging)
+            println()
+            println("✅ Library: $lib_path")
+        else
+            exe_path = compile_executable(func, (), ".", output_name,
+                                         template=:debugging)
+            println()
+            println("✅ Executable: $exe_path")
+        end
+
+        println()
+        println("Note: Using :debugging template for fast iteration")
+        println("      Use staticcompile with --template for production builds")
+
+    catch e
+        println("Error: $e")
+        exit(1)
+    end
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end
