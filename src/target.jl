@@ -1,7 +1,10 @@
 @static if isdefined(Base.Experimental, Symbol("@overlay"))
     Base.Experimental.@MethodTable(method_table)
+    # An empty overlay table for builds that link the Julia runtime (no device overrides).
+    Base.Experimental.@MethodTable(runtime_method_table)
 else
     const method_table = nothing
+    const runtime_method_table = nothing
 end
 
 """
@@ -40,7 +43,7 @@ StaticTarget(platform::Platform, cpu::String, features::String) = StaticTarget(p
 
 function StaticTarget(triple::String, cpu::String, features::String)
     platform = tryparse(Platform, triple)
-    StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = triple), triple, cpu, features), nothing)
+    StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = triple), triple, cpu, features), nothing, false)
 end
 
 """
@@ -53,6 +56,11 @@ set_compiler!(target::StaticTarget, compiler::String) = (target.compiler = compi
 
 
 set_runtime!(target::StaticTarget, julia_runtime::Bool) = (target.julia_runtime = julia_runtime)
+
+# Swap to the runtime-friendly method table when the Julia runtime is available unless the user
+# explicitly requested a different table.
+select_method_table(mt, target::StaticTarget) =
+    (target.julia_runtime && mt === method_table) ? runtime_method_table : mt
 
 """
 ```julia
@@ -90,7 +98,8 @@ end
 module StaticRuntime
     # the runtime library
     signal_exception() = return
-    malloc(sz) = ccall("extern malloc", llvmcall, Csize_t, (Csize_t,), sz)
+    # Allocate raw memory when the Julia runtime is not available.
+    malloc(sz) = ccall("extern malloc", llvmcall, Ptr{Cvoid}, (Csize_t,), sz)
     report_oom(sz) = return
     report_exception(ex) = return
     report_exception_name(ex) = return
@@ -113,14 +122,17 @@ end
 
 GPUCompiler.runtime_slug(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = "static_$(job.config.target.cpu)-$(hash(job.config.target.features))"
 
-GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = StaticRuntime
-GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) = StaticRuntime
+GPUCompiler.runtime_module(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) =
+    job.config.target.julia_runtime ? GPUCompiler.Runtime : StaticRuntime
+GPUCompiler.runtime_module(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) =
+    job.config.target.julia_runtime ? GPUCompiler.Runtime : StaticRuntime
 
 
 GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) = true
 GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = true
 
 GPUCompiler.uses_julia_runtime(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = job.config.target.julia_runtime
+GPUCompiler.imaging_mode(target::StaticCompilerTarget) = target.julia_runtime
 GPUCompiler.get_interpreter(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) =
     StaticInterpreter(job.config.params.cache, GPUCompiler.method_table(job), job.world,
                         GPUCompiler.inference_params(job), GPUCompiler.optimization_params(job))
@@ -136,6 +148,7 @@ function static_job(@nospecialize(func::Function), @nospecialize(types::Type);
         kwargs...
     )
     source = methodinstance(typeof(func), Base.to_tuple_type(types))
+    method_table = select_method_table(method_table, target)
     tm = target.tm
     gputarget = StaticCompilerTarget(LLVM.triple(tm), LLVM.cpu(tm), LLVM.features(tm), target.julia_runtime, method_table)
     params = StaticCompilerParams()
@@ -150,6 +163,7 @@ function static_job(@nospecialize(func), @nospecialize(types);
     kwargs...
 )
     source = methodinstance(typeof(func), Base.to_tuple_type(types))
+    method_table = select_method_table(method_table, target)
     tm = target.tm
     gputarget = StaticCompilerTarget(LLVM.triple(tm), LLVM.cpu(tm), LLVM.features(tm), target.julia_runtime, method_table)
     params = StaticCompilerParams()

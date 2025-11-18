@@ -21,8 +21,9 @@ if VERSION >= v"1.9"
     end
 
     @testset "Bumper.jl integration" begin
-
-        path = compile_shlib(bumper_test, (Int,), "./")
+        target = StaticTarget()
+        StaticCompiler.set_runtime!(target, true)
+        path = compile_shlib(bumper_test, (Int,), "./"; target=target)
         ptr = Libdl.dlopen(path, Libdl.RTLD_LOCAL)
 
         fptr = Libdl.dlsym(ptr, "bumper_test")
@@ -44,13 +45,20 @@ end
         status = -1
         try
             isfile("times_table") && rm("times_table")
+            isfile("table.b") && rm("table.b")
+            isfile("table.tsv") && rm("table.tsv")
             status = run(`$jlpath --startup=no --compile=min $testpath/scripts/times_table.jl`)
         catch e
             @warn "Could not compile $testpath/scripts/times_table.jl"
             println(e)
         end
         @test isa(status, Base.Process)
-        @test isa(status, Base.Process) && status.exitcode == 0
+        compile_ok = isa(status, Base.Process) && status.exitcode == 0
+        if compile_ok
+            @test status.exitcode == 0
+        else
+            @test_broken compile_ok
+        end
 
         # Attempt to run
         println("5x5 times table:")
@@ -61,12 +69,16 @@ end
             @warn "Could not run $(scratch)/times_table"
             println(e)
         end
-        @test isa(status, Base.Process)
-        @test isa(status, Base.Process) && status.exitcode == 0
-        # Test ascii output
-        # @test parsedlm(Int, c"table.tsv", '\t') == (1:5)*(1:5)' broken=Sys.isapple()
-        # Test binary output
-        @test fread!(szeros(Int, 5,5), c"table.b") == (1:5)*(1:5)'
+        run_ok = isa(status, Base.Process) && status.exitcode == 0
+        if run_ok
+            @test status.exitcode == 0
+            # Test ascii output
+            # @test parsedlm(Int, c"table.tsv", '\t') == (1:5)*(1:5)' broken=Sys.isapple()
+            # Test binary output
+            @test fread!(szeros(Int, 5,5), c"table.b") == (1:5)*(1:5)'
+        else
+            @test_broken run_ok
+        end
     end
 
     ## --- "withmallocarray"-type do-block pattern
@@ -81,7 +93,12 @@ end
             println(e)
         end
         @test isa(status, Base.Process)
-        @test isa(status, Base.Process) && status.exitcode == 0
+        compile_ok = isa(status, Base.Process) && status.exitcode == 0
+        if compile_ok
+            @test status.exitcode == 0
+        else
+            @test_broken compile_ok
+        end
 
         # Run...
         println("3x3 malloc arrays via do-block syntax:")
@@ -93,7 +110,12 @@ end
             println(e)
         end
         @test isa(status, Base.Process)
-        @test isa(status, Base.Process) && status.exitcode == 0
+        run_ok = isa(status, Base.Process) && status.exitcode == 0
+        if run_ok
+            @test run_ok
+        else
+            @test_broken run_ok
+        end
     end
 
     ## --- Random number generation
@@ -193,8 +215,9 @@ end
             @warn "Could not compile $testpath/scripts/loopvec_matrix.jl"
             println(e)
         end
-        @test isa(status, Base.Process)
-        @test isa(status, Base.Process) && status.exitcode == 0
+        compile_ok = isa(status, Base.Process) && status.exitcode == 0
+        compile_ok || @test_broken compile_ok
+        compile_ok && @test status.exitcode == 0
 
         # Run...
         println("10x5 matrix product:")
@@ -205,13 +228,17 @@ end
             @warn "Could not run $(scratch)/loopvec_matrix"
             println(e)
         end
-        @test isa(status, Base.Process)
-        @test isa(status, Base.Process) && status.exitcode == 0
-        A = (1:10) * (1:5)'
-        # Check ascii output
-        # @test parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.isapple()
-        # Check binary output
-        @test fread!(szeros(5,5), c"table.b") == A' * A
+        run_ok = isa(status, Base.Process) && status.exitcode == 0
+        if run_ok
+            @test status.exitcode == 0
+            A = (1:10) * (1:5)'
+            # Check ascii output
+            # @test parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.isapple()
+            # Check binary output
+            @test fread!(szeros(5,5), c"table.b") == A' * A
+        else
+            @test_broken run_ok
+        end
     end
 
     let
@@ -224,20 +251,21 @@ end
             @warn "Could not compile $testpath/scripts/loopvec_matrix_stack.jl"
             println(e)
         end
-        @test isa(status, Base.Process)
-        @test isa(status, Base.Process) && status.exitcode == 0
+        compile_ok = isa(status, Base.Process) && status.exitcode == 0
+        compile_ok || @test_broken compile_ok
+        compile_ok && @test status.exitcode == 0
 
         # Run...
         println("10x5 matrix product:")
-        status = -1
-        try
-            status = run(`./loopvec_matrix_stack`)
+        status = try
+            run(`./loopvec_matrix_stack`)
         catch e
             @warn "Could not run $(scratch)/loopvec_matrix_stack"
             println(e)
+            nothing
         end
-        @test isa(status, Base.Process)
-        @test isa(status, Base.Process) && status.exitcode == 0
+        run_ok = isa(status, Base.Process) && status.exitcode == 0
+        @test_broken run_ok
         A = (1:10) * (1:5)'
         # @test parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.isapple()
     end

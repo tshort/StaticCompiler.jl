@@ -34,8 +34,9 @@ end
 end
 
 # boot.jl
-@device_override @noinline Core.throw_inexacterror(f::Symbol, ::Type{T}, val) where {T} =
+@device_override @noinline function Core.throw_inexacterror(f::Symbol, ::Type{T}, val)::Union{} where {T}
     @print_and_throw c"Inexact conversion"
+end
 
 # abstractarray.jl
 @device_override @noinline Base.throw_boundserror(A, I) =
@@ -52,7 +53,7 @@ end
     @device_override @noinline Bumper.Internals.esc_err() =
         @print_and_throw c"Tried to return a PtrArray from a `no_escape` block. If you really want to do this, evaluate Bumper.allow_ptrarray_to_escape() = true"
 
-    # Just to make the compiler's life a little easier, let's not make it fetch and elide the current task
-    # since tasks don't actually exist on-device.
-    @device_override Bumper.Internals.get_task() = 0
+    # Use a stub task pointer only when the Julia runtime is unavailable (device-style compilation).
+    const _bumper_get_task = Bumper.Internals.get_task
+    @device_override Bumper.Internals.get_task() = StaticCompiler.runtime_overlays_enabled[] ? _bumper_get_task() : 0
 end

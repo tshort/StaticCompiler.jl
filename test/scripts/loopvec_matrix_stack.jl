@@ -46,4 +46,6 @@ function loopvec_matrix_stack()
 end
 
 # Attempt to compile
-path = compile_executable(loopvec_matrix_stack, (), "./")
+target = StaticTarget()
+StaticCompiler.set_runtime!(target, true)
+path = compile_executable(loopvec_matrix_stack, (), "./"; target=target)

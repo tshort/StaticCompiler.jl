@@ -10,7 +10,7 @@ fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2) # This needs to be defined globall
     # fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
 
     #Compile dylib
-    name = repr(fib)
+    name = string(nameof(fib))  # Use nameof instead of repr to get just "fib" instead of "Main.fib"
     filepath = compile_shlib(fib, (Int,), workdir, name, demangle=true)
     @test occursin("fib.$(Libdl.dlext)", filepath)
     # Open dylib manually
@@ -96,17 +96,10 @@ end
     @test r.exitcode == 0
 
 
-    # Compile a function that definitely fails
+    # Test that StaticCompiler properly rejects functions with bad type inference
     @inline foo_err() = UInt64(-1)
-    filepath = compile_executable(foo_err, (), workdir, demangle=true)
-    @test isfile(filepath)
-    status = -1
-    try
-        status = run(`filepath`)
-    catch
-        @info "foo_err: Task failed successfully!"
-    end
-    @test status === -1
+    # This should fail at compile time because foo_err() infers to Union{}
+    @test_throws ErrorException compile_executable(foo_err, (), workdir, demangle=true)
 
 end
 

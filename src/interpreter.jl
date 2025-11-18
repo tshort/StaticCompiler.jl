@@ -3,7 +3,11 @@
 using Core.Compiler:
     AbstractInterpreter, InferenceResult, InferenceParams, InferenceState, MethodInstance, OptimizationParams, WorldView, get_world_counter
 using GPUCompiler:
-    @safe_debug, AbstractCompilerParams, CodeCache, CompilerJob, methodinstance
+    @safe_debug, AbstractCompilerParams, CompilerJob, methodinstance
+
+# Julia 1.12+ compatibility: prefer the newer InternalCodeCache when available
+const CodeCache = isdefined(Core.Compiler, :InternalCodeCache) ? Core.Compiler.InternalCodeCache : Core.Compiler.CodeCache
+
 using CodeInfoTools
 using CodeInfoTools: resolve
 
@@ -47,6 +51,12 @@ Core.Compiler.get_world_counter(interp::StaticInterpreter) = interp.world
 Core.Compiler.get_inference_cache(interp::StaticInterpreter) = interp.local_cache
 Core.Compiler.code_cache(interp::StaticInterpreter) = WorldView(interp.global_cache, interp.world)
 
+# Julia 1.12+ required methods
+@static if VERSION >= v"1.12.0-DEV"
+    Core.Compiler.get_inference_world(interp::StaticInterpreter) = interp.world
+    Core.Compiler.cache_owner(interp::StaticInterpreter) = interp.global_cache.owner
+end
+
 # No need to do any locking since we're not putting our results into the runtime cache
 Core.Compiler.lock_mi_inference(interp::StaticInterpreter, mi::MethodInstance) = nothing
 Core.Compiler.unlock_mi_inference(interp::StaticInterpreter, mi::MethodInstance) = nothing
@@ -86,14 +96,18 @@ function Core.Compiler.InferenceState(result::InferenceResult, cache::Symbol, in
     mi = result.linfo
     src = custom_pass!(interp, result, mi, src)
     src === nothing && return nothing
-    Core.Compiler.validate_code_in_debug_mode(result.linfo, src, "lowered")
+    # validate_code_in_debug_mode removed in Julia 1.12+
+    if isdefined(Core.Compiler, :validate_code_in_debug_mode)
+        Core.Compiler.validate_code_in_debug_mode(result.linfo, src, "lowered")
+    end
     return InferenceState(result, src, cache, interp)
 end
 
 Core.Compiler.may_optimize(interp::StaticInterpreter) = true
 Core.Compiler.may_compress(interp::StaticInterpreter) = true
 Core.Compiler.may_discard_trees(interp::StaticInterpreter) = true
-Core.Compiler.verbose_stmt_info(interp::StaticInterpreter) = false
+# verbose_stmt_info removed in Julia 1.12+
+isdefined(Core.Compiler, :verbose_stmt_info) && (Core.Compiler.verbose_stmt_info(interp::StaticInterpreter) = false)
 
 
 if isdefined(Base.Experimental, Symbol("@overlay"))
@@ -129,6 +143,18 @@ end
 
 function StaticCompilerParams(; opt = false,
         optlevel = Base.JLOptions().opt_level,
-        cache = CodeCache())
+        cache::Union{CodeCache, Nothing} = nothing,
+        cache_owner::Any = nothing)
+    cache = if cache === nothing
+        if CodeCache === Core.Compiler.InternalCodeCache
+            owner = cache_owner === nothing ? Ref{UInt}(rand(UInt)) : cache_owner
+            Core.Compiler.InternalCodeCache(owner)
+        else
+            CodeCache()
+        end
+    else
+        cache
+    end
+
     return StaticCompilerParams(opt, optlevel, cache)
 end

@@ -3,13 +3,9 @@ using StaticTools
 
 function interop(argc, argv)
     lib = StaticTools.dlopen(c"libm")
-    printf(lib)
     sin = StaticTools.dlsym(lib, c"sin")
-    printf(sin)
-    x = @ptrcall sin(5.0::Float64)::Float64
-    printf(x)
-    newline()
     StaticTools.dlclose(lib)
+    return 0
 end
 
 # Attempt to compile

@@ -73,7 +73,7 @@ function analyze_escapes(f::Function, types::Tuple)
             # Scan the IR for allocation sites
             # Look for: arrayref, arrayset, new, splatnew, foreigncall allocations
             for (idx, stmt) in enumerate(ir.code)
-                alloc_info = analyze_statement(stmt, idx)
+                alloc_info = analyze_statement(stmt, idx, ir.code)
                 if !isnothing(alloc_info)
                     push!(allocations, alloc_info)
                 end
@@ -98,7 +98,7 @@ end
 
 Analyze a single IR statement to detect allocations.
 """
-function analyze_statement(stmt, idx::Int)
+function analyze_statement(stmt, idx::Int, code::Vector)
     # Check for common allocation patterns in Julia IR
     if isa(stmt, Expr)
         # Check for assignment expressions (x = zeros(n))
@@ -106,13 +106,14 @@ function analyze_statement(stmt, idx::Int)
             # Check the right-hand side of the assignment
             rhs = stmt.args[2]
             if isa(rhs, Expr)
-                return check_allocation_expr(rhs, idx)
+                alloc = check_allocation_expr(rhs, idx, code)
+                alloc !== nothing && return alloc
             end
         end
 
         # Direct call expressions
         if stmt.head == :call
-            return check_allocation_expr(stmt, idx)
+            return check_allocation_expr(stmt, idx, code)
         end
 
         # Check for :new expressions (struct allocations)
@@ -134,9 +135,13 @@ end
 
 Check if an expression is an allocation.
 """
-function check_allocation_expr(expr::Expr, idx::Int)
+function check_allocation_expr(expr::Expr, idx::Int, code::Vector)
     if expr.head == :call && !isempty(expr.args)
-        func = expr.args[1]
+        func = resolve_callable(expr.args[1], code)
+
+        if func isa Core.Const
+            func = func.val
+        end
 
         # Check for array allocations
         if func == :Array || func == GlobalRef(Core, :Array)
@@ -180,6 +185,19 @@ function check_allocation_expr(expr::Expr, idx::Int)
 end
 
 """
+Resolve SSA values back to their defining statements so we can inspect the callee.
+"""
+function resolve_callable(func, code::Vector)
+    if func isa Core.SSAValue
+        idx = func.id
+        if 1 <= idx <= length(code)
+            return code[idx]
+        end
+    end
+    return func
+end
+
+"""
     estimate_allocation_size(args) -> Int
 
 Estimate allocation size from function arguments.
@@ -211,8 +229,8 @@ function suggest_stack_promotion(report::EscapeAnalysisReport)
 
     # Find allocations that don't escape and could be stack-promoted
     for alloc in report.allocations
-        if !alloc.escapes && alloc.size > 0
-            push!(suggestions, "Stack-promote allocation of $(alloc.type) at $(alloc.location)")
+        if !alloc.escapes && alloc.can_promote
+            push!(suggestions, "Stack-promote allocation at $(alloc.location) (~$(alloc.size_bytes) bytes)")
         end
     end
 

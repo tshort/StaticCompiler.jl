@@ -64,6 +64,49 @@ include("package_compilation.jl")
 fix_name(f::Function) = fix_name(string(nameof(f)))
 fix_name(s) = String(GPUCompiler.safe_name(s))
 
+const runtime_overlays_enabled = Ref(false)
+
+function julia_runtime_link_flags()
+    libname = Base.isdebugbuild() ? "julia-debug" : "julia"
+    libpath = try
+        Libdl.dlpath("lib$libname")
+    catch
+        Libdl.dlpath(libname)
+    end |> abspath
+
+    libdir = dirname(libpath)
+    includedir = abspath(Sys.BINDIR, Base.INCLUDEDIR, "julia")
+    flags = String["-I$includedir", "-L$libdir", "-Wl,-rpath,$libdir"]
+    if Sys.isapple()
+        push!(flags, "-Wl,-undefined,dynamic_lookup")
+    end
+
+    privdir = abspath(Sys.BINDIR, Base.PRIVATE_LIBDIR)
+    if privdir != libdir
+        push!(flags, "-L$privdir")
+        push!(flags, "-Wl,-rpath,$privdir")
+    end
+    push!(flags, "-l$libname")
+
+    internal = try
+        Libdl.dlpath("libjulia-internal")
+    catch
+        nothing
+    end
+    if internal !== nothing
+        push!(flags, "-ljulia-internal")
+    end
+    codegen = try
+        Libdl.dlpath("libjulia-codegen")
+    catch
+        nothing
+    end
+    if codegen !== nothing
+        push!(flags, "-ljulia-codegen")
+    end
+    flags
+end
+
 
 """
 ```julia
@@ -149,12 +192,14 @@ Hello, world!
 """
 function compile_executable(f::Function, types=(), path::String=pwd(), name=fix_name(f);
                             also_expose=Tuple{Function, Tuple{DataType}}[], target::StaticTarget=StaticTarget(),
-                            verify::Bool=false,
-                            min_score::Int=80,
-                            suggest_fixes::Bool=true,
-                            export_analysis::Bool=false,
+                            template::Union{Symbol,Nothing}=nothing,
+                            verify::Union{Bool,Nothing}=nothing,
+                            min_score::Union{Int,Nothing}=nothing,
+                            suggest_fixes::Union{Bool,Nothing}=nothing,
+                            export_analysis::Union{Bool,Nothing}=nothing,
+                            method_table::Union{Core.MethodTable,Nothing}=StaticCompiler.method_table,
                             kwargs...)
-    compile_executable(vcat([(f, types)], also_expose), path, name; target, verify, min_score, suggest_fixes, export_analysis, kwargs...)
+    compile_executable(vcat([(f, types)], also_expose), path, name; target, template, verify, min_score, suggest_fixes, export_analysis, method_table, kwargs...)
 end
 
 function compile_executable(funcs::Union{Array,Tuple}, path::String=pwd(), name=fix_name(first(first(funcs)));
@@ -163,12 +208,58 @@ function compile_executable(funcs::Union{Array,Tuple}, path::String=pwd(), name=
         cflags = ``,
         target::StaticTarget=StaticTarget(),
         llvm_to_clang = Sys.iswindows(),
-        verify::Bool=false,
-        min_score::Int=80,
-        suggest_fixes::Bool=true,
-        export_analysis::Bool=false,
+        method_table::Union{Core.MethodTable,Nothing}=StaticCompiler.method_table,
+        template::Union{Symbol,Nothing}=nothing,
+        verify::Union{Bool,Nothing}=nothing,
+        min_score::Union{Int,Nothing}=nothing,
+        suggest_fixes::Union{Bool,Nothing}=nothing,
+        export_analysis::Union{Bool,Nothing}=nothing,
         kwargs...
     )
+
+    # Apply template if specified, then apply final defaults
+    if !isnothing(template)
+        template_obj = get_template(template)
+        println("Using template: :$(template)")
+        println("  ", template_obj.description)
+        println()
+
+        template_params = template_obj.params
+
+        # Apply template values only for parameters not explicitly set by user
+        if isnothing(verify)
+            verify = template_params.verify
+        end
+
+        if isnothing(min_score)
+            min_score = template_params.min_score
+        end
+
+        if isnothing(suggest_fixes)
+            suggest_fixes = template_params.suggest_fixes
+        end
+
+        if isnothing(export_analysis)
+            export_analysis = template_params.export_analysis
+        end
+    end
+
+    # Apply final defaults for any still-nothing values
+    if isnothing(verify)
+        verify = false
+    end
+
+    if isnothing(min_score)
+        min_score = 80
+    end
+
+    if isnothing(suggest_fixes)
+        suggest_fixes = true
+    end
+
+    if isnothing(export_analysis)
+        export_analysis = false
+    end
 
     # Pre-compilation analysis if requested
     if verify
@@ -246,12 +337,25 @@ function compile_executable(funcs::Union{Array,Tuple}, path::String=pwd(), name=
     isexecutableargtype = tt == Tuple{} || tt == Tuple{Int, Ptr{Ptr{UInt8}}}
     isexecutableargtype || @warn "input type signature $types should be either `()` or `(Int, Ptr{Ptr{UInt8}})` for standard executables"
 
-    rt = last(only(static_code_typed(f, tt; target, kwargs...)))
+    infer_return_type(f, tt) = begin
+        typed = Base.code_typed(f, tt; optimize=false)
+        isempty(typed) && return Union{}
+        last(only(typed))
+    end
+
+    rt = infer_return_type(f, tt)
     isconcretetype(rt) || error("`$f$types` did not infer to a concrete type. Got `$rt`")
     nativetype = isprimitivetype(rt) || isa(rt, Ptr)
     nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
 
-    generate_executable(funcs, path, name, filename; demangle, cflags, target, llvm_to_clang, kwargs...)
+    generate_executable(funcs, path, name, filename;
+                        demangle=demangle,
+                        cflags=cflags,
+                        return_type=rt,
+                        target=target,
+                        llvm_to_clang=llvm_to_clang,
+                        method_table=method_table,
+                        kwargs...)
     Sys.iswindows() && (filename *= ".exe")
     joinpath(abspath(path), filename)
 end
@@ -371,15 +475,16 @@ Generated C header: ./test.h
 function compile_shlib(f::Function, types=(), path::String=pwd(), name=fix_name(f);
         filename=name,
         target::StaticTarget=StaticTarget(),
+        method_table::Union{Core.MethodTable,Nothing}=StaticCompiler.method_table,
         template::Union{Symbol,Nothing}=nothing,
-        verify::Bool=false,
-        min_score::Int=80,
-        suggest_fixes::Bool=true,
-        export_analysis::Bool=false,
-        generate_header::Bool=false,
+        verify::Union{Bool,Nothing}=nothing,
+        min_score::Union{Int,Nothing}=nothing,
+        suggest_fixes::Union{Bool,Nothing}=nothing,
+        export_analysis::Union{Bool,Nothing}=nothing,
+        generate_header::Union{Bool,Nothing}=nothing,
         kwargs...
     )
-    compile_shlib(((f, types),), path; filename, target, template, verify, min_score, suggest_fixes, export_analysis, generate_header, kwargs...)
+    compile_shlib(((f, types),), path; filename, target, method_table, template, verify, min_score, suggest_fixes, export_analysis, generate_header, kwargs...)
 end
 # As above, but taking an array of functions and returning a single shlib
 function compile_shlib(funcs::Union{Array,Tuple}, path::String=pwd();
@@ -388,29 +493,67 @@ function compile_shlib(funcs::Union{Array,Tuple}, path::String=pwd();
         cflags = ``,
         target::StaticTarget=StaticTarget(),
         llvm_to_clang = Sys.iswindows(),
+        method_table::Union{Core.MethodTable,Nothing}=StaticCompiler.method_table,
         template::Union{Symbol,Nothing}=nothing,
-        verify::Bool=false,
-        min_score::Int=80,
-        suggest_fixes::Bool=true,
-        export_analysis::Bool=false,
-        generate_header::Bool=false,
+        verify::Union{Bool,Nothing}=nothing,
+        min_score::Union{Int,Nothing}=nothing,
+        suggest_fixes::Union{Bool,Nothing}=nothing,
+        export_analysis::Union{Bool,Nothing}=nothing,
+        generate_header::Union{Bool,Nothing}=nothing,
         kwargs...
     )
 
-    # Apply template if specified
+    # Apply template if specified, then apply final defaults
     if !isnothing(template)
         template_obj = get_template(template)
         println("Using template: :$(template)")
         println("  ", template_obj.description)
         println()
 
-        # Apply template parameters (explicit params override template)
         template_params = template_obj.params
-        verify = get(kwargs, :verify, template_params.verify)
-        min_score = get(kwargs, :min_score, template_params.min_score)
-        suggest_fixes = get(kwargs, :suggest_fixes, template_params.suggest_fixes)
-        export_analysis = get(kwargs, :export_analysis, template_params.export_analysis)
-        generate_header = get(kwargs, :generate_header, template_params.generate_header)
+
+        # Apply template values only for parameters not explicitly set by user
+        # (nothing means user didn't pass the parameter)
+        if isnothing(verify)
+            verify = template_params.verify
+        end
+
+        if isnothing(min_score)
+            min_score = template_params.min_score
+        end
+
+        if isnothing(suggest_fixes)
+            suggest_fixes = template_params.suggest_fixes
+        end
+
+        if isnothing(export_analysis)
+            export_analysis = template_params.export_analysis
+        end
+
+        if isnothing(generate_header)
+            generate_header = template_params.generate_header
+        end
+    end
+
+    # Apply final defaults for any still-nothing values
+    if isnothing(verify)
+        verify = false
+    end
+
+    if isnothing(min_score)
+        min_score = 80
+    end
+
+    if isnothing(suggest_fixes)
+        suggest_fixes = true
+    end
+
+    if isnothing(export_analysis)
+        export_analysis = false
+    end
+
+    if isnothing(generate_header)
+        generate_header = false
     end
 
     # Pre-compilation analysis if requested
@@ -485,18 +628,30 @@ function compile_shlib(funcs::Union{Array,Tuple}, path::String=pwd();
     end
 
     # Standard type checking
+    infer_return_type(f, tt) = begin
+        typed = Base.code_typed(f, tt; optimize=false)
+        isempty(typed) && return Union{}
+        last(only(typed))
+    end
+
     for func in funcs
         f, types = func
         tt = Base.to_tuple_type(types)
         isconcretetype(tt) || error("input type signature `$types` is not concrete")
 
-        rt = last(only(static_code_typed(f, tt; target, kwargs...)))
+        rt = infer_return_type(f, tt)
         isconcretetype(rt) || error("`$f$types` did not infer to a concrete type. Got `$rt`")
         nativetype = isprimitivetype(rt) || isa(rt, Ptr)
         nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
     end
 
-    generate_shlib(funcs, path, filename; demangle, cflags, target, llvm_to_clang, kwargs...)
+    generate_shlib(funcs, path, filename;
+                   demangle=demangle,
+                   cflags=cflags,
+                   target=target,
+                   llvm_to_clang=llvm_to_clang,
+                   method_table=method_table,
+                   kwargs...)
 
     lib_path = joinpath(abspath(path), filename * "." * Libdl.dlext)
 
@@ -598,12 +753,19 @@ generate_executable(f, tt, args...; kwargs...) = generate_executable(((f, tt),),
 function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fix_name(first(first(funcs))), filename=name;
                              demangle = true,
                              cflags = ``,
+                             return_type::Union{Type,Nothing}=nothing,
                              target::StaticTarget=StaticTarget(),
                              llvm_to_clang::Bool = Sys.iswindows(),
+                             method_table::Union{Core.MethodTable,Nothing}=StaticCompiler.method_table,
                              kwargs...
                              )
     exec_path = joinpath(path, filename)
-    _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, emit_llvm_only=llvm_to_clang, kwargs...)
+    _, obj_or_ir_path = generate_obj(funcs, path, filename;
+                                     demangle=demangle,
+                                     target=target,
+                                     emit_llvm_only=llvm_to_clang,
+                                     method_table=method_table,
+                                     kwargs...)
     # Pick a compiler
     if !isnothing(target.compiler)
         cc = `$(target.compiler)`
@@ -611,43 +773,103 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
         cc = Sys.isapple() ? `cc` : clang()
     end
 
-    # Compile!
-    if Sys.isapple() && !llvm_to_clang
-        # Apple no longer uses _start, so we can just specify a custom entry
-        entry = demangle ? "_$name" : "_julia_$name"
-        run(`$cc -e $entry $cflags $obj_or_ir_path -o $exec_path`)
+    # Normalize cflags to a vector for splatting
+    cflags_vec = if cflags isa Cmd
+        copy(cflags.exec)  # Extract arguments from Cmd (preserves flags)
+    elseif cflags isa AbstractString
+        split(cflags)  # Tokenize space-delimited flags
     else
-        fn = demangle ? "$name" : "julia_$name"
-        # Write a minimal wrapper to avoid having to specify a custom entry
-        wrapper_path = joinpath(path, "wrapper.c")
-        f = open(wrapper_path, "w")
-        print(f, """int $fn(int argc, char** argv);
-        void* __stack_chk_guard = (void*) $(rand(UInt) >> 1);
-
-        int main(int argc, char** argv)
-        {
-            $fn(argc, argv);
-            return 0;
-        }""")
-        close(f)
-        if llvm_to_clang # (required on Windows)
-            # Use clang (llc) to generate an executable from the LLVM IR
-            cclang = if Sys.iswindows()
-                exec_path *= ".exe"
-                `clang`
-            elseif Sys.isapple()
-                `clang`
-            else
-                clang()
-            end
-            run(`$cclang -Wno-override-module $wrapper_path $obj_or_ir_path -o $exec_path`)
-        else
-            run(`$cc $wrapper_path $cflags $obj_or_ir_path -o $exec_path`)
-        end
-
-        # Clean up
-        rm(wrapper_path)
+        collect(cflags)  # Copy user vector before mutating
     end
+
+    if target.julia_runtime
+        append!(cflags_vec, julia_runtime_link_flags())
+    end
+
+    # Determine C signature for the entry function so the wrapper matches argument and return types.
+    entry_func, entry_tt = funcs[1]
+    entry_tuple = Base.to_tuple_type(entry_tt)
+    argtypes = Tuple(entry_tuple.parameters)
+    rettype = return_type === nothing ? Core.Compiler.return_type(entry_func, entry_tuple) : return_type
+    rettype = rettype === Union{} ? Nothing : rettype
+
+    fn = demangle ? "$name" : "julia_$name"
+    fn_decl = generate_function_declaration(name, argtypes, rettype; demangle=demangle)
+    argnames = [string("arg", i - 1) for i in eachindex(argtypes)]
+    call_args = entry_tuple == Tuple{} ? "" :
+                (entry_tuple == Tuple{Int, Ptr{Ptr{UInt8}}} ? "argc, argv" :
+                 (length(argnames) == 0 ? "" : join(argnames, ", ")))
+
+    # Compile!
+    wrapper_path = joinpath(path, "wrapper.c")
+    f = open(wrapper_path, "w")
+    print(f, "#include <stdlib.h>\n#include <stdio.h>\n#include <stdint.h>\n#include <stdbool.h>\n")
+    if target.julia_runtime
+        print(f, """
+#include <julia.h>
+JULIA_DEFINE_FAST_TLS
+
+$fn_decl
+
+void* __stack_chk_guard = (void*) $(rand(UInt) >> 1);
+
+int main(int argc, char** argv)
+{
+    jl_init();
+    jl_set_ARGS(argc, argv);
+    int ret = $(rettype <: Integer ? "(int) $fn($call_args)" : "0");
+    $(rettype <: Integer ? "" : "$fn($call_args);")
+    jl_atexit_hook(ret);
+    return ret;
+}""")
+    else
+        print(f, "\n$fn_decl\n")
+        # Basic stubs to satisfy the few Julia runtime symbols that might appear when
+        # compiling without the Julia runtime. These should never be hot code paths.
+        print(f, """
+void ijl_throw(void* ex)
+{
+    fprintf(stderr, "Julia exception\\n");
+    exit(1);
+}
+
+void ijl_error(const char* msg)
+{
+    fprintf(stderr, "%s\\n", msg ? msg : "Julia error");
+    exit(1);
+}
+
+void* gpu_gc_pool_alloc(size_t sz)
+{
+    return malloc(sz);
+}
+
+void* __stack_chk_guard = (void*) $(rand(UInt) >> 1);
+
+int main(int argc, char** argv)
+{
+    $fn($call_args);
+    return 0;
+}""")
+    end
+    close(f)
+    if llvm_to_clang # (required on Windows)
+        # Use clang (llc) to generate an executable from the LLVM IR
+        cclang = if Sys.iswindows()
+            exec_path *= ".exe"
+            `clang`
+        elseif Sys.isapple()
+            `clang`
+        else
+            clang()
+        end
+        run(`$cclang -Wno-override-module $wrapper_path $obj_or_ir_path $cflags_vec -o $exec_path`)
+    else
+        run(`$cc $wrapper_path $obj_or_ir_path $cflags_vec -o $exec_path`)
+    end
+
+    # Clean up
+    rm(wrapper_path)
     path, name
 end
 
@@ -692,8 +914,8 @@ julia> ccall(("test", "example/test.dylib"), Float64, (Int64,), 100_000)
 5.2564961094956075
 ```
 """
-function generate_shlib(f::Function, tt, path::String=tempname(), name=fix_name(f), filename=name; target=StaticTarget(), kwargs...)
-    generate_shlib(((f, tt),), path, filename; target, kwargs...)
+function generate_shlib(f::Function, tt, path::String=tempname(), name=fix_name(f), filename=name; target=StaticTarget(), method_table::Union{Core.MethodTable,Nothing}=StaticCompiler.method_table, kwargs...)
+    generate_shlib(((f, tt),), path, filename; target, method_table, kwargs...)
 end
 # As above, but taking an array of functions and returning a single shlib
 function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), filename::String="libfoo";
@@ -701,6 +923,7 @@ function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), file
         cflags = ``,
         target::StaticTarget=StaticTarget(),
         llvm_to_clang::Bool = Sys.iswindows(),
+        method_table::Union{Core.MethodTable,Nothing}=StaticCompiler.method_table,
         kwargs...
     )
     if !isnothing(target.platform)
@@ -709,13 +932,32 @@ function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), file
         lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
     end
 
-    _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, emit_llvm_only=llvm_to_clang, kwargs...)
+    _, obj_or_ir_path = generate_obj(funcs, path, filename;
+                                     demangle=demangle,
+                                     target=target,
+                                     emit_llvm_only=llvm_to_clang,
+                                     method_table=method_table,
+                                     kwargs...)
     # Pick a Clang
     if !isnothing(target.compiler)
         cc = `$(target.compiler)`
     else
         cc = Sys.isapple() ? `cc` : clang()
     end
+
+    # Normalize cflags to a vector for splatting
+    cflags_vec = if cflags isa Cmd
+        copy(cflags.exec)  # Extract arguments from Cmd (preserves flags)
+    elseif cflags isa AbstractString
+        split(cflags)  # Tokenize space-delimited flags
+    else
+        collect(cflags)  # Copy user vector before mutating
+    end
+
+    if target.julia_runtime
+        append!(cflags_vec, julia_runtime_link_flags())
+    end
+
     # Compile!
     if llvm_to_clang # (required on Windows)
         # Use clang (llc) to generate an executable from the LLVM IR
@@ -727,53 +969,60 @@ function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), file
         else
             clang()
         end
-        run(`$cclang -shared -Wno-override-module $obj_or_ir_path -o $lib_path`)
+        run(`$cclang -shared -Wno-override-module $obj_or_ir_path $cflags_vec -o $lib_path`)
     else
-        run(`$cc -shared $cflags $obj_or_ir_path -o $lib_path `)
+        run(`$cc -shared $obj_or_ir_path $cflags_vec -o $lib_path`)
     end
 
     path, name
 end
 
-function static_code_llvm(@nospecialize(func), @nospecialize(types); target::StaticTarget=StaticTarget(), kwargs...)
-    job, kwargs = static_job(func, types; target, kwargs...)
-    GPUCompiler.code_llvm(stdout, job; libraries=false, kwargs...)
+function static_code_llvm(@nospecialize(func), @nospecialize(types); target::StaticTarget=StaticTarget(), method_table::Union{Core.MethodTable,Nothing}=StaticCompiler.method_table, kwargs...)
+    job, kwargs = static_job(func, types; target=target, method_table=method_table, kwargs...)
+    GPUCompiler.code_llvm(stdout, job; libraries=!target.julia_runtime, kwargs...)
 end
 
-function static_code_typed(@nospecialize(func), @nospecialize(types); target::StaticTarget=StaticTarget(), kwargs...)
-    job, kwargs = static_job(func, types; target, kwargs...)
+function static_code_typed(@nospecialize(func), @nospecialize(types); target::StaticTarget=StaticTarget(), method_table::Union{Core.MethodTable,Nothing}=StaticCompiler.method_table, kwargs...)
+    job, kwargs = static_job(func, types; target=target, method_table=method_table, kwargs...)
     GPUCompiler.code_typed(job; kwargs...)
 end
 
-function static_code_native(@nospecialize(f), @nospecialize(tt), fname=fix_name(f); target::StaticTarget=StaticTarget(), kwargs...)
-    job, kwargs = static_job(f, tt; fname, target, kwargs...)
-    GPUCompiler.code_native(stdout, job; libraries=false, kwargs...)
+function static_code_native(@nospecialize(f), @nospecialize(tt), fname=fix_name(f); target::StaticTarget=StaticTarget(), method_table::Union{Core.MethodTable,Nothing}=StaticCompiler.method_table, kwargs...)
+    job, kwargs = static_job(f, tt; fname=fname, target=target, method_table=method_table, kwargs...)
+    GPUCompiler.code_native(stdout, job; libraries=!target.julia_runtime, kwargs...)
 end
 
 # Return an LLVM module
-function static_llvm_module(f, tt, name=fix_name(f); demangle=true, target::StaticTarget=StaticTarget(), kwargs...)
+function static_llvm_module(f, tt, name=fix_name(f); demangle=true, target::StaticTarget=StaticTarget(), method_table::Union{Core.MethodTable,Nothing}=StaticCompiler.method_table, kwargs...)
     if !demangle
         name = "julia_"*name
     end
-    job, kwargs = static_job(f, tt; name, target, kwargs...)
+    link_libraries = !target.julia_runtime
+    runtime_overlays_enabled[] = target.julia_runtime
+    job, kwargs = static_job(f, tt; name=name, target=target, method_table=method_table, kwargs...)
     m = GPUCompiler.JuliaContext() do context
-        m, _ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, libraries=false)
+        # Link required runtime support (GC stubs, etc.) when generating LLVM so standalone
+        # binaries have the needed definitions.
+        m, _ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, libraries=link_libraries)
         locate_pointers_and_runtime_calls(m)
+        strip_verifier_errors!(m)
         m
     end
     return m
 end
 
 #Return an LLVM module for multiple functions
-function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::StaticTarget=StaticTarget(), kwargs...)
+function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::StaticTarget=StaticTarget(), method_table::Union{Core.MethodTable,Nothing}=StaticCompiler.method_table, kwargs...)
     f,tt = funcs[1]
+    link_libraries = !target.julia_runtime
+    runtime_overlays_enabled[] = target.julia_runtime
     mod = GPUCompiler.JuliaContext() do context
         name_f = fix_name(f)
         if !demangle
             name_f = "julia_"*name_f
         end
-        job, kwargs = static_job(f, tt; name = name_f, target, kwargs...)
-        mod,_ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, libraries=false)
+        job, kwargs = static_job(f, tt; name = name_f, target=target, method_table=method_table, kwargs...)
+        mod,_ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, libraries=link_libraries)
         if length(funcs) > 1
             for func in funcs[2:end]
                 f,tt = func
@@ -781,12 +1030,13 @@ function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::St
                 if !demangle
                     name_f = "julia_"*name_f
                 end
-                job, kwargs = static_job(f, tt; name = name_f, target, kwargs...)
-                tmod,_ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, libraries=false)
+                job, kwargs = static_job(f, tt; name = name_f, target=target, method_table=method_table, kwargs...)
+                tmod,_ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, libraries=link_libraries)
                 link!(mod,tmod)
             end
         end
         locate_pointers_and_runtime_calls(mod)
+        strip_verifier_errors!(mod)
         mod
     end
     # Just to be sure
@@ -799,7 +1049,10 @@ function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::St
         end
     end
     LLVM.ModulePassManager() do pass_manager #remove duplicate functions
-        LLVM.merge_functions!(pass_manager)
+        # merge_functions! removed in LLVM.jl for Julia 1.12+
+        @static if VERSION < v"1.12.0-DEV"
+            LLVM.merge_functions!(pass_manager)
+        end
         LLVM.run!(pass_manager, mod)
     end
     return mod
@@ -877,10 +1130,12 @@ function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), file
                         emit_llvm_only = false,
                         strip_llvm = false,
                         strip_asm = true,
+                        method_table::Union{Core.MethodTable,Nothing}=StaticCompiler.method_table,
                         kwargs...)
     f, tt = funcs[1]
     mkpath(path)
-    mod = static_llvm_module(funcs; demangle, kwargs...)
+    runtime_overlays_enabled[] = target.julia_runtime
+    mod = static_llvm_module(funcs; demangle=demangle, target=target, method_table=method_table, kwargs...)
 
     if emit_llvm_only # (Required on Windows)
       ir_path = joinpath(path, "$filenamebase.ll")
@@ -891,8 +1146,14 @@ function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), file
     else
       obj_path = joinpath(path, "$filenamebase.o")
       obj = GPUCompiler.JuliaContext() do ctx
-        fakejob, _ = static_job(f, tt; target, kwargs...)
-        obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
+        fakejob, _ = static_job(f, tt; target=target, method_table=method_table, kwargs...)
+        # Julia 1.12+: emit_asm changed from keyword args to positional args
+        # strip and validate options were removed in Julia 1.12
+        obj, _ = @static if VERSION >= v"1.12.0-DEV"
+          GPUCompiler.emit_asm(fakejob, mod, LLVM.API.LLVMObjectFile)
+        else
+          GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
+        end
         obj
       end
       open(obj_path, "w") do io

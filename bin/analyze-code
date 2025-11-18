@@ -134,8 +134,8 @@ function main()
     println()
 
     try
-        # Run analysis
-        result = analyze_function(func, types)
+        # Run analysis using quick_check
+        result = quick_check(func, types)
 
         # Display results
         println("Analysis Results:")
@@ -143,16 +143,14 @@ function main()
         println()
 
         println("Overall Score: $(result.score)/100")
+        println("Ready: $(result.ready_for_compilation ? "✅ YES" : "❌ NO")")
         println("Status: $(result.score >= args["min-score"] ? "✅ PASS" : "❌ FAIL")")
         println()
 
         if !isempty(result.issues)
             println("Issues Found:")
             for (i, issue) in enumerate(result.issues)
-                println("  $i. [$(issue.category)] $(issue.message)")
-                if args["verbose"] && !isnothing(issue.suggestion)
-                    println("      Suggestion: $(issue.suggestion)")
-                end
+                println("  $i. $issue")
             end
             println()
         else
@@ -165,32 +163,35 @@ function main()
             println("-" ^ 70)
             println()
 
+            println("Monomorphization:")
+            println("  Abstract types: $(result.monomorphization.has_abstract_types ? "❌ YES" : "✅ NO")")
+            println("  Specialization: $(round(result.monomorphization.specialization_factor * 100, digits=1))%")
+            println()
+
             println("Escape Analysis:")
-            println("  Heap allocations: $(length(result.escapes))")
-            if !isempty(result.escapes)
-                for esc in result.escapes
-                    println("    • $esc")
-                end
-            end
+            println("  Heap allocations: $(length(result.escape_analysis.allocations))")
+            println("  Stack-promotable: $(result.escape_analysis.promotable_allocations)")
             println()
 
-            println("Type Stability:")
-            println("  Monomorphic: $(result.type_stable ? "✅" : "❌")")
+            println("Devirtualization:")
+            println("  Dynamic calls: $(result.devirtualization.total_dynamic_calls)")
+            println("  Devirtualizable: $(result.devirtualization.devirtualizable_calls)")
             println()
 
-            println("Dynamic Dispatch:")
-            println("  Call sites: $(length(result.dynamic_calls))")
-            if !isempty(result.dynamic_calls)
-                for call in result.dynamic_calls
-                    println("    • $call")
-                end
-            end
+            println("Constant Propagation:")
+            println("  Foldable expressions: $(result.constant_propagation.foldable_expressions)")
+            println("  Code reduction potential: $(round(result.constant_propagation.code_reduction_potential_pct, digits=1))%")
+            println()
+
+            println("Lifetime Analysis:")
+            println("  Potential leaks: $(result.lifetime_analysis.potential_leaks)")
+            println("  Proper frees: $(result.lifetime_analysis.proper_frees)")
             println()
         end
 
         # Export if requested
         if !isnothing(args["export"])
-            export_analysis(result, args["export"])
+            export_report(result, args["export"])
             println("Analysis exported to: $(args["export"])")
             println()
         end

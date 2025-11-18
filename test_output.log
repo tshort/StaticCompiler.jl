@@ -1,0 +1,307 @@
+     Testing StaticCompiler
+        Test Could not use exact versions of packages in manifest. Re-resolving dependencies
+    Updating `/private/var/folders/98/l2ptpkyn41q7d3sp6x4xp87m0000gn/T/jl_U7h61l/Project.toml`
+⌅ [8ce10254] ↓ Bumper v0.7.1 ⇒ v0.6.0
+  [59287772] + Formatting v0.4.3
+  [81625895] + StaticCompiler v0.7.2 `~/Work/staticcompiler.jl`
+  [10745b16] + Statistics v1.11.1
+  [7792a7ef] + StrideArraysCore v0.5.8
+  [8ba89e20] ~ Distributed ⇒ v1.11.0
+  [8dfed614] ~ Test ⇒ v1.11.0
+    Updating `/private/var/folders/98/l2ptpkyn41q7d3sp6x4xp87m0000gn/T/jl_U7h61l/Manifest.toml`
+⌅ [8ce10254] ↓ Bumper v0.7.1 ⇒ v0.6.0
+  [bc773b8a] + CodeInfoTools v0.3.5
+  [59287772] + Formatting v0.4.3
+  [682c06a0] + JSON v1.3.0
+  [69de0a69] + Parsers v2.8.3
+  [81625895] + StaticCompiler v0.7.2 `~/Work/staticcompiler.jl`
+  [10745b16] + Statistics v1.11.1
+  [7792a7ef] + StrideArraysCore v0.5.8
+  [ec057cc2] + StructUtils v2.6.0
+  [c4a57d5a] - UnsafeArrays v1.0.8
+⌅ [0ee61d77] + Clang_jll v18.1.7+4
+  [8ba89e20] ~ Distributed ⇒ v1.11.0
+  [6462fe0b] + Sockets v1.11.0
+  [8dfed614] ~ Test ⇒ v1.11.0
+        Info Packages marked with ⌅ have new versions available but compatibility constraints restrict them from upgrading. To see why use `status --outdated -m`
+        Test Successfully re-resolved
+      Status `/private/var/folders/98/l2ptpkyn41q7d3sp6x4xp87m0000gn/T/jl_U7h61l/Project.toml`
+⌅ [8ce10254] Bumper v0.6.0
+  [59287772] Formatting v0.4.3
+  [61eb1bfa] GPUCompiler v1.7.4
+  [929cbde3] LLVM v9.4.4
+  [bdcacae8] LoopVectorization v0.12.173
+  [1914dd2f] MacroTools v0.5.16
+  [d125e4d3] ManualMemory v0.1.8
+  [90137ffa] StaticArrays v1.9.15
+  [81625895] StaticCompiler v0.7.2 `~/Work/staticcompiler.jl`
+  [86c06d3c] StaticTools v0.8.11
+  [10745b16] Statistics v1.11.1
+  [7792a7ef] StrideArraysCore v0.5.8
+  [ade2ca70] Dates v1.11.0
+  [8ba89e20] Distributed v1.11.0
+  [8f399da3] Libdl v1.11.0
+  [37e2e46d] LinearAlgebra v1.12.0
+  [fa267f1f] TOML v1.0.3
+  [8dfed614] Test v1.11.0
+  [d55e3150] LLD_jll v18.1.7+5
+      Status `/private/var/folders/98/l2ptpkyn41q7d3sp6x4xp87m0000gn/T/jl_U7h61l/Manifest.toml`
+  [79e6a3ab] Adapt v4.4.0
+  [4fba245c] ArrayInterface v7.22.0
+  [62783981] BitTwiddlingConvenienceFunctions v0.1.6
+⌅ [8ce10254] Bumper v0.6.0
+  [fa961155] CEnum v0.5.0
+  [2a0fbf3d] CPUSummary v0.2.7
+  [fb6a15b2] CloseOpenIntervals v0.1.13
+  [bc773b8a] CodeInfoTools v0.3.5
+  [f70d9fcc] CommonWorldInvalidations v1.0.0
+  [34da2185] Compat v4.18.1
+  [adafc99b] CpuId v0.3.1
+  [ffbed154] DocStringExtensions v0.9.5
+  [e2ba6199] ExprTools v0.1.10
+  [59287772] Formatting v0.4.3
+  [61eb1bfa] GPUCompiler v1.7.4
+  [3e5b6fbb] HostCPUFeatures v0.1.17
+  [615f187c] IfElse v0.1.1
+  [692b3bcd] JLLWrappers v1.7.1
+  [682c06a0] JSON v1.3.0
+  [929cbde3] LLVM v9.4.4
+  [10f19ff3] LayoutPointers v0.1.17
+  [bdcacae8] LoopVectorization v0.12.173
+  [1914dd2f] MacroTools v0.5.16
+  [d125e4d3] ManualMemory v0.1.8
+  [6fe1bfb0] OffsetArrays v1.17.0
+  [69de0a69] Parsers v2.8.3
+  [1d0040c9] PolyesterWeave v0.2.2
+  [aea7be01] PrecompileTools v1.3.3
+  [21216c6a] Preferences v1.5.0
+  [ae029012] Requires v1.3.1
+  [94e857df] SIMDTypes v0.1.0
+  [476501e8] SLEEFPirates v0.6.43
+  [431bcebd] SciMLPublic v1.0.0
+  [6c6a2e73] Scratch v1.3.0
+  [aedffcd0] Static v1.3.1
+  [0d7ed370] StaticArrayInterface v1.8.0
+  [90137ffa] StaticArrays v1.9.15
+  [1e83bf80] StaticArraysCore v1.4.4
+  [81625895] StaticCompiler v0.7.2 `~/Work/staticcompiler.jl`
+  [86c06d3c] StaticTools v0.8.11
+  [10745b16] Statistics v1.11.1
+  [7792a7ef] StrideArraysCore v0.5.8
+  [ec057cc2] StructUtils v2.6.0
+  [8290d209] ThreadingUtilities v0.5.5
+  [e689c965] Tracy v0.1.6
+  [3a884ed6] UnPack v1.0.2
+  [3d5dd08c] VectorizationBase v0.21.72
+⌅ [0ee61d77] Clang_jll v18.1.7+4
+  [dad2f222] LLVMExtra_jll v0.0.38+0
+  [ad6e5548] LibTracyClient_jll v0.9.1+6
+  [0dad84c5] ArgTools v1.1.2
+  [56f22d72] Artifacts v1.11.0
+  [2a0f44e3] Base64 v1.11.0
+  [ade2ca70] Dates v1.11.0
+  [8ba89e20] Distributed v1.11.0
+  [f43a241f] Downloads v1.6.0
+  [7b1f6079] FileWatching v1.11.0
+  [b77e0a4c] InteractiveUtils v1.11.0
+  [ac6e5ff7] JuliaSyntaxHighlighting v1.12.0
+  [4af54fe1] LazyArtifacts v1.11.0
+  [b27032c2] LibCURL v0.6.4
+  [76f85450] LibGit2 v1.11.0
+  [8f399da3] Libdl v1.11.0
+  [37e2e46d] LinearAlgebra v1.12.0
+  [56ddb016] Logging v1.11.0
+  [d6f4376e] Markdown v1.11.0
+  [ca575930] NetworkOptions v1.3.0
+  [44cfe95a] Pkg v1.12.0
+  [de0858da] Printf v1.11.0
+  [9a3f8284] Random v1.11.0
+  [ea8e919c] SHA v0.7.0
+  [9e88b42a] Serialization v1.11.0
+  [6462fe0b] Sockets v1.11.0
+  [f489334b] StyledStrings v1.11.0
+  [fa267f1f] TOML v1.0.3
+  [a4e569a6] Tar v1.10.0
+  [8dfed614] Test v1.11.0
+  [cf7118a7] UUIDs v1.11.0
+  [4ec0a83e] Unicode v1.11.0
+  [e66e0078] CompilerSupportLibraries_jll v1.3.0+1
+  [d55e3150] LLD_jll v18.1.7+5
+  [deac9b47] LibCURL_jll v8.11.1+1
+  [e37daf67] LibGit2_jll v1.9.0+0
+  [29816b5a] LibSSH2_jll v1.11.3+1
+  [14a3606d] MozillaCACerts_jll v2025.5.20
+  [4536629a] OpenBLAS_jll v0.3.29+0
+  [458c3c95] OpenSSL_jll v3.5.1+0
+  [83775a58] Zlib_jll v1.3.1+2
+  [8f36deef] libLLVM_jll v18.1.7+5
+  [8e850b90] libblastrampoline_jll v5.15.0+0
+  [8e850ede] nghttp2_jll v1.64.0+1
+  [3f19e933] p7zip_jll v17.5.0+2
+        Info Packages marked with ⌅ have new versions available but compatibility constraints restrict them from upgrading.
+Precompiling for configuration --code-coverage=none --color=auto --check-bounds=yes --warn-overwrite=yes --depwarn=yes --inline=yes --startup-file=no --track-allocation=none
+    461.1 ms  ✓ UUIDs
+    470.3 ms  ✓ Logging
+    502.2 ms  ✓ Unicode
+    533.2 ms  ✓ OpenSSL_jll
+    524.9 ms  ✓ UnPack
+    555.7 ms  ✓ CodeInfoTools
+    600.8 ms  ✓ NetworkOptions
+    789.2 ms  ✓ Serialization
+    380.3 ms  ✓ Zlib_jll
+    395.1 ms  ✓ SIMDTypes
+    316.1 ms  ✓ IfElse
+    375.4 ms  ✓ ExprTools
+    543.5 ms  ✓ DocStringExtensions
+    594.4 ms  ✓ Statistics
+    374.2 ms  ✓ libLLVM_jll
+    344.7 ms  ✓ CommonWorldInvalidations
+    350.8 ms  ✓ MozillaCACerts_jll
+    449.7 ms  ✓ Base64
+    354.6 ms  ✓ nghttp2_jll
+    364.7 ms  ✓ p7zip_jll
+    358.7 ms  ✓ CEnum
+    508.1 ms  ✓ StaticArraysCore
+    669.2 ms  ✓ SciMLPublic
+   1449.6 ms  ✓ ArgTools
+    591.1 ms  ✓ ManualMemory
+    663.0 ms  ✓ Requires
+    406.5 ms  ✓ LibSSH2_jll
+    666.8 ms  ✓ Printf
+    996.9 ms  ✓ OffsetArrays
+    427.0 ms  ✓ LLD_jll
+    323.6 ms  ✓ LibGit2_jll
+    513.6 ms  ✓ Adapt
+    702.6 ms  ✓ Tar
+    385.7 ms  ✓ LibCURL_jll
+    461.6 ms  ✓ Formatting
+    827.0 ms  ✓ ThreadingUtilities
+    337.1 ms  ✓ OffsetArrays → OffsetArraysAdaptExt
+    418.9 ms  ✓ ArrayInterface
+   2421.3 ms  ✓ MacroTools
+    335.6 ms  ✓ ArrayInterface → ArrayInterfaceStaticArraysCoreExt
+    520.2 ms  ✓ LibCURL
+   1889.6 ms  ✓ Distributed
+   1781.7 ms  ✓ Dates
+    341.5 ms  ✓ Scratch
+    371.7 ms  ✓ TOML
+   1870.7 ms  ✓ LibGit2
+    528.6 ms  ✓ StructUtils
+    416.3 ms  ✓ Compat
+    523.6 ms  ✓ Preferences
+    380.5 ms  ✓ Compat → CompatLinearAlgebraExt
+    411.4 ms  ✓ PrecompileTools
+    549.3 ms  ✓ JLLWrappers
+   2161.6 ms  ✓ Downloads
+    500.1 ms  ✓ LibTracyClient_jll
+    601.2 ms  ✓ Clang_jll
+    511.4 ms  ✓ Tracy
+   7420.8 ms  ✓ StyledStrings
+   2153.8 ms  ✓ Static
+    344.2 ms  ✓ BitTwiddlingConvenienceFunctions
+    637.3 ms  ✓ HostCPUFeatures
+   1734.4 ms  ✓ JuliaSyntaxHighlighting
+   5039.6 ms  ✓ StaticArrays
+    445.8 ms  ✓ StaticArrays → StaticArraysStatisticsExt
+    453.4 ms  ✓ Adapt → AdaptStaticArraysExt
+   3899.8 ms  ✓ Markdown
+   7979.6 ms  ✓ Parsers
+    609.9 ms  ✓ CpuId
+    394.5 ms  ✓ CPUSummary
+   1139.3 ms  ✓ InteractiveUtils
+    434.7 ms  ✓ PolyesterWeave
+   2636.5 ms  ✓ JSON
+   2895.6 ms  ✓ Test
+  11915.6 ms  ✓ StaticArrayInterface
+    394.5 ms  ✓ StaticArrayInterface → StaticArrayInterfaceOffsetArraysExt
+    398.8 ms  ✓ CloseOpenIntervals
+    450.4 ms  ✓ LayoutPointers
+    477.6 ms  ✓ StaticArrayInterface → StaticArrayInterfaceStaticArraysExt
+    577.4 ms  ✓ StrideArraysCore
+    355.0 ms  ✓ Bumper
+   5361.7 ms  ✓ VectorizationBase
+   1130.7 ms  ✓ SLEEFPirates
+  15960.7 ms  ✓ LoopVectorization
+   2116.5 ms  ✓ StaticTools
+  41242.4 ms  ✓ Pkg
+    572.2 ms  ✓ LazyArtifacts
+    786.0 ms  ✓ LLVMExtra_jll
+   4906.0 ms  ✓ LLVM
+  23323.1 ms  ✓ GPUCompiler
+   2856.3 ms  ✓ StaticCompiler
+  89 dependencies successfully precompiled in 87 seconds
+  24 dependencies precompiled but different versions are currently loaded. Restart julia to access the new versions. Otherwise, loading dependents of these packages may trigger further precompilation to work with the unexpected versions.
+  1 dependency had output during precompilation:
+┌ Formatting
+│  ┌ Warning: DEPRECATION NOTICE
+│  │ 
+│  │ Formatting.jl has been unmaintained for a while, with some serious
+│  │ correctness bugs compromising the original purpose of the package. As a result,
+│  │ it has been deprecated - consider using an alternative, such as
+│  │ `Format.jl` (https://github.com/JuliaString/Format.jl) or the `Printf` stdlib directly.
+│  │ 
+│  │ If you are not using Formatting.jl as a direct dependency, please consider
+│  │ opening an issue on any packages you are using that do use it as a dependency.
+│  │ From Julia 1.9 onwards, you can query `]why Formatting` to figure out which
+│  │ package originally brings it in as a dependency.
+│  └ @ Formatting ~/.julia/packages/Formatting/3VxOt/src/Formatting.jl:12
+└  
+     Testing Running tests...
+Standalone Dylibs: Error During Test at /Users/joel/Work/staticcompiler.jl/test/testcore.jl:7
+  Got exception outside of a @test
+  MethodError: no method matching Compiler.InternalCodeCache()
+  The type `Compiler.InternalCodeCache` exists, but no method is defined for this combination of argument types when trying to construct it.
+  
+  Closest candidates are:
+    Compiler.InternalCodeCache(!Matched::Any)
+     @ Base /opt/homebrew/Cellar/julia/1.12.1/share/julia/Compiler/src/cicache.jl:11
+  
+  Stacktrace:
+    [1] StaticCompiler.StaticCompilerParams()
+      @ StaticCompiler ~/Work/staticcompiler.jl/src/interpreter.jl:135
+    [2] static_job(func::Function, types::Type; name::String, kernel::Bool, target::StaticTarget, method_table::Core.MethodTable, kwargs::@Kwargs{})
+      @ StaticCompiler ~/Work/staticcompiler.jl/src/target.jl:141
+    [3] static_code_typed(func::Any, types::Any; target::StaticTarget, kwargs::@Kwargs{})
+      @ StaticCompiler ~/Work/staticcompiler.jl/src/StaticCompiler.jl:846
+    [4] compile_shlib(funcs::Tuple{Tuple{typeof(fib), Tuple{DataType}}}, path::String; filename::String, demangle::Bool, cflags::Cmd, target::StaticTarget, llvm_to_clang::Bool, template::Nothing, verify::Nothing, min_score::Nothing, suggest_fixes::Nothing, export_analysis::Nothing, generate_header::Nothing, kwargs::@Kwargs{})
+      @ StaticCompiler ~/Work/staticcompiler.jl/src/StaticCompiler.jl:576
+    [5] compile_shlib(f::typeof(fib), types::Tuple{DataType}, path::String, name::String; filename::String, target::StaticTarget, template::Nothing, verify::Nothing, min_score::Nothing, suggest_fixes::Nothing, export_analysis::Nothing, generate_header::Nothing, kwargs::@Kwargs{demangle::Bool})
+      @ StaticCompiler ~/Work/staticcompiler.jl/src/StaticCompiler.jl:428
+    [6] macro expansion
+      @ ~/Work/staticcompiler.jl/test/testcore.jl:14 [inlined]
+    [7] macro expansion
+      @ /opt/homebrew/Cellar/julia/1.12.1/share/julia/stdlib/v1.12/Test/src/Test.jl:1776 [inlined]
+    [8] top-level scope
+      @ ~/Work/staticcompiler.jl/test/testcore.jl:13
+    [9] include_string(mapexpr::typeof(identity), mod::Module, code::String, filename::String)
+      @ Base ./loading.jl:2842
+   [10] top-level scope
+      @ ~/Work/staticcompiler.jl/test/runtests.jl:20
+   [11] top-level scope
+      @ none:6
+Test Summary:     | Error  Total  Time
+Standalone Dylibs |     1      1  1.0s
+RNG of the outermost testset: Random.Xoshiro(0xd50429f52e68198a, 0xe1c94761b01dfd1a, 0x0cbb26aa74826107, 0x5f68428251ed241b, 0x55e192fec2c9f2b8)
+ERROR: LoadError: Some tests did not pass: 0 passed, 0 failed, 1 errored, 0 broken.
+in expression starting at /Users/joel/Work/staticcompiler.jl/test/testcore.jl:7
+in expression starting at /Users/joel/Work/staticcompiler.jl/test/runtests.jl:19
+ERROR: Package StaticCompiler errored during testing
+Stacktrace:
+ [1] pkgerror(msg::String)
+   @ Pkg.Types /opt/homebrew/Cellar/julia/1.12.1/share/julia/stdlib/v1.12/Pkg/src/Types.jl:68
+ [2] test(ctx::Pkg.Types.Context, pkgs::Vector{PackageSpec}; coverage::Bool, julia_args::Cmd, test_args::Cmd, test_fn::Nothing, force_latest_compatible_version::Bool, allow_earlier_backwards_compatible_versions::Bool, allow_reresolve::Bool)
+   @ Pkg.Operations /opt/homebrew/Cellar/julia/1.12.1/share/julia/stdlib/v1.12/Pkg/src/Operations.jl:2427
+ [3] test
+   @ /opt/homebrew/Cellar/julia/1.12.1/share/julia/stdlib/v1.12/Pkg/src/Operations.jl:2280 [inlined]
+ [4] test(ctx::Pkg.Types.Context, pkgs::Vector{PackageSpec}; coverage::Bool, test_fn::Nothing, julia_args::Cmd, test_args::Cmd, force_latest_compatible_version::Bool, allow_earlier_backwards_compatible_versions::Bool, allow_reresolve::Bool, kwargs::@Kwargs{io::IOContext{IO}})
+   @ Pkg.API /opt/homebrew/Cellar/julia/1.12.1/share/julia/stdlib/v1.12/Pkg/src/API.jl:484
+ [5] test(pkgs::Vector{PackageSpec}; io::IOContext{IO}, kwargs::@Kwargs{})
+   @ Pkg.API /opt/homebrew/Cellar/julia/1.12.1/share/julia/stdlib/v1.12/Pkg/src/API.jl:164
+ [6] test(pkgs::Vector{PackageSpec})
+   @ Pkg.API /opt/homebrew/Cellar/julia/1.12.1/share/julia/stdlib/v1.12/Pkg/src/API.jl:153
+ [7] test(; name::Nothing, uuid::Nothing, version::Nothing, url::Nothing, rev::Nothing, path::Nothing, mode::PackageMode, subdir::Nothing, kwargs::@Kwargs{})
+   @ Pkg.API /opt/homebrew/Cellar/julia/1.12.1/share/julia/stdlib/v1.12/Pkg/src/API.jl:179
+ [8] test()
+   @ Pkg.API /opt/homebrew/Cellar/julia/1.12.1/share/julia/stdlib/v1.12/Pkg/src/API.jl:170
+ [9] top-level scope
+   @ none:1

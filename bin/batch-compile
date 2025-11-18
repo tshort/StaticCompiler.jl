@@ -180,17 +180,29 @@ function main()
 
             compile_params = Dict{Symbol, Any}()
 
-            # Apply defaults first
+            # Apply defaults first, converting types as needed
             for (key, value) in defaults
                 if key ∉ ["path"]
-                    compile_params[Symbol(key)] = value
+                    key_sym = Symbol(key)
+                    # Convert string values to symbols for known symbol-valued parameters
+                    if key in ["template"] && value isa String
+                        compile_params[key_sym] = Symbol(value)
+                    else
+                        compile_params[key_sym] = value
+                    end
                 end
             end
 
-            # Override with function-specific settings
+            # Override with function-specific settings, converting types as needed
             for (key, value) in func_config
                 if key ∉ ["source", "function", "output", "path", "shlib", "types"]
-                    compile_params[Symbol(key)] = value
+                    key_sym = Symbol(key)
+                    # Convert string values to symbols for known symbol-valued parameters
+                    if key in ["template"] && value isa String
+                        compile_params[key_sym] = Symbol(value)
+                    else
+                        compile_params[key_sym] = value
+                    end
                 end
             end
 

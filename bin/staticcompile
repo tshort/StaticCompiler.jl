@@ -98,6 +98,11 @@ function parse_commandline()
             help = "Compile entire package/module (requires signatures file)"
             action = :store_true
 
+        "--module"
+            help = "Module name for package mode (if different from source filename)"
+            arg_type = String
+            default = nothing
+
         "--signatures"
             help = "JSON file with function signatures for package compilation"
             arg_type = String
@@ -296,7 +301,8 @@ function compile_from_cli(args::Dict)
 
     # Compiler flags
     if !isnothing(args["cflags"])
-        compile_params[:cflags] = `$(split(args["cflags"]))`
+        # Split into individual flags, don't wrap in Cmd (no executable)
+        compile_params[:cflags] = split(args["cflags"])
     end
 
     try
@@ -315,9 +321,25 @@ function compile_from_cli(args::Dict)
             # Load the module
             include(args["source"])
 
-            # Get module name from source file
-            module_name = Symbol(splitext(basename(args["source"]))[1])
-            mod = getfield(Main, module_name)
+            # Get module name: use --module flag if provided, otherwise derive from filename
+            if !isnothing(args["module"])
+                module_name_str = args["module"]
+            else
+                module_name_str = splitext(basename(args["source"]))[1]
+            end
+
+            # Parse nested module names (e.g., "Outer.Inner")
+            try
+                mod = Main
+                for part in split(module_name_str, '.')
+                    mod = getfield(mod, Symbol(part))
+                end
+            catch e
+                println("Error: Module '$module_name_str' not found after loading $(args["source"])")
+                println("Hint: Use --module flag if the module name differs from the filename")
+                println("Error: $e")
+                exit(1)
+            end
 
             # Load signatures
             signatures = load_signatures(args["signatures"])
@@ -329,7 +351,7 @@ function compile_from_cli(args::Dict)
 
             # Compile package
             if !args["quiet"]
-                println("Compiling package: $module_name")
+                println("Compiling package: $module_name_str")
                 println("Output: $(args["path"])/$output_name")
                 println()
             end

@@ -1,8 +1,7 @@
 name = "StaticCompiler"
 uuid = "81625895-6c0f-48fc-b932-11a18313743c"
-authors = ["Tom Short and contributors"]
 version = "0.7.2"
-
+authors = ["Tom Short and contributors"]
 
 [deps]
 Clang_jll = "0ee61d77-7f21-5576-8119-9fcc46b10100"
@@ -20,16 +19,27 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 StaticTools = "86c06d3c-3f03-46de-9781-57580aa96d0a"
 
 [compat]
+Bumper = "0.6.0"
 CodeInfoTools = "0.3"
-GPUCompiler = "0.21, 0.22, 0.23, 0.24, 0.25, 0.26"
-LLVM = "6"
+GPUCompiler = "0.21, 0.22, 0.23, 0.24, 0.25, 0.26, 1.6, 1.7, 1.8"
+LLVM = "6, 7, 8, 9"
 MacroTools = "0.5"
-StaticTools = "0.8"
-julia = "1.8, 1.9"
+StaticTools = "0.8, 0.9"
+julia = "1.8, 1.9, 1.10, 1.11, 1.12"
 
 [extras]
+Bumper = "8ce10254-0962-460f-a3d8-1f77fea1446e"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 Formatting = "59287772-0a20-5a39-b81b-1366585eb4c0"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+LoopVectorization = "bdcacae8-1622-11e9-2a5c-532679323890"
+ManualMemory = "d125e4d3-2237-4719-b19c-fa641b8a4667"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+StrideArraysCore = "7792a7ef-975c-4747-a70f-980b88e8d1da"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "Formatting"]
+test = ["Test", "Formatting", "LinearAlgebra", "LoopVectorization", "ManualMemory", "Distributed", "StrideArraysCore", "Bumper", "StaticArrays", "Statistics", "JSON", "Dates"]

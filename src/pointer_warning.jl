@@ -67,6 +67,36 @@ end
 
 llvmeltype(x::LLVM.Value) = eltype(LLVM.value_type(x))
 
+function strip_verifier_errors!(mod::LLVM.Module)
+    err_blocks = Set{LLVM.BasicBlock}()
+    for gv in globals(mod)
+        occursin("Malformed_LLVM_function", name(gv)) || continue
+        for f in functions(mod), bb in blocks(f), inst in instructions(bb)
+            inst isa LLVM.CallInst || continue
+            any(x -> x === gv, operands(inst)) || continue
+            push!(err_blocks, bb)
+        end
+    end
 
-
-
+    for bb in err_blocks
+        for pred in predecessors(bb)
+            term = terminator(pred)
+            # Normalize successors to a concrete collection; some LLVM.jl terminator
+            # helpers return a BasicBlock directly instead of an iterable with length.
+            nsucc = Int(LLVM.API.LLVMGetNumSuccessors(term))
+            succs = LLVM.BasicBlock[]
+            for i in 0:nsucc-1
+                push!(succs, LLVM.BasicBlock(LLVM.API.LLVMGetSuccessor(term, i)))
+            end
+            if length(succs) == 2 && bb in succs
+                other = [s for s in succs if s !== bb]
+                isempty(other) && continue
+                @dispose builder=IRBuilder() begin
+                    position!(builder, term)
+                    br!(builder, only(other))
+                end
+                erase!(term)
+            end
+        end
+    end
+end
