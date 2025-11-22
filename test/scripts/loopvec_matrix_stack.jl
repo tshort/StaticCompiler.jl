@@ -2,8 +2,11 @@ using StaticCompiler
 using StaticTools
 using LoopVectorization
 
-@inline function mul!(C::StackArray, A::StackArray, B::StackArray)
-    @turbo for n ∈ indices((C,B), 2), m ∈ indices((C,A), 1)
+const STACK_ROWS = 10
+const STACK_COLS = 5
+
+@inline function mul!(C::MallocArray, A::MallocArray, B::MallocArray)
+    @turbo for n ∈ axes(C, 2), m ∈ axes(C, 1)
         Cmn = zero(eltype(C))
         for k ∈ indices((A,B), (2,1))
             Cmn += A[m,k] * B[k,n]
@@ -14,11 +17,8 @@ using LoopVectorization
 end
 
 function loopvec_matrix_stack()
-    rows = 10
-    cols = 5
-
     # LHS
-    A = StackArray{Float64}(undef, rows, cols)
+    A = MallocArray{Float64}(undef, STACK_ROWS, STACK_COLS)
     @turbo for i ∈ axes(A, 1)
         for j ∈ axes(A, 2)
            A[i,j] = i*j
@@ -26,7 +26,7 @@ function loopvec_matrix_stack()
     end
 
     # RHS
-    B = StackArray{Float64}(undef, cols, rows)
+    B = MallocArray{Float64}(undef, STACK_COLS, STACK_ROWS)
     @turbo for i ∈ axes(B, 1)
         for j ∈ axes(B, 2)
            B[i,j] = i*j
@@ -34,18 +34,18 @@ function loopvec_matrix_stack()
     end
 
     # # Matrix multiplication
-    C = StackArray{Float64}(undef, cols, cols)
+    C = MallocArray{Float64}(undef, STACK_COLS, STACK_COLS)
     mul!(C, B, A)
 
     # Print to stdout
     printf(C)
     # Also print to file
-    fp = fopen(c"table.tsv",c"w")
-    printf(fp, C)
-    fclose(fp)
+    printdlm(c"table.tsv", C, '\t')
+    fwrite(c"table.b", C)
+    free(A); free(B); free(C)
 end
 
-# Attempt to compile
+# Attempt to compile with runtime linked
 target = StaticTarget()
 StaticCompiler.set_runtime!(target, true)
 path = compile_executable(loopvec_matrix_stack, (), "./"; target=target)

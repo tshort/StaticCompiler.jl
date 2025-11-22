@@ -251,9 +251,8 @@ end
             @warn "Could not compile $testpath/scripts/loopvec_matrix_stack.jl"
             println(e)
         end
-        compile_ok = isa(status, Base.Process) && status.exitcode == 0
-        compile_ok || @test_broken compile_ok
-        compile_ok && @test status.exitcode == 0
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
 
         # Run...
         println("10x5 matrix product:")
@@ -262,12 +261,12 @@ end
         catch e
             @warn "Could not run $(scratch)/loopvec_matrix_stack"
             println(e)
-            nothing
         end
-        run_ok = isa(status, Base.Process) && status.exitcode == 0
-        @test_broken run_ok
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
         A = (1:10) * (1:5)'
         # @test parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.isapple()
+        @test fread!(szeros(5,5), c"table.b") == A' * A
     end
 
 

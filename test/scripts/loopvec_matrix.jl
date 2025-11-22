@@ -3,7 +3,7 @@ using StaticTools
 using LoopVectorization
 
 @inline function mul!(C::MallocArray, A::MallocArray, B::MallocArray)
-    @turbo for n ∈ indices((C,B), 2), m ∈ indices((C,A), 1)
+    @turbo for n ∈ axes(C, 2), m ∈ axes(C, 1)
         Cmn = zero(eltype(C))
         for k ∈ indices((A,B), (2,1))
             Cmn += A[m,k] * B[k,n]
