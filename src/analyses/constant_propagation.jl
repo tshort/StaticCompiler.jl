@@ -53,6 +53,8 @@ function analyze_constants(f::Function, types::Tuple)
     fname = nameof(f)
     constants = ConstantInfo[]
     foldable_count = 0
+    ssa_constants = Dict{Int,Bool}()
+    slot_constants = Dict{Int,Bool}()
 
     try
         # Get typed IR
@@ -65,31 +67,29 @@ function analyze_constants(f::Function, types::Tuple)
 
             # Scan for constant values and foldable expressions
             for (idx, stmt) in enumerate(ir.code)
+                is_constant_stmt = false
+
                 # Check for literal constants
                 if is_constant_value(stmt)
-                    const_info = ConstantInfo(
-                        stmt,
-                        "line $idx",
-                        true
-                    )
-                    push!(constants, const_info)
+                    is_constant_stmt = true
+                    push!(constants, ConstantInfo(stmt, "line $idx", true))
                     foldable_count += 1
-                end
+
+                # Track slot reads so downstream SSA values know the slot value
+                elseif stmt isa Core.SlotNumber
+                    is_constant_stmt = get(slot_constants, stmt.id, false)
 
                 # Check for expressions with constant operands
-                if isa(stmt, Expr)
-                    if is_foldable_expression(stmt, ir)
+                elseif isa(stmt, Expr)
+                    if is_foldable_expression(stmt, ir, ssa_constants, slot_constants)
+                        is_constant_stmt = true
+                        push!(constants, ConstantInfo(stmt, "line $idx", true))
                         foldable_count += 1
-
-                        # Try to extract constant value
-                        const_info = ConstantInfo(
-                            stmt,
-                            "line $idx",
-                            true
-                        )
-                        push!(constants, const_info)
                     end
                 end
+
+                # Mark the SSA value produced by this statement
+                ssa_constants[idx] = is_constant_stmt
             end
 
             # Calculate code reduction potential
@@ -121,6 +121,8 @@ end
 Check if a statement represents a constant value.
 """
 function is_constant_value(stmt)
+    stmt = stmt isa Core.Const ? stmt.value : stmt
+
     # Literal numbers, strings, symbols
     return isa(stmt, Number) || isa(stmt, String) || isa(stmt, Symbol) ||
            isa(stmt, Bool) || isa(stmt, Nothing) ||
@@ -128,77 +130,107 @@ function is_constant_value(stmt)
 end
 
 """
-    is_foldable_expression(expr::Expr, ir) -> Bool
+    is_foldable_expression(expr::Expr, ir, ssa_constants, slot_constants) -> Bool
 
 Check if an expression can be folded at compile time.
 """
-function is_foldable_expression(expr::Expr, ir)
+function is_foldable_expression(expr::Expr, ir, ssa_constants, slot_constants)
     # Handle assignment expressions
     if expr.head == :(=) && length(expr.args) >= 2
         rhs = expr.args[2]
-        if isa(rhs, Expr)
-            return check_foldable_call(rhs, ir)
+        rhs_constant = is_constant_reference(rhs, ir, ssa_constants, slot_constants) ||
+                       (isa(rhs, Expr) && is_foldable_call(rhs, ir, ssa_constants, slot_constants))
+
+        if expr.args[1] isa Core.SlotNumber
+            slot_constants[expr.args[1].id] = rhs_constant
         end
-        return is_constant_value(rhs)
+
+        return rhs_constant
     end
 
     # Direct call expressions
     if expr.head == :call
-        return check_foldable_call(expr, ir)
+        return is_foldable_call(expr, ir, ssa_constants, slot_constants)
     end
 
     return false
 end
 
 """
-    check_foldable_call(expr::Expr, ir) -> Bool
+    resolve_value(ir, value)
 
-Check if a call expression can be folded.
+Resolve SSAValue and Core.Const wrappers to the underlying value.
 """
-function check_foldable_call(expr::Expr, ir)
-    if expr.head == :call && length(expr.args) >= 2
-        func = expr.args[1]
-
-        # Check if it's a foldable function (arithmetic, comparison, etc.)
-        if is_foldable_function(func)
-            # Check if all arguments are constants or constant references
-            args_foldable = all(arg -> is_constant_or_ref(arg, ir), expr.args[2:end])
-            return args_foldable
+function resolve_value(ir, value)
+    current = value
+    while true
+        if current isa Core.Const
+            current = current.value
+        elseif current isa Core.SSAValue
+            current = ir.code[current.id]
+        else
+            return current
         end
     end
+end
+
+"""
+    is_constant_reference(arg, ir, ssa_constants, slot_constants) -> Bool
+
+Check if an argument is a constant or a reference to a constant.
+"""
+function is_constant_reference(arg, ir, ssa_constants, slot_constants)
+    resolved = resolve_value(ir, arg)
+
+    if is_constant_value(resolved)
+        return true
+    elseif resolved isa Core.SSAValue
+        return get(ssa_constants, resolved.id, false)
+    elseif resolved isa Core.SlotNumber
+        return get(slot_constants, resolved.id, false)
+    end
 
     return false
 end
 
 """
-    is_foldable_function(func) -> Bool
+    is_foldable_function(func, ir, ssa_constants, slot_constants) -> Bool
 
 Check if a function is pure and foldable.
 """
-function is_foldable_function(func)
-    if isa(func, GlobalRef)
-        fname = func.name
+function is_foldable_function(func, ir, ssa_constants, slot_constants)
+    resolved = resolve_value(ir, func)
+
+    if resolved isa GlobalRef
+        fname = resolved.name
         # Common foldable functions
         return fname in (:+, :-, :*, :/, :^, :<, :>, :<=, :>=, :(==), :(!=),
                          :abs, :sqrt, :sin, :cos, :log, :exp,
                          :min, :max, :div, :rem, :mod)
+    elseif resolved isa Core.SSAValue
+        return is_foldable_function(resolved, ir, ssa_constants, slot_constants)
     end
+
     return false
 end
 
 """
-    is_constant_or_ref(arg, ir) -> Bool
+    is_foldable_call(expr::Expr, ir, ssa_constants, slot_constants) -> Bool
 
-Check if an argument is a constant or reference to a constant.
+Check if a call expression can be folded.
 """
-function is_constant_or_ref(arg, ir)
-    # Direct constant
-    if is_constant_value(arg)
-        return true
+function is_foldable_call(expr::Expr, ir, ssa_constants, slot_constants)
+    if expr.head == :call && length(expr.args) >= 2
+        func = expr.args[1]
+
+        # Check if it's a foldable function (arithmetic, comparison, etc.)
+        if is_foldable_function(func, ir, ssa_constants, slot_constants)
+            # Check if all arguments are constants or constant references
+            args_foldable = all(arg -> is_constant_reference(arg, ir, ssa_constants, slot_constants), expr.args[2:end])
+            return args_foldable
+        end
     end
 
-    # SSA value reference - would need to trace back
-    # For simplicity, assume SSA values might not be constant
     return false
 end
 

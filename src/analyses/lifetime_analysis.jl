@@ -57,6 +57,19 @@ println("Potential leaks: \$(report.potential_leaks)")
 println("Proper frees: \$(report.proper_frees)")
 ```
 """
+function resolve_ir_value(ir, value)
+    current = value
+    while true
+        if current isa Core.Const
+            current = current.value
+        elseif current isa Core.SSAValue
+            current = ir.code[current.id]
+        else
+            return current
+        end
+    end
+end
+
 function analyze_lifetimes(f::Function, types::Tuple)
     fname = nameof(f)
     allocations = AllocationSite[]
@@ -85,7 +98,7 @@ function analyze_lifetimes(f::Function, types::Tuple)
                     if length(stmt.args) >= 2 && stmt.args[1] == GlobalRef(Core, :apply_type)
                         # Check if it's MallocArray or similar
                         if length(stmt.args) >= 2
-                            type_arg = stmt.args[2]
+                            type_arg = resolve_ir_value(ir, stmt.args[2])
                             if isa(type_arg, GlobalRef) && occursin("Malloc", string(type_arg.name))
                                 prev_stmt = idx  # Remember this for next iteration
                             end
@@ -94,10 +107,15 @@ function analyze_lifetimes(f::Function, types::Tuple)
                 end
 
                 # Check if current statement might be calling the type from prev_stmt
-                if !isnothing(prev_stmt) && isa(stmt, Expr)
-                    # Constructor call - record as allocation
-                    allocation_vars[idx] = length(allocations) + 1
+                if !isnothing(prev_stmt) && isa(stmt, Expr) && idx != prev_stmt
+                    alloc_idx = length(allocations) + 1
+                    allocation_vars[idx] = alloc_idx
+                    allocation_vars[Core.SSAValue(idx)] = alloc_idx
+                    if length(stmt.args) >= 1 && stmt.args[1] isa Core.SlotNumber
+                        allocation_vars[stmt.args[1]] = alloc_idx
+                    end
 
+                    # Constructor call - record as allocation
                     alloc_site = AllocationSite(
                         "line $idx",
                         :malloc_array,
@@ -115,9 +133,12 @@ function analyze_lifetimes(f::Function, types::Tuple)
 
                     # Check for allocation functions
                     if is_allocation_call(func)
+                        alloc_idx = length(allocations) + 1
+
                         # Record allocation
                         # The result is assigned to the SSA value at this index
-                        allocation_vars[idx] = length(allocations) + 1
+                        allocation_vars[idx] = alloc_idx
+                        allocation_vars[Core.SSAValue(idx)] = alloc_idx
 
                         alloc_site = AllocationSite(
                             "line $idx",
