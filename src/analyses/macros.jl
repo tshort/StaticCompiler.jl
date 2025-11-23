@@ -12,7 +12,7 @@ julia> @analyze compute_fast(10, 20)
 ======================================================================
 COMPILATION READINESS REPORT: compute_fast
 ======================================================================
-Status: ✅ READY
+Status: READY
 Score:  100/100
 ...
 ======================================================================
@@ -56,7 +56,7 @@ Returns true/false and prints a summary.
 # Example
 ```julia
 julia> @check_ready my_function(Int, Float64)
-✅ my_function is ready for compilation (score: 95/100)
+my_function is ready for compilation (score: 95/100)
 true
 ```
 """

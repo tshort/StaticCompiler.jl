@@ -20,7 +20,7 @@ using StaticTools
         report = analyze_escapes(nested_allocs, (Int,))
         @test !isnothing(report)
         @test length(report.allocations) >= 2  # At least outer and inner arrays
-        println("  ✓ Complex nested allocations")
+        println("  OK Complex nested allocations")
     end
 
     # Test 2: Conditional escape (allocation escapes based on condition)
@@ -40,7 +40,7 @@ using StaticTools
         if !isempty(report.allocations)
             @test any(a -> a.escapes, report.allocations)
         end
-        println("  ✓ Conditional escape")
+        println("  OK Conditional escape")
     end
 
     # Test 3: Escape via closure capture
@@ -55,11 +55,11 @@ using StaticTools
         try
             report = analyze_escapes(closure_escape, (Int,))
             @test !isnothing(report)
-            println("  ✓ Escape via closure")
+            println("  OK Escape via closure")
         catch e
             # Expected - closures might not be analyzable
             @test true
-            println("  ✓ Escape via closure (correctly rejected)")
+            println("  OK Escape via closure (correctly rejected)")
         end
     end
 
@@ -77,7 +77,7 @@ using StaticTools
         report = analyze_escapes(loop_allocation, (Int,))
         @test !isnothing(report)
         # Should detect allocations, even though size is not constant
-        println("  ✓ Loop-carried dependencies")
+        println("  OK Loop-carried dependencies")
     end
 
     # Test 5: Aliasing and escape
@@ -91,7 +91,7 @@ using StaticTools
 
         report = analyze_escapes(aliasing_case, (Int,))
         @test !isnothing(report)
-        println("  ✓ Aliasing scenarios")
+        println("  OK Aliasing scenarios")
     end
 
     # Test 6: Multi-dimensional arrays
@@ -108,7 +108,7 @@ using StaticTools
 
         report = analyze_escapes(multidim_array, ())
         @test !isnothing(report)
-        println("  ✓ Multi-dimensional arrays")
+        println("  OK Multi-dimensional arrays")
     end
 
     # Test 7: Zero-sized allocation
@@ -120,7 +120,7 @@ using StaticTools
 
         report = analyze_escapes(zero_sized, ())
         @test !isnothing(report)
-        println("  ✓ Zero-sized allocation")
+        println("  OK Zero-sized allocation")
     end
 end
 
@@ -138,7 +138,7 @@ end
         report = analyze_monomorphization(recursive_abstract, (Number, Int))
         @test report.has_abstract_types
         @test report.function_name == :recursive_abstract
-        println("  ✓ Recursive with abstract types")
+        println("  OK Recursive with abstract types")
     end
 
     # Test 2: Multiple abstract type hierarchies
@@ -159,7 +159,7 @@ end
         @test report.has_abstract_types
         # Should find multiple abstract parameters
         @test length(report.abstract_parameters) >= 2
-        println("  ✓ Multiple abstract hierarchies")
+        println("  OK Multiple abstract hierarchies")
     end
 
     # Test 3: Deeply nested type parameters
@@ -170,7 +170,7 @@ end
 
         report = analyze_monomorphization(process_nested, (Vector{Vector{Number}},))
         @test report.has_abstract_types
-        println("  ✓ Nested type parameters")
+        println("  OK Nested type parameters")
     end
 
     # Test 4: UnionAll types
@@ -182,7 +182,7 @@ end
         report = analyze_monomorphization(generic_vector, (Vector{Int},))
         # Concrete instantiation, should not need monomorphization
         @test !isnothing(report)
-        println("  ✓ UnionAll types")
+        println("  OK UnionAll types")
     end
 
     # Test 5: Abstract types with no subtypes
@@ -196,7 +196,7 @@ end
         # This should be analyzable even though type has no subtypes
         report = analyze_monomorphization(use_empty, (EmptyAbstract,))
         @test report.has_abstract_types
-        println("  ✓ Abstract with no subtypes")
+        println("  OK Abstract with no subtypes")
     end
 end
 
@@ -217,7 +217,7 @@ end
 
         report = analyze_devirtualization(dispatch_deep, (Level2A,))
         @test !isnothing(report)
-        println("  ✓ Deep inheritance")
+        println("  OK Deep inheritance")
     end
 
     # Test 2: Many method targets (>10)
@@ -238,7 +238,7 @@ end
         Type1 = @eval Type1
         report = analyze_devirtualization(dispatch_many, (Type1,))
         @test !isnothing(report)
-        println("  ✓ Many method targets")
+        println("  OK Many method targets")
     end
 
     # Test 3: Recursive dispatch
@@ -259,7 +259,7 @@ end
 
         report = analyze_devirtualization(height, (Leaf,))
         @test !isnothing(report)
-        println("  ✓ Recursive dispatch")
+        println("  OK Recursive dispatch")
     end
 end
 
@@ -279,7 +279,7 @@ end
 
         report = analyze_lifetimes(early_return, (Int,))
         @test !isnothing(report)
-        println("  ✓ Early return with allocation")
+        println("  OK Early return with allocation")
     end
 
     # Test 2: Multiple allocations with different lifetimes
@@ -296,7 +296,7 @@ end
         report = analyze_lifetimes(multi_alloc, (Int,))
         @test !isnothing(report)
         # Should track both allocations
-        println("  ✓ Multiple allocations")
+        println("  OK Multiple allocations")
     end
 
     # Test 3: Conditional free (potential double-free)
@@ -314,7 +314,7 @@ end
         report = analyze_lifetimes(conditional_free, (Bool, Int))
         @test !isnothing(report)
         # Should detect missing free path
-        println("  ✓ Conditional free")
+        println("  OK Conditional free")
     end
 
     # Test 4: Allocation in loop
@@ -331,7 +331,7 @@ end
 
         report = analyze_lifetimes(loop_malloc, (Int,))
         @test !isnothing(report)
-        println("  ✓ Loop allocation")
+        println("  OK Loop allocation")
     end
 end
 
@@ -349,7 +349,7 @@ end
         @test !isnothing(report)
         # With literals, we should detect foldable expressions
         @test report.foldable_expressions > 0
-        println("  ✓ Complex constant expressions")
+        println("  OK Complex constant expressions")
     end
 
     # Test 2: Dead code with multiple branches
@@ -369,7 +369,7 @@ end
 
         report = analyze_constants(multi_branch, (Int,))
         @test !isnothing(report)
-        println("  ✓ Multiple dead branches")
+        println("  OK Multiple dead branches")
     end
 
     # Test 3: Nested constant propagation
@@ -384,7 +384,7 @@ end
 
         report = analyze_constants(nested_const, ())
         @test !isnothing(report)
-        println("  ✓ Nested constants")
+        println("  OK Nested constants")
     end
 
     # Test 4: Type-based constant propagation
@@ -395,7 +395,7 @@ end
 
         report = analyze_constants(type_const, (Type{Int64},))
         @test !isnothing(report)
-        println("  ✓ Type-based constants")
+        println("  OK Type-based constants")
     end
 end
 
@@ -405,7 +405,7 @@ end
         report = analyze_escapes(+, (Int, Int))
         @test !isnothing(report)
         # Should handle gracefully
-        println("  ✓ Native function")
+        println("  OK Native function")
     end
 
     # Test 2: Function with type instability
@@ -420,7 +420,7 @@ end
 
         report = analyze_monomorphization(type_unstable, (Int,))
         @test !isnothing(report)
-        println("  ✓ Type unstable function")
+        println("  OK Type unstable function")
     end
 
     # Test 3: Very large function
@@ -438,7 +438,7 @@ end
 
         report = analyze_constants(large_function, (Int,))
         @test !isnothing(report)
-        println("  ✓ Large function")
+        println("  OK Large function")
     end
 
     # Test 4: Function with exceptions
@@ -452,7 +452,7 @@ end
 
         report = analyze_escapes(with_exception, (Int,))
         @test !isnothing(report)
-        println("  ✓ Function with exceptions")
+        println("  OK Function with exceptions")
     end
 
     # Test 5: Function with @generated
@@ -465,10 +465,10 @@ end
         try
             report = analyze_escapes(generated_func, (Int,))
             @test !isnothing(report)
-            println("  ✓ Generated function")
+            println("  OK Generated function")
         catch e
             @test true  # Expected to fail gracefully
-            println("  ✓ Generated function (correctly rejected)")
+            println("  OK Generated function (correctly rejected)")
         end
     end
 end

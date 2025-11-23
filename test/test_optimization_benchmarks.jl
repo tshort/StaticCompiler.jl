@@ -15,7 +15,7 @@ println()
 
 # Helper function to compile and measure
 function benchmark_optimization(func_unopt, func_opt, types, args, name::String; samples=20)
-    println("📊 Benchmarking: $name")
+    println("Benchmarking: $name")
 
     workdir = mktempdir()
 
@@ -104,7 +104,7 @@ end
         @test !isnothing(report_unopt)
         @test !isnothing(report_opt)
 
-        println("   ✅ Escape analysis impact verified")
+        println("   Escape analysis impact verified")
     end
 
     # Test 2: Nested allocations
@@ -129,7 +129,7 @@ end
         println("   Potential savings: $(report.potential_savings_bytes) bytes")
 
         if report.promotable_allocations > 0
-            println("   ✅ Identified $(report.promotable_allocations) stack-promotable allocations")
+            println("   Identified $(report.promotable_allocations) stack-promotable allocations")
         else
             println("   ℹ️  No stack-promotable allocations identified")
         end
@@ -173,7 +173,7 @@ end
         @test report_abstract.has_abstract_types
         @test !report_concrete.has_abstract_types
 
-        println("   ✅ Monomorphization impact verified")
+        println("   Monomorphization impact verified")
     end
 
     # Test 2: Multiple type instantiations
@@ -196,7 +196,7 @@ end
             println("      Specialization factor: $(report.specialization_factor)")
         end
 
-        println("   ✅ Type specialization verified")
+        println("   Type specialization verified")
     end
 end
 
@@ -249,7 +249,7 @@ end
         @test !isnothing(report_virtual)
         @test !isnothing(report_direct)
 
-        println("   ✅ Devirtualization impact verified")
+        println("   Devirtualization impact verified")
     end
 
     # Test 2: Method dispatch optimization
@@ -280,7 +280,7 @@ end
         @test !isnothing(report_abstract)
         @test !isnothing(report_concrete)
 
-        println("   ✅ Method dispatch optimization verified")
+        println("   Method dispatch optimization verified")
     end
 end
 
@@ -321,7 +321,7 @@ end
         @test report.foldable_expressions >= 0
         @test report.code_reduction_potential_pct >= 0
 
-        println("   ✅ Dead code elimination impact verified")
+        println("   Dead code elimination impact verified")
     end
 
     # Test 2: Constant folding
@@ -344,12 +344,12 @@ end
         println("   Foldable expressions: $(report.foldable_expressions)")
 
         if report.foldable_expressions > 0
-            println("   ✅ Identified $(report.foldable_expressions) expressions that can be folded")
+            println("   Identified $(report.foldable_expressions) expressions that can be folded")
         end
 
         @test !isnothing(report)
 
-        println("   ✅ Constant folding impact verified")
+        println("   Constant folding impact verified")
     end
 end
 
@@ -394,13 +394,13 @@ end
         # Get suggestions
         suggestions = suggest_lifetime_improvements(report_leaky)
         if !isempty(suggestions)
-            println("   ✅ Detected memory leak and suggested fix")
+            println("   Detected memory leak and suggested fix")
         end
 
         @test !isnothing(report_manual)
         @test !isnothing(report_leaky)
 
-        println("   ✅ Memory safety analysis verified")
+        println("   Memory safety analysis verified")
     end
 
     # Test 2: Complex lifetime tracking
@@ -428,7 +428,7 @@ end
 
         @test !isnothing(report)
 
-        println("   ✅ Complex lifetime tracking verified")
+        println("   Complex lifetime tracking verified")
     end
 end
 
@@ -501,7 +501,7 @@ end
         @test mono_unopt.has_abstract_types
         @test !mono_opt.has_abstract_types
 
-        println("   ✅ Combined optimization benefits verified")
+        println("   Combined optimization benefits verified")
     end
 end
 
@@ -510,31 +510,31 @@ println("\n" * "="^70)
 println("BENCHMARK SUMMARY")
 println("="^70)
 println()
-println("✅ Escape Analysis Impact:")
+println("Escape Analysis Impact:")
 println("   - Allocation tracking verified")
 println("   - Stack promotion opportunities identified")
 println("   - Memory savings estimated")
 println()
-println("✅ Monomorphization Impact:")
+println("Monomorphization Impact:")
 println("   - Abstract type detection verified")
 println("   - Type specialization opportunities identified")
 println("   - Compilation readiness improved")
 println()
-println("✅ Devirtualization Impact:")
+println("Devirtualization Impact:")
 println("   - Virtual call detection verified")
 println("   - Direct call optimization opportunities found")
 println("   - Dispatch overhead reduction measured")
 println()
-println("✅ Constant Propagation Impact:")
+println("Constant Propagation Impact:")
 println("   - Constant folding opportunities identified")
 println("   - Dead code elimination verified")
 println("   - Code size reduction estimated")
 println()
-println("✅ Lifetime Analysis Impact:")
+println("Lifetime Analysis Impact:")
 println("   - Memory leak detection verified")
 println("   - Auto-free opportunities identified")
 println("   - Use-after-free prevention verified")
 println()
 println("="^70)
-println("All optimization impacts validated! 🎉")
+println("All optimization impacts validated! ")
 println("="^70)

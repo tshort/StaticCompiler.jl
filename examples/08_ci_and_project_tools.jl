@@ -78,7 +78,7 @@ results = batch_check_cached(functions_to_analyze)
 
 println("\nResults:")
 for (name, report) in sort(collect(results), by=x->x[2].score, rev=true)
-    status = report.ready_for_compilation ? "✅" : "❌"
+    status = report.ready_for_compilation ? "" : ""
     println("  $status $name: $(report.score)/100")
 end
 println()
@@ -117,9 +117,9 @@ passed = check_quality_gate(results,
                             exit_on_fail=false)
 
 if passed
-    println("Would allow deployment ✅")
+    println("Would allow deployment ")
 else
-    println("Would block deployment ❌")
+    println("Would block deployment ")
 end
 println()
 
@@ -233,8 +233,8 @@ println("  analyze_module()      - Analyze entire module")
 println("  compare_modules()     - Compare two modules")
 println()
 println("Benefits:")
-println("  ✅ Faster repeated analysis (caching)")
-println("  ✅ CI/CD integration (quality gates)")
-println("  ✅ Project-wide analysis (find all functions)")
-println("  ✅ Automated reporting (MD, JSON, GitHub)")
+println("  Faster repeated analysis (caching)")
+println("  CI/CD integration (quality gates)")
+println("  Project-wide analysis (find all functions)")
+println("  Automated reporting (MD, JSON, GitHub)")
 println("="^70)

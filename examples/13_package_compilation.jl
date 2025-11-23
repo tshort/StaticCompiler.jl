@@ -81,7 +81,7 @@ try
     lib_path = compile_package(SimpleMath, signatures, output_dir1, "simplemath")
 
     println()
-    println("✅ Package compiled successfully!")
+    println("Package compiled successfully!")
     println("   Library: $lib_path")
     println()
 
@@ -122,7 +122,7 @@ try
                                namespace="mymath")
 
     println()
-    println("✅ Compiled with custom namespace 'mymath'")
+    println("Compiled with custom namespace 'mymath'")
     println("   Functions: mymath_add, mymath_subtract, ...")
     println()
 catch e
@@ -150,7 +150,7 @@ try
     lib_path = compile_package_exports(SimpleMath, signatures,
                                        output_dir3, "exports_only")
 
-    println("✅ Compiled only exported functions")
+    println("Compiled only exported functions")
     println("   (internal_helper was skipped)")
     println()
 catch e
@@ -194,7 +194,7 @@ try
     lib_path = compile_package(PolyMath, poly_signatures,
                                output_dir4, "polymath")
 
-    println("✅ Compiled 3 variants of compute function")
+    println("Compiled 3 variants of compute function")
     println()
 catch e
     println("Error: $e")
@@ -220,7 +220,7 @@ try
                                output_dir5, "simplemath_prod",
                                template=:production)
 
-    println("✅ Compiled with :production template")
+    println("Compiled with :production template")
     println("   All functions verified with strict quality standards")
     println()
 catch e
@@ -303,7 +303,7 @@ try
                                generate_header=true)
 
     println()
-    println("✅ Statistics library compiled!")
+    println("Statistics library compiled!")
     println()
 
     # Show the generated header
@@ -356,29 +356,29 @@ println("-"^70)
 println()
 
 println("1. Use meaningful module names")
-println("   ✓ module MathOps")
-println("   ✗ module M")
+println("   OK module MathOps")
+println("   FAIL module M")
 println()
 
 println("2. Export only the public API")
-println("   ✓ Keep internal helpers private")
+println("   OK Keep internal helpers private")
 println()
 
 println("3. Use consistent type signatures")
-println("   ✓ All Int or all Int64, not mixed")
+println("   OK All Int or all Int64, not mixed")
 println()
 
 println("4. Document expected C usage")
-println("   ✓ Add doc strings with C examples")
+println("   OK Add doc strings with C examples")
 println()
 
 println("5. Use templates for consistency")
-println("   ✓ template=:production for releases")
+println("   OK template=:production for releases")
 println()
 
 println("6. Choose meaningful library names")
-println("   ✓ libmyproject_math.so")
-println("   ✗ liblib.so")
+println("   OK libmyproject_math.so")
+println("   FAIL liblib.so")
 println()
 
 # ============================================================================
@@ -467,12 +467,12 @@ println("="^70)
 println()
 println("Package-level compilation allows you to:")
 println()
-println("✓ Compile entire modules/packages at once")
-println("✓ Avoid tedious function-by-function compilation")
-println("✓ Automatic namespace management")
-println("✓ Generate complete libraries with headers")
-println("✓ Use templates for consistent quality")
-println("✓ Create reusable components")
+println("OK Compile entire modules/packages at once")
+println("OK Avoid tedious function-by-function compilation")
+println("OK Automatic namespace management")
+println("OK Generate complete libraries with headers")
+println("OK Use templates for consistent quality")
+println("OK Create reusable components")
 println()
 println("Key functions:")
 println("  compile_package(module, signatures, path, name)")

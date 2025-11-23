@@ -77,7 +77,7 @@ output_dir1 = mktempdir()
 try
     lib_path = compile_shlib(calculate_sum, (Int,), output_dir1, "calc_embedded",
                              template=:embedded)
-    println("✅ Compiled: $lib_path")
+    println("Compiled: $lib_path")
     println()
 catch e
     println("Error: $e")
@@ -91,7 +91,7 @@ output_dir2 = mktempdir()
 try
     lib_path = compile_shlib(calculate_sum, (Int,), output_dir2, "calc_perf",
                              template=:performance)
-    println("✅ Compiled: $lib_path")
+    println("Compiled: $lib_path")
     println()
 catch e
     println("Error: $e")
@@ -105,7 +105,7 @@ output_dir3 = mktempdir()
 try
     lib_path = compile_shlib(calculate_sum, (Int,), output_dir3, "calc_debug",
                              template=:debugging)
-    println("✅ Compiled: $lib_path")
+    println("Compiled: $lib_path")
     println()
 catch e
     println("Error: $e")
@@ -137,7 +137,7 @@ try
                              template=:embedded,
                              min_score=80)  # Override template default
 
-    println("✅ Successfully used template with custom override")
+    println("Successfully used template with custom override")
     println()
 catch e
     println("Error: $e")
@@ -161,7 +161,7 @@ output_dir5 = mktempdir()
 try
     lib_path = compile_with_template(:production, calculate_sum, (Int,),
                                       output_dir5, "calc_production")
-    println("✅ Compiled using compile_with_template")
+    println("Compiled using compile_with_template")
     println()
 catch e
     println("Error: $e")
@@ -200,7 +200,7 @@ try
     lib_path = compile_shlib(functions, output_dir6,
                              filename="math_ops",
                              template=:production)
-    println("✅ Batch compiled with production template")
+    println("Batch compiled with production template")
     println()
 catch e
     println("Error: $e")
@@ -287,7 +287,7 @@ println("Using custom configuration:")
 try
     lib_path = compile_shlib(calculate_sum, (Int,), output_dir7, "custom",
                              MY_PROJECT_CONFIG...)
-    println("✅ Compiled with custom configuration")
+    println("Compiled with custom configuration")
     println()
 catch e
     println("Error: $e")
@@ -313,7 +313,7 @@ try
     lib_path = compile_shlib(calculate_sum, (Int,), output_dir8, "combined",
                              template=:performance,
                              cflags=`-O3`)  # Additional optimization
-    println("✅ Template combined with custom cflags")
+    println("Template combined with custom cflags")
     println()
 catch e
     println("Error: $e")
@@ -330,28 +330,28 @@ println("-"^70)
 println()
 
 println(":embedded template enables:")
-println("  ✓ Code quality verification (min_score=90)")
-println("  ✓ C header generation (for integration)")
-println("  ✓ Strict standards (for embedded reliability)")
+println("  OK Code quality verification (min_score=90)")
+println("  OK C header generation (for integration)")
+println("  OK Strict standards (for embedded reliability)")
 println()
 
 println(":performance template enables:")
-println("  ✓ Code quality verification (min_score=85)")
-println("  ✓ C header generation (for benchmarking)")
-println("  ✓ Focus on speed over size")
+println("  OK Code quality verification (min_score=85)")
+println("  OK C header generation (for benchmarking)")
+println("  OK Focus on speed over size")
 println()
 
 println(":debugging template enables:")
-println("  ✓ Permissive verification (min_score=70)")
-println("  ✓ Analysis export (for diagnostics)")
-println("  ✓ C header generation")
-println("  ✓ Helpful suggestions")
+println("  OK Permissive verification (min_score=70)")
+println("  OK Analysis export (for diagnostics)")
+println("  OK C header generation")
+println("  OK Helpful suggestions")
 println()
 
 println(":production template enables:")
-println("  ✓ Strict verification (min_score=90)")
-println("  ✓ Complete documentation (headers + reports)")
-println("  ✓ Quality enforcement")
+println("  OK Strict verification (min_score=90)")
+println("  OK Complete documentation (headers + reports)")
+println("  OK Quality enforcement")
 println()
 
 # ============================================================================
@@ -394,12 +394,12 @@ println("="^70)
 println()
 println("Compilation templates provide pre-configured settings for:")
 println()
-println("✓ :embedded   - IoT/embedded systems (small, strict)")
-println("✓ :performance - HPC/computation (fast, optimized)")
-println("✓ :portable    - Broad compatibility (conservative)")
-println("✓ :debugging   - Development (helpful, permissive)")
-println("✓ :production  - Deployment (strict, documented)")
-println("✓ :default     - Standard behavior")
+println("OK :embedded   - IoT/embedded systems (small, strict)")
+println("OK :performance - HPC/computation (fast, optimized)")
+println("OK :portable    - Broad compatibility (conservative)")
+println("OK :debugging   - Development (helpful, permissive)")
+println("OK :production  - Deployment (strict, documented)")
+println("OK :default     - Standard behavior")
 println()
 println("Benefits:")
 println("  • No need to remember parameter combinations")

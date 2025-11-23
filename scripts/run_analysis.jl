@@ -39,7 +39,7 @@ try
     mkpath("reports")
     generate_ci_report(results, report_path)
 
-    println("✅ Reports generated:")
+    println("Reports generated:")
     println("   Markdown: $(report_path).md")
     println("   JSON:     $(report_path).json")
     println()
@@ -48,17 +48,17 @@ try
     summary = analysis[:summary]
 
     if summary[:average_score] >= QUALITY_THRESHOLD
-        println("✅ Analysis PASSED - Quality threshold met")
+        println("Analysis PASSED - Quality threshold met")
         exit(0)
     else
-        println("⚠️  Analysis WARNING - Quality below threshold")
+        println(" Analysis WARNING - Quality below threshold")
         println("   Current: $(summary[:average_score])/100")
         println("   Required: $QUALITY_THRESHOLD/100")
         exit(1)
     end
 
 catch e
-    println("❌ Error during analysis:")
+    println("Error during analysis:")
     println(e)
     exit(1)
 end

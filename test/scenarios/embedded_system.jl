@@ -22,7 +22,7 @@ using StaticTools
     # - Real-time constraints (<1ms processing)
 
     @testset "Temperature sensor processing" begin
-        println("📊 Test 1: Temperature Sensor Data Processing")
+        println("Test 1: Temperature Sensor Data Processing")
         println("   Requirement: Process sensor data without heap allocations")
         println()
 
@@ -65,12 +65,12 @@ using StaticTools
         # The optimized version should have significantly fewer allocations
         @test length(report_opt.allocations) <= length(report_unopt.allocations)
 
-        println("   ✅ Embedded system optimization verified")
+        println("   Embedded system optimization verified")
         println()
     end
 
     @testset "PWM signal generation" begin
-        println("📊 Test 2: PWM Signal Generation")
+        println("Test 2: PWM Signal Generation")
         println("   Requirement: Fixed-time execution, no allocations")
         println()
 
@@ -93,12 +93,12 @@ using StaticTools
         const_report = analyze_constants(calculate_pwm_duty_cycle, (Float32, Float32))
         println("      Foldable expressions: $(const_report.foldable_expressions)")
 
-        println("   ✅ PWM signal generation verified")
+        println("   PWM signal generation verified")
         println()
     end
 
     @testset "Circular buffer management" begin
-        println("📊 Test 3: Circular Buffer for Sensor History")
+        println("Test 3: Circular Buffer for Sensor History")
         println("   Requirement: Fixed-size buffer, no dynamic allocation")
         println()
 
@@ -141,12 +141,12 @@ using StaticTools
         @test length(report_push.allocations) == 0
         @test length(report_avg.allocations) == 0
 
-        println("   ✅ Circular buffer verified")
+        println("   Circular buffer verified")
         println()
     end
 
     @testset "Binary size constraints" begin
-        println("📊 Test 4: Binary Size Validation")
+        println("Test 4: Binary Size Validation")
         println("   Requirement: Binary must fit in 32KB flash")
         println()
 
@@ -170,12 +170,12 @@ using StaticTools
         # More constants = smaller code
         @test const_report.foldable_expressions >= 0
 
-        println("   ✅ Binary size analysis complete")
+        println("   Binary size analysis complete")
         println()
     end
 
     println("-"^70)
-    println("✅ EMBEDDED SYSTEM SCENARIO COMPLETE")
+    println("EMBEDDED SYSTEM SCENARIO COMPLETE")
     println("-"^70)
     println()
     println("Summary:")
@@ -184,6 +184,6 @@ using StaticTools
     println("  • Constant propagation opportunities identified")
     println("  • Binary size optimization validated")
     println()
-    println("Embedded System Readiness: ✅ PASS")
+    println("Embedded System Readiness: PASS")
     println()
 end

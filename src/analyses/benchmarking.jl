@@ -137,17 +137,17 @@ function benchmark_compilation(f::Function, types::Tuple, path::String, name::St
             elapsed = time() - start_time
             push!(times, elapsed)
             successes += 1
-            println("  Sample $i/$samples: $(round(elapsed, digits=2))s ✅")
+            println("  Sample $i/$samples: $(round(elapsed, digits=2))s ")
         catch e
             elapsed = time() - start_time
             push!(times, elapsed)
-            println("  Sample $i/$samples: $(round(elapsed, digits=2))s ❌ (failed)")
+            println("  Sample $i/$samples: $(round(elapsed, digits=2))s (failed)")
         end
     end
     println()
 
     if isempty(times)
-        println("⚠️  No successful compilations")
+        println(" No successful compilations")
         return Dict(:success => false)
     end
 
@@ -225,11 +225,11 @@ function compare_performance(old_func::Function, new_func::Function, types::Tupl
     println()
 
     if speedup > 1.0
-        println("✅ Improvement: $(round(improvement, digits=1))% faster ($(round(speedup, digits=2))x speedup)")
+        println("Improvement: $(round(improvement, digits=1))% faster ($(round(speedup, digits=2))x speedup)")
     elseif speedup < 1.0
-        println("⚠️  Regression: $(round(-improvement, digits=1))% slower ($(round(1/speedup, digits=2))x slowdown)")
+        println(" Regression: $(round(-improvement, digits=1))% slower ($(round(1/speedup, digits=2))x slowdown)")
     else
-        println("➡️  No significant change")
+        println("->  No significant change")
     end
     println()
     println("="^70)
@@ -261,7 +261,7 @@ Appends current analysis results to a history file for trend tracking.
 # Example
 ```julia
 julia> track_quality_over_time(my_func, (Int,), "quality_history.json")
-✅ Quality tracked: score 85/100
+Quality tracked: score 85/100
    History file: quality_history.json
 ```
 """
@@ -301,7 +301,7 @@ function track_quality_over_time(f::Function, types::Tuple, history_file::String
         JSON.print(io, history, 2)
     end
 
-    println("✅ Quality tracked: score $(report.score)/100")
+    println("Quality tracked: score $(report.score)/100")
     println("   History file: $history_file")
     println("   Total entries: $(length(history))")
 
@@ -338,14 +338,14 @@ julia> plot_quality_history("quality_history.json")
 """
 function plot_quality_history(history_file::String)
     if !isfile(history_file)
-        println("❌ History file not found: $history_file")
+        println("History file not found: $history_file")
         return
     end
 
     history = JSON.parsefile(history_file)
 
     if isempty(history)
-        println("❌ No history data found")
+        println("No history data found")
         return
     end
 

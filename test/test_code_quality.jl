@@ -17,7 +17,7 @@ println()
     pkg_root = pkgdir(StaticCompiler)
 
     @testset "Project structure" begin
-        println("📋 Checking project structure...")
+        println("Checking project structure...")
 
         # Check essential files exist
         @test isfile(joinpath(pkg_root, "Project.toml"))
@@ -25,33 +25,33 @@ println()
         @test isdir(joinpath(pkg_root, "src"))
         @test isdir(joinpath(pkg_root, "test"))
 
-        println("  ✓ Project structure valid")
+        println("  OK Project structure valid")
     end
 
     @testset "Source file organization" begin
-        println("📁 Checking source files...")
+        println("Checking source files...")
 
         src_dir = joinpath(pkg_root, "src")
         src_files = filter(f -> endswith(f, ".jl"), readdir(src_dir))
         @test !isempty(src_files)
         @test "StaticCompiler.jl" in src_files
 
-        println("  ✓ Source files organized")
+        println("  OK Source files organized")
     end
 
     @testset "Test file organization" begin
-        println("📁 Checking test files...")
+        println("Checking test files...")
 
         test_dir = joinpath(pkg_root, "test")
         test_files = filter(f -> endswith(f, ".jl"), readdir(test_dir))
         @test !isempty(test_files)
         @test "runtests.jl" in test_files
 
-        println("  ✓ Test files organized")
+        println("  OK Test files organized")
     end
 
     @testset "Documentation presence" begin
-        println("📚 Checking documentation...")
+        println("Checking documentation...")
 
         # Check for key documentation
         @test isfile(joinpath(pkg_root, "README.md"))
@@ -63,11 +63,11 @@ println()
             println("  Found $(length(guides)) guide files")
         end
 
-        println("  ✓ Documentation present")
+        println("  OK Documentation present")
     end
 
     @testset "No obvious code smells" begin
-        println("🔍 Checking for code smells...")
+        println("Checking for code smells...")
 
         # Check that source files aren't too large
         src_dir = joinpath(pkg_root, "src")
@@ -82,11 +82,11 @@ println()
             end
         end
 
-        println("  ✓ No major code smells detected")
+        println("  OK No major code smells detected")
     end
 
     @testset "Naming conventions" begin
-        println("📝 Checking naming conventions...")
+        println("Checking naming conventions...")
 
         # Check that test files follow naming convention
         test_dir = joinpath(pkg_root, "test")
@@ -100,13 +100,13 @@ println()
             end
         end
 
-        println("  ✓ Naming conventions reasonable")
+        println("  OK Naming conventions reasonable")
     end
 end
 
 println()
 println("="^70)
-println("✅ Code quality checks complete")
+println("Code quality checks complete")
 println("="^70)
 println()
 

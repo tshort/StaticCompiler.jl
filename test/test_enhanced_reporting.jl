@@ -55,7 +55,7 @@ function generate_test_summary_report(results::Vector{TestReport}; output_file=n
     println(report, "-"^80)
 
     for result in results
-        status = result.failed == 0 ? "✅ PASS" : "❌ FAIL"
+        status = result.failed == 0 ? "PASS" : "FAIL"
         duration_str = lpad("$(round(result.duration_ms/1000, digits=2))s", 8)
         println(report, "  $status  $(rpad(result.name, 40)) $duration_str  ($(result.passed) passed, $(result.failed) failed)")
     end
@@ -136,18 +136,18 @@ end
     ]
 
     @testset "Test summary generation" begin
-        println("📊 Generating test summary...")
+        println("Generating test summary...")
 
         report = generate_test_summary_report(sample_results)
         @test !isempty(report)
         @test occursin("TEST EXECUTION SUMMARY", report)
         @test occursin("PASS", report)
 
-        println("  ✓ Summary report generated")
+        println("  OK Summary report generated")
     end
 
     @testset "JUnit XML generation" begin
-        println("📊 Generating JUnit XML...")
+        println("Generating JUnit XML...")
 
         output_file = tempname() * ".xml"
         xml = generate_junit_xml(sample_results, output_file)
@@ -160,12 +160,12 @@ end
         # Cleanup
         rm(output_file, force=true)
 
-        println("  ✓ JUnit XML generated")
+        println("  OK JUnit XML generated")
     end
 
     println()
     println("="^70)
-    println("✅ Enhanced reporting tests complete")
+    println("Enhanced reporting tests complete")
     println("="^70)
     println()
 end

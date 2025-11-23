@@ -22,7 +22,7 @@ using StaticTools
     # - Small binary for container deployment
 
     @testset "JSON parsing and validation" begin
-        println("📊 Test 1: Request Parsing and Validation")
+        println("Test 1: Request Parsing and Validation")
         println("   Requirement: Fast request parsing with minimal allocation")
         println()
 
@@ -64,12 +64,12 @@ using StaticTools
         # Should be allocation-free for low latency
         @test !isnothing(escape_report)
 
-        println("   ✅ Request parsing analyzed")
+        println("   Request parsing analyzed")
         println()
     end
 
     @testset "Response formatting" begin
-        println("📊 Test 2: Response Formatting")
+        println("Test 2: Response Formatting")
         println("   Requirement: Fast response generation")
         println()
 
@@ -93,12 +93,12 @@ using StaticTools
         # Should have minimal allocations
         @test length(escape_report.allocations) == 0
 
-        println("   ✅ Response formatting analyzed")
+        println("   Response formatting analyzed")
         println()
     end
 
     @testset "Rate limiting logic" begin
-        println("📊 Test 3: Rate Limiting")
+        println("Test 3: Rate Limiting")
         println("   Requirement: Fast rate limit checking")
         println()
 
@@ -134,12 +134,12 @@ using StaticTools
         # Must be allocation-free for hot path
         @test length(escape_report.allocations) == 0
 
-        println("   ✅ Rate limiting analyzed")
+        println("   Rate limiting analyzed")
         println()
     end
 
     @testset "Cache key generation" begin
-        println("📊 Test 4: Cache Key Generation")
+        println("Test 4: Cache Key Generation")
         println("   Requirement: Fast cache key computation")
         println()
 
@@ -162,12 +162,12 @@ using StaticTools
         # Should be completely allocation-free
         @test length(escape_report.allocations) == 0
 
-        println("   ✅ Cache key generation analyzed")
+        println("   Cache key generation analyzed")
         println()
     end
 
     @testset "Data validation" begin
-        println("📊 Test 5: Input Data Validation")
+        println("Test 5: Input Data Validation")
         println("   Requirement: Fast validation with clear error paths")
         println()
 
@@ -192,12 +192,12 @@ using StaticTools
 
         @test !isnothing(escape_report)
 
-        println("   ✅ Input validation analyzed")
+        println("   Input validation analyzed")
         println()
     end
 
     @testset "Request routing" begin
-        println("📊 Test 6: Request Routing Logic")
+        println("Test 6: Request Routing Logic")
         println("   Requirement: Fast endpoint dispatch")
         println()
 
@@ -227,12 +227,12 @@ using StaticTools
 
         @test !isnothing(devirt_report)
 
-        println("   ✅ Request routing analyzed")
+        println("   Request routing analyzed")
         println()
     end
 
     @testset "Connection pooling logic" begin
-        println("📊 Test 7: Connection Pool Management")
+        println("Test 7: Connection Pool Management")
         println("   Requirement: Efficient connection reuse")
         println()
 
@@ -263,12 +263,12 @@ using StaticTools
         # Should be allocation-free
         @test !isnothing(escape_report)
 
-        println("   ✅ Connection pooling analyzed")
+        println("   Connection pooling analyzed")
         println()
     end
 
     @testset "Error handling paths" begin
-        println("📊 Test 8: Error Handling Optimization")
+        println("Test 8: Error Handling Optimization")
         println("   Requirement: Fast error responses")
         println()
 
@@ -302,12 +302,12 @@ using StaticTools
 
         @test !isnothing(const_report)
 
-        println("   ✅ Error handling analyzed")
+        println("   Error handling analyzed")
         println()
     end
 
     println("-"^70)
-    println("✅ WEB SERVICE SCENARIO COMPLETE")
+    println("WEB SERVICE SCENARIO COMPLETE")
     println("-"^70)
     println()
     println("Summary:")
@@ -320,7 +320,7 @@ using StaticTools
     println("  • Connection pooling efficient")
     println("  • Error handling optimized")
     println()
-    println("Web Service Readiness: ✅ PASS")
+    println("Web Service Readiness: PASS")
     println("Expected Performance: <10ms p99 latency")
     println()
 end

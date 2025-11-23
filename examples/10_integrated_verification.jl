@@ -123,7 +123,7 @@ try
     # Check if report exists
     report_file = joinpath(report_dir, "simple_sum_analysis.json")
     if isfile(report_file)
-        println("✅ Report file exists: $report_file")
+        println("Report file exists: $report_file")
         println("   Size: $(filesize(report_file)) bytes")
     end
     println()
@@ -227,12 +227,12 @@ println("  compile_shlib(func, types, path, name, verify=true)")
 println()
 
 println("Benefits of integrated verification:")
-println("  ✓ More convenient - just add verify=true")
-println("  ✓ Works with existing code")
-println("  ✓ Customizable thresholds")
-println("  ✓ Optional report export")
-println("  ✓ Works with batch compilation")
-println("  ✓ Backward compatible (verify=false by default)")
+println("  OK More convenient - just add verify=true")
+println("  OK Works with existing code")
+println("  OK Customizable thresholds")
+println("  OK Optional report export")
+println("  OK Works with batch compilation")
+println("  OK Backward compatible (verify=false by default)")
 println()
 
 # ============================================================================

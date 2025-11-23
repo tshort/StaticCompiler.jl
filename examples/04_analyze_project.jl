@@ -104,9 +104,9 @@ for (name, func, types) in functions_to_check
     
     # Display results
     if ready
-        println("  ✅ READY (score: $score/100)")
+        println("  READY (score: $score/100)")
     else
-        println("  ❌ NOT READY (score: $score/100)")
+        println("  NOT READY (score: $score/100)")
         for issue in issues
             println("     • $issue")
         end
@@ -144,7 +144,7 @@ println()
 # Show ready functions
 ready_funcs = filter(r -> r.ready, results)
 if !isempty(ready_funcs)
-    println("✅ READY FOR COMPILATION:")
+    println("READY FOR COMPILATION:")
     for r in ready_funcs
         println("   • $(r.name) (score: $(r.score)/100)")
     end
@@ -154,7 +154,7 @@ end
 # Show functions needing work
 not_ready = filter(r -> !r.ready, results)
 if !isempty(not_ready)
-    println("❌ NEED FIXES:")
+    println("NEED FIXES:")
     for r in not_ready
         println("   • $(r.name) (score: $(r.score)/100)")
         for issue in r.issues
@@ -171,7 +171,7 @@ println("="^70)
 sorted_results = sort(results, by=r->r.score, rev=true)
 
 for (i, r) in enumerate(sorted_results)
-    status = r.ready ? "✅" : "❌"
+    status = r.ready ? "" : ""
     bar_len = div(r.score, 2)  # Scale to 50 chars
     bar = "█"^bar_len * "░"^(50-bar_len)
     separator = "│"
@@ -200,7 +200,7 @@ if total_issues > 0
     println("  • Dynamic dispatch:   $dispatch_count")
     println("  • Memory leaks:       $leak_count")
 else
-    println("✅ No issues found! All functions ready for compilation.")
+    println("No issues found! All functions ready for compilation.")
 end
 println()
 
@@ -210,14 +210,14 @@ println("RECOMMENDATIONS")
 println("="^70)
 
 if abstract_count > 0
-    println("📝 Abstract Types ($abstract_count functions):")
+    println("Abstract Types ($abstract_count functions):")
     println("   Replace abstract types (Number, Real) with concrete types (Int, Float64)")
     println("   Or use type parameters: function f(x::T) where {T<:Number}")
     println()
 end
 
 if alloc_count > 0
-    println("📝 Heap Allocations ($alloc_count functions):")
+    println("Heap Allocations ($alloc_count functions):")
     println("   • Use StaticArrays for fixed-size arrays")
     println("   • Use MallocArray for dynamic sizes (remember to free!)")
     println("   • Consider Bumper.jl for arena allocation")
@@ -225,13 +225,13 @@ if alloc_count > 0
 end
 
 if dispatch_count > 0
-    println("📝 Dynamic Dispatch ($dispatch_count functions):")
+    println("Dynamic Dispatch ($dispatch_count functions):")
     println("   Use concrete types to enable compile-time method resolution")
     println()
 end
 
 if leak_count > 0
-    println("📝 Memory Leaks ($leak_count functions):")
+    println("Memory Leaks ($leak_count functions):")
     println("   Add free() calls for all MallocArray allocations")
     println()
 end

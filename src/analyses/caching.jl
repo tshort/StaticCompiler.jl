@@ -92,13 +92,13 @@ Clear all cached analysis results.
 # Example
 ```julia
 julia> clear_analysis_cache!()
-✅ Cache cleared (removed 15 entries)
+Cache cleared (removed 15 entries)
 ```
 """
 function clear_analysis_cache!()
     count = length(ANALYSIS_CACHE)
     empty!(ANALYSIS_CACHE)
-    println("✅ Cache cleared (removed $count entries)")
+    println("Cache cleared (removed $count entries)")
     return count
 end
 

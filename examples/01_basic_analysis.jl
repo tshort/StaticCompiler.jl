@@ -65,7 +65,7 @@ println("Call sites: ", length(report.call_sites))
 println()
 
 # Example 4: Function ready for static compilation
-println("Example 4: Ready for Static Compilation ✓")
+println("Example 4: Ready for Static Compilation OK")
 println("-"^70)
 
 function compute_fast(x::Int, y::Int)
@@ -76,9 +76,9 @@ ma = analyze_monomorphization(compute_fast, (Int, Int))
 ea = analyze_escapes(compute_fast, (Int, Int))
 da = analyze_devirtualization(compute_fast, (Int, Int))
 
-println("✓ Abstract types: ", !ma.has_abstract_types)
-println("✓ Allocations: ", length(ea.allocations))
-println("✓ Dynamic calls: ", da.total_dynamic_calls)
+println("OK Abstract types: ", !ma.has_abstract_types)
+println("OK Allocations: ", length(ea.allocations))
+println("OK Dynamic calls: ", da.total_dynamic_calls)
 println()
 println("This function is ready for static compilation!")
 println()

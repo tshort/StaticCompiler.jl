@@ -47,7 +47,7 @@ println()
     @test isfile(lib_path)
     @test filesize(lib_path) > 0
 
-    println("  ✅ Basic compilation works")
+    println("  Basic compilation works")
     println()
 end
 
@@ -95,7 +95,7 @@ end
         @test contains(string(e), "verification") || contains(string(e), "score")
     end
 
-    println("  ✅ Verification system works")
+    println("  Verification system works")
     println()
 end
 
@@ -140,7 +140,7 @@ end
     multiheader_path = joinpath(output_dir, "multimath.h")
     @test isfile(multiheader_path)
 
-    println("  ✅ Header generation works")
+    println("  Header generation works")
     println()
 end
 
@@ -188,7 +188,7 @@ end
     @test tmpl.params.verify == true
     @test tmpl.params.min_score == 90
 
-    println("  ✅ All templates work")
+    println("  All templates work")
     println()
 end
 
@@ -248,7 +248,7 @@ end
     lib_path = compile_package_exports(TestMath, signatures, output_dir, "testmath_exp")
     @test isfile(lib_path)
 
-    println("  ✅ Package compilation works")
+    println("  Package compilation works")
     println()
 end
 
@@ -299,7 +299,7 @@ end
     header_content = read(header_path, String)
     @test contains(header_content, "it_")  # Custom namespace
 
-    println("  ✅ All features work together")
+    println("  All features work together")
     println()
 end
 
@@ -342,7 +342,7 @@ end
     println("    Basic: $(round(size_basic/1024, digits=1)) KB")
     println("    -Os: $(round(size_os/1024, digits=1)) KB")
     println("    -Os -flto: $(round(size_optimized/1024, digits=1)) KB")
-    println("  ✅ Optimization flags work")
+    println("  Optimization flags work")
     println()
 end
 
@@ -375,7 +375,7 @@ end
         min_score=150  # Invalid: > 100
     )
 
-    println("  ✅ Error handling works")
+    println("  Error handling works")
     println()
 end
 
@@ -389,18 +389,18 @@ println("=" ^ 70)
 println()
 
 println("All enhancements tested:")
-println("  ✅ Basic compilation (baseline)")
-println("  ✅ Integrated verification")
-println("  ✅ C header generation")
-println("  ✅ Compilation templates (6 templates)")
-println("  ✅ Package-level compilation")
-println("  ✅ Integration (all features together)")
-println("  ✅ Binary size optimization")
-println("  ✅ Error handling")
+println("  Basic compilation (baseline)")
+println("  Integrated verification")
+println("  C header generation")
+println("  Compilation templates (6 templates)")
+println("  Package-level compilation")
+println("  Integration (all features together)")
+println("  Binary size optimization")
+println("  Error handling")
 println()
 
 println("Test output directory: $test_output")
 println()
 
-println("All tests passed! ✅")
+println("All tests passed! ")
 println()

@@ -272,11 +272,11 @@ function compare_modules(mod1::Module, mod2::Module; threshold::Int=80, verbose:
         println()
 
         if score_diff > 0 && ready_diff > 0
-            println("✅ Module 2 shows improvement!")
+            println("Module 2 shows improvement!")
         elseif score_diff < 0 || ready_diff < 0
-            println("⚠️  Module 2 shows regression")
+            println(" Module 2 shows regression")
         else
-            println("➡️  No significant change")
+            println("->  No significant change")
         end
 
         println()

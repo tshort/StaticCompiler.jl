@@ -133,7 +133,7 @@ lib_path = safe_compile_shlib(fibonacci, (Int,), tempdir(), "fibonacci_safe",
                                threshold=80, export_report=true)
 
 if lib_path !== nothing
-    println("\n✅ Library created:", lib_path)
+    println("\nLibrary created:", lib_path)
 end
 println()
 
@@ -152,7 +152,7 @@ result = safe_compile_shlib(not_ready_func, (Number,), tempdir(), "not_ready",
                             threshold=90, export_report=false)
 
 if result === nothing
-    println("Compilation was prevented due to low score ✅")
+    println("Compilation was prevented due to low score ")
 end
 println()
 
@@ -190,8 +190,8 @@ println("  safe_compile_shlib(...)     - Compile with verification")
 println("  safe_compile_executable(...) - Compile executable with verification")
 println()
 println("Benefits:")
-println("  ✅ Prevent compilation failures")
-println("  ✅ Get specific fix suggestions")
-println("  ✅ Track analysis reports")
-println("  ✅ Set quality thresholds")
+println("  Prevent compilation failures")
+println("  Get specific fix suggestions")
+println("  Track analysis reports")
+println("  Set quality thresholds")
 println("="^70)

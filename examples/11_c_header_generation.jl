@@ -34,7 +34,7 @@ try
     lib_path = compile_shlib(add_numbers, (Int, Int), output_dir, "add",
                              generate_header=true)
 
-    println("✅ Library compiled: $lib_path")
+    println("Library compiled: $lib_path")
     println()
 
     # Read and display the generated header
@@ -102,7 +102,7 @@ try
                              filename="mathlib",
                              generate_header=true)
 
-    println("✅ Library compiled: $lib_path")
+    println("Library compiled: $lib_path")
     println()
 
     # Display the generated header
@@ -287,7 +287,7 @@ try
                              min_score=80,
                              generate_header=true) # Generate header
 
-    println("✅ Function verified and compiled with header")
+    println("Function verified and compiled with header")
     println()
 
     header_path = joinpath(output_dir3, "fast.h")
@@ -393,7 +393,7 @@ try
                                     verbose=true)
 
     println()
-    println("✅ Manually generated header: $header_path")
+    println("Manually generated header: $header_path")
     println()
 catch e
     println("Error: $e")
@@ -410,10 +410,10 @@ println("SUMMARY")
 println("="^70)
 println()
 println("C Header Generation makes Julia functions accessible from:")
-println("  ✓ C")
-println("  ✓ C++")
-println("  ✓ Rust")
-println("  ✓ Any language with C FFI")
+println("  OK C")
+println("  OK C++")
+println("  OK Rust")
+println("  OK Any language with C FFI")
 println()
 println("Key features:")
 println("  • Automatic type mapping (Julia → C)")

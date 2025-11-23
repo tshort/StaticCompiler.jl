@@ -27,9 +27,9 @@ Safely compile a function to a shared library with automatic readiness verificat
 ```julia
 julia> lib_path = safe_compile_shlib(my_func, (Int,), "./", "my_func",
                                       threshold=90)
-✅ my_func is ready for compilation (score: 95/100)
+my_func is ready for compilation (score: 95/100)
 Compiling...
-✅ Compilation successful
+Compilation successful
 "./my_func.so"
 ```
 """
@@ -55,7 +55,7 @@ function safe_compile_shlib(f::Function, tt::Tuple, path::String, name::String;
     if !force
         if report.score < threshold
             println()
-            println("❌ Compilation aborted: score $(report.score)/100 below threshold $threshold/100")
+            println("Compilation aborted: score $(report.score)/100 below threshold $threshold/100")
             println()
             println("Issues found:")
             for issue in report.issues
@@ -67,14 +67,14 @@ function safe_compile_shlib(f::Function, tt::Tuple, path::String, name::String;
             println("  2. Lower threshold: safe_compile_shlib(..., threshold=$(report.score))")
             println("  3. Force compilation: safe_compile_shlib(..., force=true)")
             println()
-            println("💡 Run suggest_optimizations($fname, $tt) for fix suggestions")
+            println("Run suggest_optimizations($fname, $tt) for fix suggestions")
             println()
             return nothing
         end
 
-        println("✅ $fname is ready for compilation (score: $(report.score)/100)")
+        println("$fname is ready for compilation (score: $(report.score)/100)")
     else
-        println("⚠️  Forcing compilation (score: $(report.score)/100)")
+        println(" Forcing compilation (score: $(report.score)/100)")
         if !isempty(report.issues)
             println("   Issues present:")
             for issue in report.issues
@@ -88,7 +88,7 @@ function safe_compile_shlib(f::Function, tt::Tuple, path::String, name::String;
     println("Compiling $fname to shared library...")
     try
         lib_path = compile_shlib(f, tt, path, name)
-        println("✅ Compilation successful: $lib_path")
+        println("Compilation successful: $lib_path")
         println()
 
         # Print final summary
@@ -97,7 +97,7 @@ function safe_compile_shlib(f::Function, tt::Tuple, path::String, name::String;
         println("="^70)
         println("Function:       $fname")
         println("Readiness:      $(report.score)/100")
-        println("Status:         ✅ Compiled")
+        println("Status:         Compiled")
         println("Library:        $lib_path")
         if export_report
             println("Analysis:       $(joinpath(path, "$(name)_analysis.json"))")
@@ -107,7 +107,7 @@ function safe_compile_shlib(f::Function, tt::Tuple, path::String, name::String;
 
         return lib_path
     catch e
-        println("❌ Compilation failed!")
+        println("Compilation failed!")
         println()
         println("Error: $e")
         println()
@@ -122,7 +122,7 @@ function safe_compile_shlib(f::Function, tt::Tuple, path::String, name::String;
             println("  • Heap allocations")
         end
         println()
-        println("💡 Run suggest_optimizations($fname, $tt) for help")
+        println("Run suggest_optimizations($fname, $tt) for help")
         println()
 
         rethrow(e)
@@ -165,21 +165,21 @@ function safe_compile_executable(f::Function, tt::Tuple, path::String, name::Str
     if !force
         if report.score < threshold
             println()
-            println("❌ Compilation aborted: score $(report.score)/100 below threshold $threshold/100")
+            println("Compilation aborted: score $(report.score)/100 below threshold $threshold/100")
             println()
             println("Issues found:")
             for issue in report.issues
                 println("  • $issue")
             end
             println()
-            println("💡 Run suggest_optimizations($fname, $tt) for fix suggestions")
+            println("Run suggest_optimizations($fname, $tt) for fix suggestions")
             println()
             return nothing
         end
 
-        println("✅ $fname is ready for compilation (score: $(report.score)/100)")
+        println("$fname is ready for compilation (score: $(report.score)/100)")
     else
-        println("⚠️  Forcing compilation (score: $(report.score)/100)")
+        println(" Forcing compilation (score: $(report.score)/100)")
     end
 
     # Attempt compilation
@@ -187,14 +187,14 @@ function safe_compile_executable(f::Function, tt::Tuple, path::String, name::Str
     println("Compiling $fname to executable...")
     try
         exe_path = compile_executable(f, tt, path, name)
-        println("✅ Compilation successful: $exe_path")
+        println("Compilation successful: $exe_path")
         println()
 
         return exe_path
     catch e
-        println("❌ Compilation failed: $e")
+        println("Compilation failed: $e")
         println()
-        println("💡 Run suggest_optimizations($fname, $tt) for help")
+        println("Run suggest_optimizations($fname, $tt) for help")
         println()
 
         rethrow(e)

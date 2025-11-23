@@ -94,15 +94,15 @@ println("Example 6: Verify and compile final version")
 println("-"^70)
 
 if verify_compilation_readiness(calculate_sum_v4, (Int,), threshold=90)
-    println("\n✅ Compiling optimized function...")
+    println("\nCompiling optimized function...")
     try
         lib_path = compile_shlib(calculate_sum_v4, (Int,), tempdir(), "calculate_sum")
-        println("✅ Compilation successful: $lib_path")
+        println("Compilation successful: $lib_path")
     catch e
-        println("❌ Compilation failed: $e")
+        println("Compilation failed: $e")
     end
 else
-    println("\n❌ Function needs more optimization")
+    println("\nFunction needs more optimization")
 end
 println()
 
@@ -116,7 +116,7 @@ baseline_data = import_report_summary(tempdir() * "/baseline_report.json")
 println("\nLoading final report:")
 final_data = import_report_summary(tempdir() * "/final_report.json")
 
-println("\n📊 Progress Summary:")
+println("\nProgress Summary:")
 println("   Initial score: $(baseline_data["score"])/100")
 println("   Final score:   $(final_data["score"])/100")
 println("   Improvement:   +$(final_data["score"] - baseline_data["score"]) points")
@@ -129,7 +129,7 @@ end
 println()
 
 if isempty(final_data["issues"])
-    println("   Final issues:  ✅ None!")
+    println("   Final issues:  None!")
 else
     println("   Final issues:")
     for issue in final_data["issues"]

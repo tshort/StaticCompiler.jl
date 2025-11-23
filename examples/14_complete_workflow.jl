@@ -104,7 +104,7 @@ module SignalProcessing
     end
 end
 
-println("✅ SignalProcessing module defined")
+println("SignalProcessing module defined")
 println()
 println("Exported functions:")
 println("  • moving_average(Ptr{Float64}, Int, Int) → Float64")
@@ -142,14 +142,14 @@ try
                                export_analysis=true)
 
     println()
-    println("✅ Development build successful!")
+    println("Development build successful!")
     println("   Library: $lib_path")
     println()
 
     # Check for analysis report
     analysis_path = joinpath(output_dir_dev, "signal_dev_analysis.json")
     if isfile(analysis_path)
-        println("📊 Detailed analysis report: $analysis_path")
+        println("Detailed analysis report: $analysis_path")
         println()
     end
 
@@ -180,7 +180,7 @@ try
                                generate_header=true)
 
     println()
-    println("✅ Test build successful!")
+    println("Test build successful!")
     println("   Library: $lib_path")
     println()
 
@@ -229,7 +229,7 @@ try
                                namespace="sp")  # Short namespace for embedded
 
     println()
-    println("✅ Production build successful!")
+    println("Production build successful!")
     println("   Library: $lib_path")
     println()
 
@@ -296,7 +296,7 @@ try
                                generate_header=true)
 
     println()
-    println("✅ Performance build successful!")
+    println("Performance build successful!")
     println("   Library: $lib_path")
     println()
 
@@ -368,38 +368,38 @@ println()
 println("Development Workflow Demonstrated:")
 println()
 
-println("1. ✅ Module Definition")
+println("1. Module Definition")
 println("   - Defined SignalProcessing module with 3 exported functions")
 println("   - Used concrete types for C interoperability")
 println("   - Documented C signatures in docstrings")
 println()
 
-println("2. ✅ Development Build (:debugging template)")
+println("2. Development Build (:debugging template)")
 println("   - Pre-compilation verification enabled")
 println("   - Detailed analysis report exported")
 println("   - Helpful diagnostics for iteration")
 println()
 
-println("3. ✅ Testing Build (:portable template)")
+println("3. Testing Build (:portable template)")
 println("   - Verified cross-platform compatibility")
 println("   - Generated C header for integration testing")
 println("   - More permissive verification for broader compatibility")
 println()
 
-println("4. ✅ Production Build (:embedded template)")
+println("4. Production Build (:embedded template)")
 println("   - Strict verification (min_score=90)")
 println("   - Aggressive size optimization flags")
 println("   - Custom namespace for embedded systems")
 println("   - Stripped binary for deployment")
 println()
 
-println("5. ✅ Performance Build (:performance template)")
+println("5. Performance Build (:performance template)")
 println("   - Aggressive optimization (-O3 -march=native)")
 println("   - Fast math optimizations")
 println("   - Optimized for HPC workloads")
 println()
 
-println("6. ✅ Integration")
+println("6. Integration")
 println("   - Generated C headers for all builds")
 println("   - Example C code demonstrating usage")
 println("   - Ready for deployment in multiple scenarios")
@@ -453,16 +453,16 @@ println("Part 9: Best Practices Demonstrated")
 println("-" ^ 70)
 println()
 
-println("✓ Use concrete types (Ptr{Float64}, Int, not Number)")
-println("✓ Export only public API (internal helpers private)")
-println("✓ Document C signatures in docstrings")
-println("✓ Use templates for different build stages")
-println("✓ Enable verification during development")
-println("✓ Generate headers for C integration")
-println("✓ Apply size optimization for embedded")
-println("✓ Use custom namespaces to avoid collisions")
-println("✓ Strip binaries for production")
-println("✓ Export analysis during development")
+println("OK Use concrete types (Ptr{Float64}, Int, not Number)")
+println("OK Export only public API (internal helpers private)")
+println("OK Document C signatures in docstrings")
+println("OK Use templates for different build stages")
+println("OK Enable verification during development")
+println("OK Generate headers for C integration")
+println("OK Apply size optimization for embedded")
+println("OK Use custom namespaces to avoid collisions")
+println("OK Strip binaries for production")
+println("OK Export analysis during development")
 println()
 
 # ============================================================================
@@ -513,16 +513,16 @@ println("=" ^ 70)
 println()
 
 println("This example demonstrated:")
-println("  ✓ Package-level compilation")
-println("  ✓ All six compilation templates")
-println("  ✓ Pre-compilation verification")
-println("  ✓ C header generation")
-println("  ✓ Custom namespaces")
-println("  ✓ Size optimization")
-println("  ✓ Multiple build configurations")
-println("  ✓ C integration")
-println("  ✓ CLI tool workflow")
-println("  ✓ Best practices")
+println("  OK Package-level compilation")
+println("  OK All six compilation templates")
+println("  OK Pre-compilation verification")
+println("  OK C header generation")
+println("  OK Custom namespaces")
+println("  OK Size optimization")
+println("  OK Multiple build configurations")
+println("  OK C integration")
+println("  OK CLI tool workflow")
+println("  OK Best practices")
 println()
 
 println("Next steps:")

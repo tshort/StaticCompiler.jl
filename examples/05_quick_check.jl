@@ -59,18 +59,18 @@ function check_and_compile(f, types, path="./")
     report = quick_check(f, types)
     
     if report.ready_for_compilation
-        println("✅ $(report.function_name) is ready (score: $(report.score)/100)")
+        println("$(report.function_name) is ready (score: $(report.score)/100)")
         println("   Attempting compilation...")
         try
             lib_path = compile_shlib(f, types, path, string(report.function_name))
-            println("   ✅ Compiled successfully: $lib_path")
+            println("   Compiled successfully: $lib_path")
             return true
         catch e
-            println("   ❌ Compilation failed: $e")
+            println("   Compilation failed: $e")
             return false
         end
     else
-        println("❌ $(report.function_name) is not ready (score: $(report.score)/100)")
+        println("$(report.function_name) is not ready (score: $(report.score)/100)")
         println("   Issues:")
         for issue in report.issues
             println("     • $issue")
@@ -84,9 +84,9 @@ println("\nAttempting to compile good_func:")
 success = check_and_compile(good_func, (Int, Int), tempdir())
 
 if success
-    println("\n✅ Function compiled and ready to use!")
+    println("\nFunction compiled and ready to use!")
 else
-    println("\n❌ Function needs fixes before compilation")
+    println("\nFunction needs fixes before compilation")
 end
 
 println()

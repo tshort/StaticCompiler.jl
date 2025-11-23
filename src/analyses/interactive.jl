@@ -45,7 +45,7 @@ Type 'help' for commands, 'quit' to exit
 
 analysis> analyze my_func(Int, Int)
 Score: 95/100
-Status: ✅ READY
+Status: READY
 
 analysis> suggest
 [Shows suggestions...]
@@ -122,7 +122,7 @@ function start_interactive()
                 else
                     bookmark_name = parts[2]
                     SESSION[].bookmarks[bookmark_name] = (SESSION[].current_function, SESSION[].current_types)
-                    println("✅ Bookmarked as '$bookmark_name'")
+                    println("Bookmarked as '$bookmark_name'")
                 end
 
             elseif cmd == "list"
@@ -130,7 +130,7 @@ function start_interactive()
 
             elseif cmd == "clear"
                 SESSION[] = AnalysisSession()
-                println("✅ Session cleared")
+                println("Session cleared")
 
             else
                 println("Unknown command: $cmd")
@@ -183,7 +183,7 @@ function show_history()
     println()
 
     for (i, (fname, types, report)) in enumerate(SESSION[].history)
-        status = report.ready_for_compilation ? "✅" : "❌"
+        status = report.ready_for_compilation ? "" : ""
         println("$i. $status $fname$types - $(report.score)/100")
     end
 end

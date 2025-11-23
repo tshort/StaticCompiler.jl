@@ -14,23 +14,23 @@ println()
 println("Problem 1: Abstract Type Parameters")
 println("-"^70)
 
-# ❌ BEFORE: Won't compile
+# BEFORE: Won't compile
 function process_bad(x::Number)
     return x * 2
 end
 
 report_bad = analyze_monomorphization(process_bad, (Number,))
-println("❌ BEFORE:")
+println("BEFORE:")
 println("   Has abstract types: ", report_bad.has_abstract_types)
 println()
 
-# ✅ AFTER: Will compile
+# AFTER: Will compile
 function process_good(x::Int)
     return x * 2
 end
 
 report_good = analyze_monomorphization(process_good, (Int,))
-println("✅ AFTER:")
+println("AFTER:")
 println("   Has abstract types: ", report_good.has_abstract_types)
 println()
 
@@ -38,25 +38,25 @@ println()
 println("Problem 2: Heap Allocations")
 println("-"^70)
 
-# ❌ BEFORE: Won't compile (dynamic allocation)
+# BEFORE: Won't compile (dynamic allocation)
 function sum_bad(n::Int)
     arr = zeros(n)
     return sum(arr)
 end
 
 report_bad = analyze_escapes(sum_bad, (Int,))
-println("❌ BEFORE:")
+println("BEFORE:")
 println("   Allocations: ", length(report_bad.allocations))
 println()
 
-# ✅ AFTER: Will compile (stack allocated, fixed size)
+# AFTER: Will compile (stack allocated, fixed size)
 function sum_good()
     arr = @SVector zeros(10)  # Stack allocated
     return sum(arr)
 end
 
 report_good = analyze_escapes(sum_good, ())
-println("✅ AFTER:")
+println("AFTER:")
 println("   Allocations: ", length(report_good.allocations))
 println()
 
@@ -70,7 +70,7 @@ function sum_manual(n::Int)
 end
 
 report_manual = analyze_lifetimes(sum_manual, (Int,))
-println("✅ ALTERNATIVE (manual memory):")
+println("ALTERNATIVE (manual memory):")
 println("   Potential leaks: ", report_manual.potential_leaks)
 println()
 
@@ -78,22 +78,22 @@ println()
 println("Problem 3: String Operations")
 println("-"^70)
 
-# ❌ BEFORE: Won't compile (String allocates)
+# BEFORE: Won't compile (String allocates)
 function greet_bad(name::String)
     return "Hello, " * name
 end
 
-println("❌ BEFORE:")
+println("BEFORE:")
 println("   Uses Julia String (heap allocated)")
 println()
 
-# ✅ AFTER: Will compile (static string)
+# AFTER: Will compile (static string)
 function greet_good()
     println(c"Hello, World!")
     return 0
 end
 
-println("✅ AFTER:")
+println("AFTER:")
 println("   Uses StaticTools string (stack allocated)")
 println()
 
@@ -109,23 +109,23 @@ struct Cat <: Animal
     name::String  
 end
 
-# ❌ BEFORE: Dynamic dispatch
+# BEFORE: Dynamic dispatch
 function speak_bad(a::Animal)
     return "Animal speaks"
 end
 
 report_bad = analyze_devirtualization(speak_bad, (Dog,))
-println("❌ BEFORE:")
+println("BEFORE:")
 println("   Dynamic calls: ", report_bad.total_dynamic_calls)
 println()
 
-# ✅ AFTER: Direct dispatch
+# AFTER: Direct dispatch
 function speak_good(d::Dog)
     return "Woof!"
 end
 
 report_good = analyze_devirtualization(speak_good, (Dog,))
-println("✅ AFTER:")
+println("AFTER:")
 println("   Dynamic calls: ", report_good.total_dynamic_calls)
 println()
 
@@ -133,7 +133,7 @@ println()
 println("Problem 5: Memory Leaks")
 println("-"^70)
 
-# ❌ BEFORE: Memory leak
+# BEFORE: Memory leak
 function allocate_bad(n::Int)
     arr = MallocArray{Float64}(undef, n)
     # Forgot to free!
@@ -141,11 +141,11 @@ function allocate_bad(n::Int)
 end
 
 report_bad = analyze_lifetimes(allocate_bad, (Int,))
-println("❌ BEFORE:")
+println("BEFORE:")
 println("   Potential leaks: ", report_bad.potential_leaks)
 println()
 
-# ✅ AFTER: Proper cleanup
+# AFTER: Proper cleanup
 function allocate_good(n::Int)
     arr = MallocArray{Float64}(undef, n)
     # ... use arr ...
@@ -154,7 +154,7 @@ function allocate_good(n::Int)
 end
 
 report_good = analyze_lifetimes(allocate_good, (Int,))
-println("✅ AFTER:")
+println("AFTER:")
 println("   Potential leaks: ", report_good.potential_leaks)
 println()
 

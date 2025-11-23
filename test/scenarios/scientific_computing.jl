@@ -22,7 +22,7 @@ using StaticTools
     # - Potential for SIMD optimization
 
     @testset "Matrix-vector operations" begin
-        println("📊 Test 1: Matrix-Vector Multiplication")
+        println("Test 1: Matrix-Vector Multiplication")
         println("   Requirement: Efficient linear algebra operations")
         println()
 
@@ -51,12 +51,12 @@ using StaticTools
         @test !isnothing(escape_report)
         @test !isnothing(devirt_report)
 
-        println("   ✅ Matrix operations analyzed")
+        println("   Matrix operations analyzed")
         println()
     end
 
     @testset "Numerical integration" begin
-        println("📊 Test 2: Numerical Integration (Trapezoidal Rule)")
+        println("Test 2: Numerical Integration (Trapezoidal Rule)")
         println("   Requirement: Accurate numerical integration")
         println()
 
@@ -87,12 +87,12 @@ using StaticTools
 
         @test !isnothing(const_report)
 
-        println("   ✅ Integration algorithm analyzed")
+        println("   Integration algorithm analyzed")
         println()
     end
 
     @testset "Particle dynamics simulation" begin
-        println("📊 Test 3: N-Body Particle Simulation")
+        println("Test 3: N-Body Particle Simulation")
         println("   Requirement: Efficient force calculations")
         println()
 
@@ -146,12 +146,12 @@ using StaticTools
         # Should have minimal allocations for performance
         @test !isnothing(escape_report)
 
-        println("   ✅ Particle dynamics analyzed")
+        println("   Particle dynamics analyzed")
         println()
     end
 
     @testset "Iterative solver" begin
-        println("📊 Test 4: Conjugate Gradient Solver")
+        println("Test 4: Conjugate Gradient Solver")
         println("   Requirement: Iterative linear system solver")
         println()
 
@@ -189,12 +189,12 @@ using StaticTools
 
         @test !isnothing(escape_report)
 
-        println("   ✅ Iterative solver analyzed")
+        println("   Iterative solver analyzed")
         println()
     end
 
     @testset "Fast Fourier Transform (simplified)" begin
-        println("📊 Test 5: FFT-like Algorithm")
+        println("Test 5: FFT-like Algorithm")
         println("   Requirement: Efficient recursive decomposition")
         println()
 
@@ -218,12 +218,12 @@ using StaticTools
         # Should be allocation-free
         @test length(escape_report.allocations) == 0
 
-        println("   ✅ FFT operation analyzed")
+        println("   FFT operation analyzed")
         println()
     end
 
     @testset "Performance-critical loop optimization" begin
-        println("📊 Test 6: Tight Loop Optimization")
+        println("Test 6: Tight Loop Optimization")
         println("   Requirement: Maximize loop performance")
         println()
 
@@ -251,12 +251,12 @@ using StaticTools
         # Analysis complete
         @test !isnothing(escape_report)
 
-        println("   ✅ Loop optimization analyzed")
+        println("   Loop optimization analyzed")
         println()
     end
 
     println("-"^70)
-    println("✅ SCIENTIFIC COMPUTING SCENARIO COMPLETE")
+    println("SCIENTIFIC COMPUTING SCENARIO COMPLETE")
     println("-"^70)
     println()
     println("Summary:")
@@ -267,6 +267,6 @@ using StaticTools
     println("  • FFT operations validated")
     println("  • Tight loops optimized")
     println()
-    println("Scientific Computing Readiness: ✅ PASS")
+    println("Scientific Computing Readiness: PASS")
     println()
 end

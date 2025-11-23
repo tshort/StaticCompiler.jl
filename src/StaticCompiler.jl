@@ -278,10 +278,10 @@ function compile_executable(funcs::Union{Array,Tuple}, path::String=pwd(), name=
             push!(all_reports, (fname, types, report))
 
             if report.score < min_score
-                println("❌ (score: $(report.score)/$min_score)")
+                println("(score: $(report.score)/$min_score)")
                 push!(failed_funcs, (fname, types, report))
             else
-                println("✅ (score: $(report.score)/100)")
+                println("(score: $(report.score)/100)")
             end
         end
 
@@ -302,7 +302,7 @@ function compile_executable(funcs::Union{Array,Tuple}, path::String=pwd(), name=
 
         # Handle failures
         if !isempty(failed_funcs)
-            println("❌ Pre-compilation verification failed!")
+            println("Pre-compilation verification failed!")
             println()
             println("$(length(failed_funcs)) function(s) below minimum score ($min_score):")
             println()
@@ -318,7 +318,7 @@ function compile_executable(funcs::Union{Array,Tuple}, path::String=pwd(), name=
             end
 
             if suggest_fixes
-                println("💡 Get optimization suggestions:")
+                println("Get optimization suggestions:")
                 for (fname, types, _) in failed_funcs
                     println("   suggest_optimizations($fname, $types)")
                 end
@@ -328,7 +328,7 @@ function compile_executable(funcs::Union{Array,Tuple}, path::String=pwd(), name=
             error("Compilation aborted: $(length(failed_funcs)) function(s) failed verification (score < $min_score)")
         end
 
-        println("✅ All functions passed verification (min score: $min_score)")
+        println("All functions passed verification (min score: $min_score)")
         println()
     end
 
@@ -448,7 +448,7 @@ julia> ccall(("test", "test.dylib"), Float64, (Int64,), 100_000)
 # With automatic verification:
 julia> compile_shlib(test, (Int,), verify=true, min_score=90)
 Analyzing test...
-✅ test is ready for compilation (score: 95/100)
+test is ready for compilation (score: 95/100)
 Compiling...
 "/Users/user/test.dylib"
 
@@ -466,8 +466,8 @@ Using template: :embedded
   Embedded/IoT systems: minimal size, no stdlib
 
 Running pre-compilation analysis...
-  [1/1] Analyzing test... ✅ (score: 95/100)
-✅ All functions passed verification (min score: 90)
+  [1/1] Analyzing test... (score: 95/100)
+All functions passed verification (min score: 90)
 Generated C header: ./test.h
 "/Users/user/test.dylib"
 ```
@@ -573,10 +573,10 @@ function compile_shlib(funcs::Union{Array,Tuple}, path::String=pwd();
             push!(all_reports, (fname, types, report))
 
             if report.score < min_score
-                println("❌ (score: $(report.score)/$min_score)")
+                println("(score: $(report.score)/$min_score)")
                 push!(failed_funcs, (fname, types, report))
             else
-                println("✅ (score: $(report.score)/100)")
+                println("(score: $(report.score)/100)")
             end
         end
 
@@ -597,7 +597,7 @@ function compile_shlib(funcs::Union{Array,Tuple}, path::String=pwd();
 
         # Handle failures
         if !isempty(failed_funcs)
-            println("❌ Pre-compilation verification failed!")
+            println("Pre-compilation verification failed!")
             println()
             println("$(length(failed_funcs)) function(s) below minimum score ($min_score):")
             println()
@@ -613,7 +613,7 @@ function compile_shlib(funcs::Union{Array,Tuple}, path::String=pwd();
             end
 
             if suggest_fixes
-                println("💡 Get optimization suggestions:")
+                println("Get optimization suggestions:")
                 for (fname, types, _) in failed_funcs
                     println("   suggest_optimizations($fname, $types)")
                 end
@@ -623,7 +623,7 @@ function compile_shlib(funcs::Union{Array,Tuple}, path::String=pwd();
             error("Compilation aborted: $(length(failed_funcs)) function(s) failed verification (score < $min_score)")
         end
 
-        println("✅ All functions passed verification (min score: $min_score)")
+        println("All functions passed verification (min score: $min_score)")
         println()
     end
 

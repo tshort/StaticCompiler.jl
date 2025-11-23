@@ -55,7 +55,7 @@ function generate_ci_report(results::Dict{Symbol, CompilationReadinessReport}, o
         println(io)
 
         # Status badges
-        status = ready == total ? "✅ All Ready" : ready >= total/2 ? "⚠️ Partially Ready" : "❌ Not Ready"
+        status = ready == total ? "All Ready" : ready >= total/2 ? "Partially Ready" : "Not Ready"
         println(io, "**Status**: $status")
         println(io)
 
@@ -66,7 +66,7 @@ function generate_ci_report(results::Dict{Symbol, CompilationReadinessReport}, o
         println(io, "|----------|-------|--------|--------|")
 
         for (name, report) in sorted
-            status_icon = report.ready_for_compilation ? "✅" : "❌"
+            status_icon = report.ready_for_compilation ? "" : ""
             issues_str = isempty(report.issues) ? "-" : join(report.issues, ", ")
             println(io, "| `$name` | $(report.score)/100 | $status_icon | $issues_str |")
         end
@@ -86,7 +86,7 @@ function generate_ci_report(results::Dict{Symbol, CompilationReadinessReport}, o
         println(io, "## Recommendations")
         println(io)
         if ready == total
-            println(io, "✅ All functions are ready for compilation!")
+            println(io, "All functions are ready for compilation!")
         else
             println(io, "Focus on fixing:")
             println(io)
@@ -125,7 +125,7 @@ function generate_ci_report(results::Dict{Symbol, CompilationReadinessReport}, o
         JSON.print(io, summary_data, 2)
     end
 
-    println("✅ CI report generated:")
+    println("CI report generated:")
     println("   Markdown: $md_path")
     println("   JSON:     $json_path")
 
@@ -176,27 +176,27 @@ function check_quality_gate(results::Dict{Symbol, CompilationReadinessReport};
     score_pass = avg_score >= min_avg_score
 
     if ready_pass && score_pass
-        println("✅ QUALITY GATE PASSED")
+        println("QUALITY GATE PASSED")
         println()
         println("="^70)
         return true
     else
-        println("❌ QUALITY GATE FAILED")
+        println("QUALITY GATE FAILED")
         println()
 
         if !ready_pass
-            println("  ❌ Ready percentage too low: $ready_percent% < $min_ready_percent%")
+            println("  Ready percentage too low: $ready_percent% < $min_ready_percent%")
             println("     Functions not ready: $(total - ready)/$total")
         else
-            println("  ✅ Ready percentage acceptable: $ready_percent%")
+            println("  Ready percentage acceptable: $ready_percent%")
         end
 
         if !score_pass
-            println("  ❌ Average score too low: $avg_score < $min_avg_score")
+            println("  Average score too low: $avg_score < $min_avg_score")
             failing = [name for (name, report) in results if report.score < min_avg_score]
             println("     Functions below threshold: $(length(failing))")
         else
-            println("  ✅ Average score acceptable: $avg_score")
+            println("  Average score acceptable: $avg_score")
         end
 
         println()
@@ -232,7 +232,7 @@ function generate_github_actions_summary(results::Dict{Symbol, CompilationReadin
 
     # Generate markdown summary
     summary = """
-    # 🔍 Compiler Analysis Summary
+    # Compiler Analysis Summary
 
     - **Total Functions**: $total
     - **Ready for Compilation**: $ready/$total ($(round(Int, ready/total*100))%)
@@ -246,7 +246,7 @@ function generate_github_actions_summary(results::Dict{Symbol, CompilationReadin
 
     sorted = sort(collect(results), by=x->x[2].score, rev=true)
     for (name, report) in sorted
-        icon = report.ready_for_compilation ? "✅" : "❌"
+        icon = report.ready_for_compilation ? "" : ""
         summary *= "| `$name` | $(report.score)/100 | $icon |\n"
     end
 
@@ -257,7 +257,7 @@ function generate_github_actions_summary(results::Dict{Symbol, CompilationReadin
         open(github_summary_file, "a") do io
             println(io, summary)
         end
-        println("✅ GitHub Actions summary written to \$GITHUB_STEP_SUMMARY")
+        println("GitHub Actions summary written to \$GITHUB_STEP_SUMMARY")
     else
         println(summary)
         println()
@@ -299,7 +299,7 @@ function annotate_github_actions(results::Dict{Symbol, CompilationReadinessRepor
     end
 
     if annotations == 0
-        println("✅ No issues to annotate (all functions have good scores)")
+        println("No issues to annotate (all functions have good scores)")
     else
         println("ℹ️  Created $annotations annotation(s) for GitHub Actions")
     end

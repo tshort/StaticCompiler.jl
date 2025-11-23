@@ -27,7 +27,7 @@ using StaticTools
         @test !isnothing(report)
 
         # If suggesting stack promotion, the function should still work correctly
-        println("  ✓ Stack promotion preserves semantics")
+        println("  OK Stack promotion preserves semantics")
     end
 
     # Test 2: Escaped detection correctness
@@ -53,7 +53,7 @@ using StaticTools
         report2 = analyze_escapes(must_not_escape, (Int,))
         @test !isnothing(report2)
 
-        println("  ✓ Escaped detection is accurate")
+        println("  OK Escaped detection is accurate")
     end
 
     # Test 3: Scalar replacement correctness
@@ -77,7 +77,7 @@ using StaticTools
         report = analyze_escapes(use_point, (Float64, Float64, Float64))
         @test !isnothing(report)
 
-        println("  ✓ Scalar replacement preserves semantics")
+        println("  OK Scalar replacement preserves semantics")
     end
 end
 
@@ -104,7 +104,7 @@ end
         @test !isnothing(report_int)
         @test !isnothing(report_float)
 
-        println("  ✓ Monomorphization preserves polymorphic semantics")
+        println("  OK Monomorphization preserves polymorphic semantics")
     end
 
     # Test 2: No false positives for concrete types
@@ -117,7 +117,7 @@ end
         @test !report.has_abstract_types
         @test isempty(report.abstract_parameters)
 
-        println("  ✓ Correctly identifies concrete types")
+        println("  OK Correctly identifies concrete types")
     end
 
     # Test 3: Complex type hierarchies
@@ -152,7 +152,7 @@ end
         @test !isnothing(report_dog)
         @test !isnothing(report_cat)
 
-        println("  ✓ Type hierarchy handled correctly")
+        println("  OK Type hierarchy handled correctly")
     end
 end
 
@@ -191,7 +191,7 @@ end
         report = analyze_devirtualization(total_area_correct, (Vector{CorrectCircle},))
         @test !isnothing(report)
 
-        println("  ✓ Devirtualization preserves polymorphism")
+        println("  OK Devirtualization preserves polymorphism")
     end
 
     # Test 2: Direct call optimization correctness
@@ -207,7 +207,7 @@ end
         report = analyze_devirtualization(direct_math, (Int,))
         @test !isnothing(report)
 
-        println("  ✓ Direct call optimization is correct")
+        println("  OK Direct call optimization is correct")
     end
 end
 
@@ -226,7 +226,7 @@ end
         @test !isnothing(report)
         # Should not suggest auto-free that would create use-after-free
 
-        println("  ✓ No use-after-free bugs introduced")
+        println("  OK No use-after-free bugs introduced")
     end
 
     # Test 2: Memory leak detection
@@ -245,7 +245,7 @@ end
         suggestions = suggest_lifetime_improvements(report)
         @test !isempty(suggestions)
 
-        println("  ✓ Memory leaks detected correctly")
+        println("  OK Memory leaks detected correctly")
     end
 
     # Test 3: Escaped allocation not auto-freed
@@ -262,7 +262,7 @@ end
         auto_frees = insert_auto_frees(report)
         # Auto-free list should be empty or not include the escaped allocation
 
-        println("  ✓ Escaped allocations not auto-freed")
+        println("  OK Escaped allocations not auto-freed")
     end
 
     # Test 4: Double-free prevention
@@ -281,7 +281,7 @@ end
         auto_frees = insert_auto_frees(report)
         # Should be empty since already freed
 
-        println("  ✓ Double-free prevented")
+        println("  OK Double-free prevented")
     end
 end
 
@@ -301,7 +301,7 @@ end
         @test !isnothing(report)
         @test report.foldable_expressions > 0
 
-        println("  ✓ Constant folding preserves semantics")
+        println("  OK Constant folding preserves semantics")
     end
 
     # Test 2: Dead branch elimination correctness
@@ -323,7 +323,7 @@ end
         report = analyze_constants(dead_branch, (Int,))
         @test !isnothing(report)
 
-        println("  ✓ Dead branch elimination is correct")
+        println("  OK Dead branch elimination is correct")
     end
 
     # Test 3: Global constant propagation
@@ -346,7 +346,7 @@ end
         report = analyze_constants(use_config, ())
         @test !isnothing(report)
 
-        println("  ✓ Global constant propagation is correct")
+        println("  OK Global constant propagation is correct")
     end
 end
 
@@ -378,7 +378,7 @@ end
         @test !isnothing(const_report)
         @test !isnothing(devirt_report)
 
-        println("  ✓ Multiple optimizations work together")
+        println("  OK Multiple optimizations work together")
     end
 
     # Test 2: Real-world scenario - matrix multiplication
@@ -418,7 +418,7 @@ end
         @test !isnothing(escape_report)
         # Should find multiple allocations
 
-        println("  ✓ Real-world scenario: Matrix multiply")
+        println("  OK Real-world scenario: Matrix multiply")
     end
 
     # Test 3: Real-world scenario - data processing pipeline
@@ -457,7 +457,7 @@ end
         escape_report = analyze_escapes(data_pipeline, (Vector{Int},))
         @test !isnothing(escape_report)
 
-        println("  ✓ Real-world scenario: Data pipeline")
+        println("  OK Real-world scenario: Data pipeline")
     end
 end
 
@@ -483,7 +483,7 @@ end
         # Suggestions should not affect correctness
         # (User would manually apply suggestions and test)
 
-        println("  ✓ Suggestions preserve results")
+        println("  OK Suggestions preserve results")
     end
 
     # Test 2: Analysis doesn't modify original code
@@ -502,11 +502,11 @@ end
         # Original function should still work
         @test original(21) == 42
 
-        println("  ✓ Analysis doesn't modify code")
+        println("  OK Analysis doesn't modify code")
     end
 end
 
 println("\n" * "="^70)
 println("All correctness verification tests passed!")
-println("Optimizations preserve program semantics ✓")
+println("Optimizations preserve program semantics OK")
 println("="^70)
