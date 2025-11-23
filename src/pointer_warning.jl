@@ -67,6 +67,18 @@ end
 
 llvmeltype(x::LLVM.Value) = eltype(LLVM.value_type(x))
 
+function runtime_dependencies(mod::LLVM.Module)
+    deps = String[]
+    for f in functions(mod)
+        isempty(blocks(f)) || continue  # declarations only
+        n = name(f)
+        if startswith(n, "jl_") || startswith(n, "ijl_") || startswith(n, "julia.")
+            push!(deps, n)
+        end
+    end
+    unique(deps)
+end
+
 function strip_verifier_errors!(mod::LLVM.Module)
     err_blocks = Set{LLVM.BasicBlock}()
     for gv in globals(mod)

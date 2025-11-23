@@ -335,7 +335,7 @@ function compile_executable(funcs::Union{Array,Tuple}, path::String=pwd(), name=
     (f, types) = funcs[1]
     tt = Base.to_tuple_type(types)
     isexecutableargtype = tt == Tuple{} || tt == Tuple{Int, Ptr{Ptr{UInt8}}}
-    isexecutableargtype || @warn "input type signature $types should be either `()` or `(Int, Ptr{Ptr{UInt8}})` for standard executables"
+    isexecutableargtype || @warn "input type signature $types should be either `()` or `(Int, Ptr{Ptr{UInt8}})` for standard executables (wrapper will call the function with zero/NULL arguments)"
 
     infer_return_type(f, tt) = begin
         typed = Base.code_typed(f, tt; optimize=false)
@@ -788,17 +788,34 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
 
     # Determine C signature for the entry function so the wrapper matches argument and return types.
     entry_func, entry_tt = funcs[1]
+    entry_name = fix_name(entry_func)
     entry_tuple = Base.to_tuple_type(entry_tt)
     argtypes = Tuple(entry_tuple.parameters)
     rettype = return_type === nothing ? Core.Compiler.return_type(entry_func, entry_tuple) : return_type
     rettype = rettype === Union{} ? Nothing : rettype
 
-    fn = demangle ? "$name" : "julia_$name"
-    fn_decl = generate_function_declaration(name, argtypes, rettype; demangle=demangle)
+    fn = demangle ? entry_name : "julia_$entry_name"
+    fn_decl = generate_function_declaration(entry_name, argtypes, rettype; demangle=demangle)
     argnames = [string("arg", i - 1) for i in eachindex(argtypes)]
     call_args = entry_tuple == Tuple{} ? "" :
                 (entry_tuple == Tuple{Int, Ptr{Ptr{UInt8}}} ? "argc, argv" :
                  (length(argnames) == 0 ? "" : join(argnames, ", ")))
+
+    # When the signature does not match the standard executable forms, generate
+    # zero/NULL-initialized arguments so the wrapper compiles instead of emitting
+    # undeclared identifiers.
+    arg_setup_block = ""
+    if !isempty(call_args) && entry_tuple != Tuple{Int, Ptr{Ptr{UInt8}}}
+        decls = String[]
+        for (argname, argtype) in zip(argnames, argtypes)
+            c_type = julia_to_c_type(argtype)
+            init = (argtype <: Ptr || argtype <: Ref) ? "NULL" : "0"
+            push!(decls, "$c_type $argname = $init;")
+        end
+        if !isempty(decls)
+            arg_setup_block = "    " * join(decls, "\n    ") * "\n"
+        end
+    end
 
     # Compile!
     wrapper_path = joinpath(path, "wrapper.c")
@@ -815,7 +832,7 @@ void* __stack_chk_guard = (void*) $(rand(UInt) >> 1);
 
 int main(int argc, char** argv)
 {
-    jl_init();
+$(arg_setup_block)    jl_init();
     jl_set_ARGS(argc, argv);
     int ret = $(rettype <: Integer ? "(int) $fn($call_args)" : "0");
     $(rettype <: Integer ? "" : "$fn($call_args);")
@@ -848,7 +865,7 @@ void* __stack_chk_guard = (void*) $(rand(UInt) >> 1);
 
 int main(int argc, char** argv)
 {
-    $fn($call_args);
+$(arg_setup_block)    $fn($call_args);
     return 0;
 }""")
     end
@@ -1036,6 +1053,13 @@ function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::St
             end
         end
         locate_pointers_and_runtime_calls(mod)
+        if !target.julia_runtime
+            deps = runtime_dependencies(mod)
+            if !isempty(deps)
+                deps_str = join(deps, ", ")
+                error("Generated code references Julia runtime symbols ($deps_str). Enable runtime linkage with `set_runtime!(target, true)` or refactor the code to avoid runtime dependencies.")
+            end
+        end
         strip_verifier_errors!(mod)
         mod
     end

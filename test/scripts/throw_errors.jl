@@ -12,4 +12,6 @@ function maybe_throw(argc::Int, argv::Ptr{Ptr{UInt8}})
 end
 
 # Attempt to compile
-path = compile_executable(maybe_throw, (Int64, Ptr{Ptr{UInt8}}), "./")
+target = StaticTarget()
+StaticCompiler.set_runtime!(target, true)
+path = compile_executable(maybe_throw, (Int64, Ptr{Ptr{UInt8}}), "./"; target=target)

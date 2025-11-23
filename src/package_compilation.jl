@@ -130,7 +130,7 @@ function infer_common_signatures(f::Function, max_signatures::Int=5)
 end
 
 """
-    compile_package(mod::Module, signatures::Dict{Symbol, Vector{Tuple}},
+    compile_package(mod::Module, signatures::AbstractDict{Symbol, <:AbstractVector},
                     output_path::String, lib_name::String;
                     namespace::Union{String,Nothing}=nothing,
                     template::Union{Symbol,Nothing}=nothing,
@@ -140,7 +140,7 @@ Compile an entire module/package to a shared library.
 
 # Arguments
 - `mod::Module`: Module to compile
-- `signatures::Dict{Symbol, Vector{Tuple}}`: Function names => type signatures
+- `signatures::AbstractDict{Symbol, <:AbstractVector}`: Function names => type signatures
 - `output_path::String`: Output directory
 - `lib_name::String`: Library name
 - `namespace::Union{String,Nothing}=nothing`: Function name prefix (default: module name)
@@ -175,10 +175,11 @@ lib_path = compile_package(MyMath, signatures, "./", "mymath")
 # - mymath.h with declarations
 ```
 """
-function compile_package(mod::Module, signatures::Dict{Symbol, Vector},
+function compile_package(mod::Module, signatures::AbstractDict{Symbol, <:AbstractVector},
                         output_path::String, lib_name::String;
                         namespace::Union{String,Nothing}=nothing,
                         template::Union{Symbol,Nothing}=nothing,
+                        target::StaticTarget=StaticTarget(),
                         kwargs...)
 
     # Default namespace to module name
@@ -233,11 +234,12 @@ function compile_package(mod::Module, signatures::Dict{Symbol, Vector},
                         filename=lib_name,
                         demangle=true,  # We handle naming ourselves
                         template=template,
+                        target=target,
                         kwargs...)
 end
 
 """
-    compile_package_exports(mod::Module, default_signatures::Dict{Symbol, Vector{Tuple}},
+    compile_package_exports(mod::Module, default_signatures::AbstractDict{Symbol, <:AbstractVector},
                            output_path::String, lib_name::String;
                            kwargs...) -> String
 
@@ -248,7 +250,7 @@ and compiles them with provided signatures.
 
 # Arguments
 - `mod::Module`: Module to compile
-- `default_signatures::Dict{Symbol, Vector{Tuple}}`: Type signatures for exported functions
+- `default_signatures::AbstractDict{Symbol, <:AbstractVector}`: Type signatures for exported functions
 - `output_path::String`: Output directory
 - `lib_name::String`: Library name
 - `kwargs...`: Additional compile_package parameters
@@ -272,7 +274,7 @@ signatures = Dict(
 lib_path = compile_package_exports(Calculator, signatures, "./", "calc")
 ```
 """
-function compile_package_exports(mod::Module, default_signatures::Dict{Symbol, Vector},
+function compile_package_exports(mod::Module, default_signatures::AbstractDict{Symbol, <:AbstractVector},
                                 output_path::String, lib_name::String;
                                 kwargs...)
     # Get exported names

@@ -347,11 +347,31 @@ end
 end
 
 # ============================================================================
-# Test 8: Error Handling
+# Test 8: Runtime Requirement Detection
+# ============================================================================
+
+@testset "Runtime Requirement Detection" begin
+    # Ensures runtime-dependent code errors when runtime linking is disabled
+    println("Test 8: Runtime Requirement Detection")
+
+    output_dir = joinpath(test_output, "runtime_guard")
+    mkpath(output_dir)
+
+    f(a::Int, b::Int) = div(a, b)
+    target = StaticTarget()
+    err = @test_throws ErrorException compile_shlib(f, (Int, Int), output_dir, "div_no_runtime"; target=target)
+    @test occursin("runtime symbols", sprint(showerror, err))
+
+    println("  Runtime guard works")
+    println()
+end
+
+# ============================================================================
+# Test 9: Error Handling
 # ============================================================================
 
 @testset "Error Handling" begin
-    println("Test 8: Error Handling")
+    println("Test 9: Error Handling")
 
     output_dir = joinpath(test_output, "errors")
     mkpath(output_dir)
@@ -396,6 +416,7 @@ println("  Compilation templates (6 templates)")
 println("  Package-level compilation")
 println("  Integration (all features together)")
 println("  Binary size optimization")
+println("  Runtime requirement guard")
 println("  Error handling")
 println()
 
