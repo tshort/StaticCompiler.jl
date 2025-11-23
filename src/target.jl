@@ -58,8 +58,8 @@ set_compiler!(target::StaticTarget, compiler::String) = (target.compiler = compi
 set_runtime!(target::StaticTarget, julia_runtime::Bool) = (target.julia_runtime = julia_runtime)
 
 # Pick an appropriate method table. If the caller didn't supply one, fall back to the
-# device-overlay table or, for runtime-linked builds, the empty runtime table. If a table
-# is explicitly provided, respect it to avoid dropping overlays unexpectedly.
+# device-overlay table unless the caller provides something else. For runtime-linked
+# builds, default to the empty runtime table unless the user explicitly supplies a table.
 select_method_table(mt, target::StaticTarget) =
     (target.julia_runtime && mt === method_table) ? runtime_method_table : mt
 
