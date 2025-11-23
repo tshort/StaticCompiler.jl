@@ -231,6 +231,7 @@ function show_template(name::Symbol)
     for (key, value) in pairs(template.params)
         println("  $key = $value")
     end
+    return
 end
 
 """
@@ -252,7 +253,7 @@ function show_all_templates()
     end
 
     println("Use get_template(:name) to get template parameters")
-    println("Use show_template(:name) for detailed settings")
+    return println("Use show_template(:name) for detailed settings")
 end
 
 """
@@ -314,10 +315,12 @@ julia> compile_with_template(:performance, myfunc, (Int,), "./", "myfunc",
 julia> compile_with_template(:debugging, myfunc, (Int,), "./", "myfunc")
 ```
 """
-function compile_with_template(template::Symbol, f::Function, types::Tuple,
-                                path::String, name::String;
-                                custom_params::NamedTuple=NamedTuple(),
-                                kwargs...)
+function compile_with_template(
+        template::Symbol, f::Function, types::Tuple,
+        path::String, name::String;
+        custom_params::NamedTuple = NamedTuple(),
+        kwargs...
+    )
     # Get template parameters
     params = apply_template(template, custom_params)
 
@@ -360,10 +363,12 @@ julia> compile_with_template(:embedded, functions, "./",
                               filename="embedded_lib")
 ```
 """
-function compile_with_template(template::Symbol, funcs::Vector, path::String;
-                                filename::String="libfoo",
-                                custom_params::NamedTuple=NamedTuple(),
-                                kwargs...)
+function compile_with_template(
+        template::Symbol, funcs::Vector, path::String;
+        filename::String = "libfoo",
+        custom_params::NamedTuple = NamedTuple(),
+        kwargs...
+    )
     # Get template parameters
     params = apply_template(template, custom_params)
 

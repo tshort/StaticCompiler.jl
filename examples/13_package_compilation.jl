@@ -118,8 +118,10 @@ output_dir2 = mktempdir()
 
 println("Example: Custom namespace")
 try
-    lib_path = compile_package(SimpleMath, signatures, output_dir2, "math",
-                               namespace="mymath")
+    lib_path = compile_package(
+        SimpleMath, signatures, output_dir2, "math",
+        namespace = "mymath"
+    )
 
     println()
     println("Compiled with custom namespace 'mymath'")
@@ -147,8 +149,10 @@ output_dir3 = mktempdir()
 
 try
     # This will only compile exported functions
-    lib_path = compile_package_exports(SimpleMath, signatures,
-                                       output_dir3, "exports_only")
+    lib_path = compile_package_exports(
+        SimpleMath, signatures,
+        output_dir3, "exports_only"
+    )
 
     println("Compiled only exported functions")
     println("   (internal_helper was skipped)")
@@ -184,15 +188,17 @@ poly_signatures = Dict(
     :compute => [
         (Int,),           # compute(Int)
         (Float64,),       # compute(Float64)
-        (Int, Int)        # compute(Int, Int)
+        (Int, Int),        # compute(Int, Int)
     ]
 )
 
 output_dir4 = mktempdir()
 
 try
-    lib_path = compile_package(PolyMath, poly_signatures,
-                               output_dir4, "polymath")
+    lib_path = compile_package(
+        PolyMath, poly_signatures,
+        output_dir4, "polymath"
+    )
 
     println("Compiled 3 variants of compute function")
     println()
@@ -216,9 +222,11 @@ println()
 output_dir5 = mktempdir()
 
 try
-    lib_path = compile_package(SimpleMath, signatures,
-                               output_dir5, "simplemath_prod",
-                               template=:production)
+    lib_path = compile_package(
+        SimpleMath, signatures,
+        output_dir5, "simplemath_prod",
+        template = :production
+    )
 
     println("Compiled with :production template")
     println("   All functions verified with strict quality standards")
@@ -243,13 +251,15 @@ println()
 # Note: This is demonstration syntax - may not run without proper module setup
 println("Example syntax:")
 println()
-println("""
-    @compile_package SimpleMath "./build" "simplemath" begin
-        add => [(Int, Int)]
-        subtract => [(Int, Int)]
-        multiply => [(Float64, Float64)]
-    end
-""")
+println(
+    """
+        @compile_package SimpleMath "./build" "simplemath" begin
+            add => [(Int, Int)]
+            subtract => [(Int, Int)]
+            multiply => [(Float64, Float64)]
+        end
+    """
+)
 println()
 
 # ============================================================================
@@ -266,8 +276,8 @@ module SimpleStats
 
     function mean(data::Ptr{Float64}, n::Int)
         total = 0.0
-        for i in 0:n-1
-            total += unsafe_load(data, i+1)
+        for i in 0:(n - 1)
+            total += unsafe_load(data, i + 1)
         end
         return total / n
     end
@@ -275,8 +285,8 @@ module SimpleStats
     function variance(data::Ptr{Float64}, n::Int)
         m = mean(data, n)
         sum_sq = 0.0
-        for i in 0:n-1
-            val = unsafe_load(data, i+1)
+        for i in 0:(n - 1)
+            val = unsafe_load(data, i + 1)
             sum_sq += (val - m)^2
         end
         return sum_sq / n
@@ -297,10 +307,12 @@ output_dir6 = mktempdir()
 
 println("Compiling SimpleStats module...")
 try
-    lib_path = compile_package(SimpleStats, stats_signatures,
-                               output_dir6, "stats",
-                               template=:performance,
-                               generate_header=true)
+    lib_path = compile_package(
+        SimpleStats, stats_signatures,
+        output_dir6, "stats",
+        template = :performance,
+        generate_header = true
+    )
 
     println()
     println("Statistics library compiled!")
@@ -330,20 +342,24 @@ println("-"^70)
 println()
 
 println("Function-by-Function (tedious):")
-println("""
-    compile_shlib(add, (Int, Int), "./", "add")
-    compile_shlib(subtract, (Int, Int), "./", "subtract")
-    compile_shlib(multiply, (Float64, Float64), "./", "multiply")
-    compile_shlib(divide_int, (Int, Int), "./", "divide_int")
-    # 4 separate libraries!
-""")
+println(
+    """
+        compile_shlib(add, (Int, Int), "./", "add")
+        compile_shlib(subtract, (Int, Int), "./", "subtract")
+        compile_shlib(multiply, (Float64, Float64), "./", "multiply")
+        compile_shlib(divide_int, (Int, Int), "./", "divide_int")
+        # 4 separate libraries!
+    """
+)
 println()
 
 println("Package Compilation (convenient):")
-println("""
-    compile_package(SimpleMath, signatures, "./", "simplemath")
-    # One library with all functions!
-""")
+println(
+    """
+        compile_package(SimpleMath, signatures, "./", "simplemath")
+        # One library with all functions!
+    """
+)
 println()
 
 # ============================================================================

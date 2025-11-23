@@ -33,7 +33,7 @@ julia> report = quick_check_cached(my_func, (Int,))  # Runs analysis
 julia> report = quick_check_cached(my_func, (Int,))  # Uses cache (fast!)
 ```
 """
-function quick_check_cached(f::Function, types::Tuple; ttl::Float64=CACHE_TTL)
+function quick_check_cached(f::Function, types::Tuple; ttl::Float64 = CACHE_TTL)
     key = cache_key(f, types)
     current_time = time()
 
@@ -73,11 +73,11 @@ julia> results = batch_check_cached([
        ])
 ```
 """
-function batch_check_cached(functions::Vector; ttl::Float64=CACHE_TTL)
+function batch_check_cached(functions::Vector; ttl::Float64 = CACHE_TTL)
     results = Dict{Symbol, CompilationReadinessReport}()
 
     for (f, types) in functions
-        report = quick_check_cached(f, types; ttl=ttl)
+        report = quick_check_cached(f, types; ttl = ttl)
         results[report.function_name] = report
     end
 
@@ -140,7 +140,7 @@ function cache_stats()
         :entries => length(ANALYSIS_CACHE),
         :oldest => maximum(ages),
         :newest => minimum(ages),
-        :memory => round(memory_mb, digits=2)
+        :memory => round(memory_mb, digits = 2)
     )
 end
 
@@ -161,7 +161,7 @@ julia> removed = prune_cache!(600.0)  # Remove entries older than 10 minutes
 Pruned 5 expired entries
 ```
 """
-function prune_cache!(max_age::Float64=CACHE_TTL)
+function prune_cache!(max_age::Float64 = CACHE_TTL)
     current_time = time()
     to_remove = UInt64[]
 
@@ -197,7 +197,7 @@ julia> with_cache(ttl=600.0) do
        end
 ```
 """
-function with_cache(f::Function; ttl::Float64=CACHE_TTL)
+function with_cache(f::Function; ttl::Float64 = CACHE_TTL)
     prune_cache!(ttl)
     try
         result = f()

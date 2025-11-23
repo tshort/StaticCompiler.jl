@@ -29,9 +29,9 @@ for the target platform. For example, to cross-compile for aarch64 using a compi
 ```
 """
 mutable struct StaticTarget
-    platform::Union{Platform,Nothing}
+    platform::Union{Platform, Nothing}
     tm::LLVM.TargetMachine
-    compiler::Union{String,Nothing}
+    compiler::Union{String, Nothing}
     julia_runtime::Bool
 end
 
@@ -43,7 +43,7 @@ StaticTarget(platform::Platform, cpu::String, features::String) = StaticTarget(p
 
 function StaticTarget(triple::String, cpu::String, features::String)
     platform = tryparse(Platform, triple)
-    StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = triple), triple, cpu, features), nothing, false)
+    return StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = triple), triple, cpu, features), nothing, false)
 end
 
 """
@@ -113,9 +113,9 @@ GPUCompiler.llvm_triple(target::StaticCompilerTarget) = target.triple
 function GPUCompiler.llvm_machine(target::StaticCompilerTarget)
     triple = GPUCompiler.llvm_triple(target)
 
-    t = LLVM.Target(triple=triple)
+    t = LLVM.Target(triple = triple)
 
-    tm = LLVM.TargetMachine(t, triple, target.cpu, target.features, reloc=LLVM.API.LLVMRelocPIC)
+    tm = LLVM.TargetMachine(t, triple, target.cpu, target.features, reloc = LLVM.API.LLVMRelocPIC)
     GPUCompiler.asm_verbosity!(tm, true)
 
     return tm
@@ -137,17 +137,20 @@ GPUCompiler.uses_julia_runtime(job::GPUCompiler.CompilerJob{<:StaticCompilerTarg
     GPUCompiler.imaging_mode(target::StaticCompilerTarget) = target.julia_runtime
 end
 GPUCompiler.get_interpreter(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) =
-    StaticInterpreter(job.config.params.cache, GPUCompiler.method_table(job), job.world,
-                        GPUCompiler.inference_params(job), GPUCompiler.optimization_params(job))
+    StaticInterpreter(
+    job.config.params.cache, GPUCompiler.method_table(job), job.world,
+    GPUCompiler.inference_params(job), GPUCompiler.optimization_params(job)
+)
 GPUCompiler.ci_cache(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) = job.config.params.cache
 GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget})) = job.config.target.method_table
 
 
-function static_job(@nospecialize(func::Function), @nospecialize(types::Type);
+function static_job(
+        @nospecialize(func::Function), @nospecialize(types::Type);
         name = fix_name(func),
         kernel::Bool = false,
         target::StaticTarget = StaticTarget(),
-        method_table=method_table,
+        method_table = method_table,
         kwargs...
     )
     source = methodinstance(typeof(func), Base.to_tuple_type(types))
@@ -156,20 +159,21 @@ function static_job(@nospecialize(func::Function), @nospecialize(types::Type);
     gputarget = StaticCompilerTarget(LLVM.triple(tm), LLVM.cpu(tm), LLVM.features(tm), target.julia_runtime, method_table)
     params = StaticCompilerParams()
     config = GPUCompiler.CompilerConfig(gputarget, params, name = name, kernel = kernel)
-    StaticCompiler.CompilerJob(source, config), kwargs
+    return StaticCompiler.CompilerJob(source, config), kwargs
 end
-function static_job(@nospecialize(func), @nospecialize(types);
-    name = fix_name(func),
-    kernel::Bool = false,
-    target::StaticTarget = StaticTarget(),
-    method_table=method_table,
-    kwargs...
-)
+function static_job(
+        @nospecialize(func), @nospecialize(types);
+        name = fix_name(func),
+        kernel::Bool = false,
+        target::StaticTarget = StaticTarget(),
+        method_table = method_table,
+        kwargs...
+    )
     source = methodinstance(typeof(func), Base.to_tuple_type(types))
     method_table = select_method_table(method_table, target)
     tm = target.tm
     gputarget = StaticCompilerTarget(LLVM.triple(tm), LLVM.cpu(tm), LLVM.features(tm), target.julia_runtime, method_table)
     params = StaticCompilerParams()
     config = GPUCompiler.CompilerConfig(gputarget, params, name = name, kernel = kernel)
-    StaticCompiler.CompilerJob(source, config), kwargs
+    return StaticCompiler.CompilerJob(source, config), kwargs
 end

@@ -75,8 +75,10 @@ println()
 
 output_dir1 = mktempdir()
 try
-    lib_path = compile_shlib(calculate_sum, (Int,), output_dir1, "calc_embedded",
-                             template=:embedded)
+    lib_path = compile_shlib(
+        calculate_sum, (Int,), output_dir1, "calc_embedded",
+        template = :embedded
+    )
     println("Compiled: $lib_path")
     println()
 catch e
@@ -89,8 +91,10 @@ println()
 
 output_dir2 = mktempdir()
 try
-    lib_path = compile_shlib(calculate_sum, (Int,), output_dir2, "calc_perf",
-                             template=:performance)
+    lib_path = compile_shlib(
+        calculate_sum, (Int,), output_dir2, "calc_perf",
+        template = :performance
+    )
     println("Compiled: $lib_path")
     println()
 catch e
@@ -103,8 +107,10 @@ println()
 
 output_dir3 = mktempdir()
 try
-    lib_path = compile_shlib(calculate_sum, (Int,), output_dir3, "calc_debug",
-                             template=:debugging)
+    lib_path = compile_shlib(
+        calculate_sum, (Int,), output_dir3, "calc_debug",
+        template = :debugging
+    )
     println("Compiled: $lib_path")
     println()
 catch e
@@ -133,9 +139,11 @@ println()
 try
     # Embedded template normally has min_score=90
     # We override it to 80
-    lib_path = compile_shlib(calculate_sum, (Int,), output_dir4, "calc_custom",
-                             template=:embedded,
-                             min_score=80)  # Override template default
+    lib_path = compile_shlib(
+        calculate_sum, (Int,), output_dir4, "calc_custom",
+        template = :embedded,
+        min_score = 80
+    )  # Override template default
 
     println("Successfully used template with custom override")
     println()
@@ -159,8 +167,10 @@ println()
 output_dir5 = mktempdir()
 
 try
-    lib_path = compile_with_template(:production, calculate_sum, (Int,),
-                                      output_dir5, "calc_production")
+    lib_path = compile_with_template(
+        :production, calculate_sum, (Int,),
+        output_dir5, "calc_production"
+    )
     println("Compiled using compile_with_template")
     println()
 catch e
@@ -188,7 +198,7 @@ end
 functions = [
     (add_numbers, (Int, Int)),
     (multiply_numbers, (Int, Int)),
-    (calculate_sum, (Int,))
+    (calculate_sum, (Int,)),
 ]
 
 output_dir6 = mktempdir()
@@ -197,9 +207,11 @@ println("Example: Compile multiple functions with :production template")
 println()
 
 try
-    lib_path = compile_shlib(functions, output_dir6,
-                             filename="math_ops",
-                             template=:production)
+    lib_path = compile_shlib(
+        functions, output_dir6,
+        filename = "math_ops",
+        template = :production
+    )
     println("Batch compiled with production template")
     println()
 catch e
@@ -217,16 +229,18 @@ println("-"^70)
 println()
 
 println("Template            | Verify | Min Score | Export | Header")
-println("-"*19 * "|" * "-"*8 * "|" * "-"*11 * "|" * "-"*8 * "|" * "-"*8)
+println("-" * 19 * "|" * "-" * 8 * "|" * "-" * 11 * "|" * "-" * 8 * "|" * "-" * 8)
 
 for template_name in list_templates()
     tmpl = get_template(template_name)
     params = tmpl.params
-    println(rpad(":$template_name", 20), "|",
-            rpad("  $(params.verify)", 8), "|",
-            rpad("  $(params.min_score)", 11), "|",
-            rpad("  $(params.export_analysis)", 8), "|",
-            "  $(params.generate_header)")
+    println(
+        rpad(":$template_name", 20), "|",
+        rpad("  $(params.verify)", 8), "|",
+        rpad("  $(params.min_score)", 11), "|",
+        rpad("  $(params.export_analysis)", 8), "|",
+        "  $(params.generate_header)"
+    )
 end
 println()
 
@@ -272,7 +286,7 @@ MY_PROJECT_CONFIG = (
     min_score = 88,
     suggest_fixes = true,
     export_analysis = true,
-    generate_header = true
+    generate_header = true,
 )
 
 println("Custom configuration example:")
@@ -285,8 +299,10 @@ output_dir7 = mktempdir()
 
 println("Using custom configuration:")
 try
-    lib_path = compile_shlib(calculate_sum, (Int,), output_dir7, "custom",
-                             MY_PROJECT_CONFIG...)
+    lib_path = compile_shlib(
+        calculate_sum, (Int,), output_dir7, "custom",
+        MY_PROJECT_CONFIG...
+    )
     println("Compiled with custom configuration")
     println()
 catch e
@@ -310,9 +326,11 @@ output_dir8 = mktempdir()
 
 println("Example: Template + custom compiler flags")
 try
-    lib_path = compile_shlib(calculate_sum, (Int,), output_dir8, "combined",
-                             template=:performance,
-                             cflags=`-O3`)  # Additional optimization
+    lib_path = compile_shlib(
+        calculate_sum, (Int,), output_dir8, "combined",
+        template = :performance,
+        cflags = `-O3`
+    )  # Additional optimization
     println("Template combined with custom cflags")
     println()
 catch e
@@ -376,7 +394,7 @@ end
 println()
 
 println("Apply template with custom overrides:")
-custom_params = apply_template(:embedded, (min_score=95, export_analysis=true))
+custom_params = apply_template(:embedded, (min_score = 95, export_analysis = true))
 println("Resulting parameters:")
 for (key, value) in pairs(custom_params)
     println("  $key: $value")

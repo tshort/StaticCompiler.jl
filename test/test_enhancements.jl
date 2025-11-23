@@ -12,9 +12,9 @@ using Test
 using StaticCompiler
 using StaticTools
 
-println("=" ^ 70)
+println("="^70)
 println("StaticCompiler.jl Enhancement Test Suite")
-println("=" ^ 70)
+println("="^70)
 println()
 
 # Test output directory
@@ -43,7 +43,7 @@ println()
     @test filesize(exe_path) > 0
 
     # Test shared library compilation
-    lib_path = compile_shlib(test_basic, (), output_dir; filename="test_basic_lib")
+    lib_path = compile_shlib(test_basic, (), output_dir; filename = "test_basic_lib")
     @test isfile(lib_path)
     @test filesize(lib_path) > 0
 
@@ -75,21 +75,27 @@ end
 
     # Test that verification works
     @test_nowarn begin
-        compile_executable(good_func, (Int,), output_dir, "good",
-                          verify=true, min_score=80)
+        compile_executable(
+            good_func, (Int,), output_dir, "good",
+            verify = true, min_score = 80
+        )
     end
 
     # Test custom threshold
     @test_nowarn begin
-        compile_executable(good_func, (Int,), output_dir, "good_strict",
-                          verify=true, min_score=95)
+        compile_executable(
+            good_func, (Int,), output_dir, "good_strict",
+            verify = true, min_score = 95
+        )
     end
 
     # Test that verification can detect issues
     # (might pass or fail depending on actual score, but should not error)
     try
-        compile_executable(problematic_func, (Any,), output_dir, "problematic",
-                          verify=true, min_score=90)
+        compile_executable(
+            problematic_func, (Any,), output_dir, "problematic",
+            verify = true, min_score = 90
+        )
     catch e
         # Expected to possibly fail verification
         @test contains(string(e), "verification") || contains(string(e), "score")
@@ -118,9 +124,11 @@ end
     mkpath(output_dir)
 
     # Test header generation for single function
-    lib_path = compile_shlib(add_numbers, (Int, Int), output_dir;
-                            filename="math",
-                            generate_header=true)
+    lib_path = compile_shlib(
+        add_numbers, (Int, Int), output_dir;
+        filename = "math",
+        generate_header = true
+    )
 
     header_path = joinpath(output_dir, "math.h")
     @test isfile(header_path)
@@ -131,11 +139,15 @@ end
     @test contains(header_content, "extern")   # C linkage
 
     # Test header generation for multiple functions
-    lib_path = compile_shlib([(add_numbers, (Int, Int)),
-                              (multiply, (Float64, Float64))],
-                            output_dir;
-                            filename="multimath",
-                            generate_header=true)
+    lib_path = compile_shlib(
+        [
+            (add_numbers, (Int, Int)),
+            (multiply, (Float64, Float64)),
+        ],
+        output_dir;
+        filename = "multimath",
+        generate_header = true
+    )
 
     multiheader_path = joinpath(output_dir, "multimath.h")
     @test isfile(multiheader_path)
@@ -166,17 +178,21 @@ end
     templates = [:embedded, :performance, :portable, :debugging, :production, :default]
 
     for tmpl in templates
-        exe_path = compile_executable(template_test, (Int,), output_dir,
-                                      "test_$(tmpl)",
-                                      template=tmpl)
+        exe_path = compile_executable(
+            template_test, (Int,), output_dir,
+            "test_$(tmpl)",
+            template = tmpl
+        )
         @test isfile(exe_path)
     end
 
     # Test template with overrides
-    exe_path = compile_executable(template_test, (Int,), output_dir,
-                                  "test_override",
-                                  template=:embedded,
-                                  min_score=85)  # Override default 90
+    exe_path = compile_executable(
+        template_test, (Int,), output_dir,
+        "test_override",
+        template = :embedded,
+        min_score = 85
+    )  # Override default 90
     @test isfile(exe_path)
 
     # Test template introspection
@@ -201,24 +217,24 @@ end
 
     # Define a test module
     module TestMath
-        export add, subtract, multiply
+    export add, subtract, multiply
 
-        function add(a::Int, b::Int)
-            return a + b
-        end
+    function add(a::Int, b::Int)
+        return a + b
+    end
 
-        function subtract(a::Int, b::Int)
-            return a - b
-        end
+    function subtract(a::Int, b::Int)
+        return a - b
+    end
 
-        function multiply(x::Float64, y::Float64)
-            return x * y
-        end
+    function multiply(x::Float64, y::Float64)
+        return x * y
+    end
 
-        # Not exported
-        function internal_func(x::Int)
-            return x * 2
-        end
+    # Not exported
+    function internal_func(x::Int)
+        return x * 2
+    end
     end
 
     output_dir = joinpath(test_output, "package")
@@ -235,13 +251,17 @@ end
     @test isfile(lib_path)
 
     # Test package compilation with template
-    lib_path = compile_package(TestMath, signatures, output_dir, "testmath_prod",
-                               template=:production)
+    lib_path = compile_package(
+        TestMath, signatures, output_dir, "testmath_prod",
+        template = :production
+    )
     @test isfile(lib_path)
 
     # Test with custom namespace
-    lib_path = compile_package(TestMath, signatures, output_dir, "testmath_ns",
-                               namespace="tm")
+    lib_path = compile_package(
+        TestMath, signatures, output_dir, "testmath_ns",
+        namespace = "tm"
+    )
     @test isfile(lib_path)
 
     # Test compile_package_exports
@@ -260,15 +280,15 @@ end
     println("Test 6: Integration Test - All Features Together")
 
     module IntegrationTest
-        export process_data
+    export process_data
 
-        function process_data(data::Ptr{Float64}, n::Int)
-            total = 0.0
-            for i in 0:n-1
-                total += unsafe_load(data, i+1)
-            end
-            return total / n
+    function process_data(data::Ptr{Float64}, n::Int)
+        total = 0.0
+        for i in 0:(n - 1)
+            total += unsafe_load(data, i + 1)
         end
+        return total / n
+    end
     end
 
     output_dir = joinpath(test_output, "integration")
@@ -284,11 +304,13 @@ end
     # - Verification
     # - Header generation
     # - Custom namespace
-    lib_path = compile_package(IntegrationTest, signatures, output_dir, "integration",
-                               template=:production,
-                               verify=true,
-                               generate_header=true,
-                               namespace="it")
+    lib_path = compile_package(
+        IntegrationTest, signatures, output_dir, "integration",
+        template = :production,
+        verify = true,
+        generate_header = true,
+        namespace = "it"
+    )
 
     @test isfile(lib_path)
 
@@ -320,10 +342,14 @@ end
 
     # Compile with different optimization levels
     exe_basic = compile_executable(size_test, (), output_dir, "size_basic")
-    exe_os = compile_executable(size_test, (), output_dir, "size_os",
-                               cflags=`-Os`)
-    exe_optimized = compile_executable(size_test, (), output_dir, "size_opt",
-                                      cflags=`-Os -flto`)
+    exe_os = compile_executable(
+        size_test, (), output_dir, "size_os",
+        cflags = `-Os`
+    )
+    exe_optimized = compile_executable(
+        size_test, (), output_dir, "size_opt",
+        cflags = `-Os -flto`
+    )
 
     @test isfile(exe_basic)
     @test isfile(exe_os)
@@ -339,9 +365,9 @@ end
     @test size_optimized > 0
 
     println("  Size comparison:")
-    println("    Basic: $(round(size_basic/1024, digits=1)) KB")
-    println("    -Os: $(round(size_os/1024, digits=1)) KB")
-    println("    -Os -flto: $(round(size_optimized/1024, digits=1)) KB")
+    println("    Basic: $(round(size_basic / 1024, digits = 1)) KB")
+    println("    -Os: $(round(size_os / 1024, digits = 1)) KB")
+    println("    -Os -flto: $(round(size_optimized / 1024, digits = 1)) KB")
     println("  Optimization flags work")
     println()
 end
@@ -359,7 +385,7 @@ end
 
     f(a::Int, b::Int) = div(a, b)
     target = StaticTarget()
-    err = @test_throws ErrorException compile_shlib(f, (Int, Int), output_dir, "div_no_runtime"; target=target)
+    err = @test_throws ErrorException compile_shlib(f, (Int, Int), output_dir, "div_no_runtime"; target = target)
     @test occursin("runtime symbols", sprint(showerror, err))
 
     println("  Runtime guard works")
@@ -382,7 +408,7 @@ end
         (Int,),
         output_dir,
         "test",
-        template=:nonexistent
+        template = :nonexistent
     )
 
     # Test invalid min_score
@@ -391,8 +417,8 @@ end
         (Int,),
         output_dir,
         "test",
-        verify=true,
-        min_score=150  # Invalid: > 100
+        verify = true,
+        min_score = 150  # Invalid: > 100
     )
 
     println("  Error handling works")
@@ -403,9 +429,9 @@ end
 # Summary
 # ============================================================================
 
-println("=" ^ 70)
+println("="^70)
 println("Test Suite Complete")
-println("=" ^ 70)
+println("="^70)
 println()
 
 println("All enhancements tested:")

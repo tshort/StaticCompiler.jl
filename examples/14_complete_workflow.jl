@@ -9,9 +9,9 @@
 using StaticCompiler
 using StaticTools
 
-println("=" ^ 70)
+println("="^70)
 println("Example 14: Complete Development Workflow")
-println("=" ^ 70)
+println("="^70)
 println()
 println("Scenario: Building a signal processing library for embedded systems")
 println()
@@ -21,7 +21,7 @@ println()
 # ============================================================================
 
 println("Part 1: Defining the Signal Processing Module")
-println("-" ^ 70)
+println("-"^70)
 println()
 
 module SignalProcessing
@@ -38,8 +38,8 @@ module SignalProcessing
         end
 
         total = 0.0
-        for i in 0:window-1
-            total += unsafe_load(data, i+1)
+        for i in 0:(window - 1)
+            total += unsafe_load(data, i + 1)
         end
 
         return total / window
@@ -50,14 +50,16 @@ module SignalProcessing
 
     C signature: int find_peaks(double* data, int n, double threshold, int* peaks)
     """
-    function find_peaks(data::Ptr{Float64}, n::Int, threshold::Float64,
-                       peaks::Ptr{Int})
+    function find_peaks(
+            data::Ptr{Float64}, n::Int, threshold::Float64,
+            peaks::Ptr{Int}
+        )
         count = 0
 
-        for i in 0:n-1
-            val = unsafe_load(data, i+1)
+        for i in 0:(n - 1)
+            val = unsafe_load(data, i + 1)
             if val > threshold
-                unsafe_store!(peaks, i, count+1)
+                unsafe_store!(peaks, i, count + 1)
                 count += 1
             end
         end
@@ -75,8 +77,8 @@ module SignalProcessing
         min_val = unsafe_load(data, 1)
         max_val = min_val
 
-        for i in 1:n-1
-            val = unsafe_load(data, i+1)
+        for i in 1:(n - 1)
+            val = unsafe_load(data, i + 1)
             if val < min_val
                 min_val = val
             end
@@ -88,10 +90,10 @@ module SignalProcessing
         # Normalize
         range = max_val - min_val
         if range > 0.0
-            for i in 0:n-1
-                val = unsafe_load(data, i+1)
+            for i in 0:(n - 1)
+                val = unsafe_load(data, i + 1)
                 normalized = (val - min_val) / range
-                unsafe_store!(output, normalized, i+1)
+                unsafe_store!(output, normalized, i + 1)
             end
         end
 
@@ -118,7 +120,7 @@ println()
 
 println()
 println("Part 2: Development Phase - Code Quality Analysis")
-println("-" ^ 70)
+println("-"^70)
 println()
 
 println("Step 2.1: Analyzing code with debugging template")
@@ -135,11 +137,13 @@ output_dir_dev = mktempdir()
 
 try
     # Compile with debugging template for development
-    lib_path = compile_package(SignalProcessing, signatures,
-                               output_dir_dev, "signal_dev",
-                               template=:debugging,
-                               verify=true,
-                               export_analysis=true)
+    lib_path = compile_package(
+        SignalProcessing, signatures,
+        output_dir_dev, "signal_dev",
+        template = :debugging,
+        verify = true,
+        export_analysis = true
+    )
 
     println()
     println("Development build successful!")
@@ -164,7 +168,7 @@ end
 
 println()
 println("Part 3: Testing Phase - Portable Build for Multiple Platforms")
-println("-" ^ 70)
+println("-"^70)
 println()
 
 output_dir_test = mktempdir()
@@ -173,11 +177,13 @@ try
     println("Compiling with :portable template for compatibility testing...")
     println()
 
-    lib_path = compile_package(SignalProcessing, signatures,
-                               output_dir_test, "signal_test",
-                               template=:portable,
-                               verify=true,
-                               generate_header=true)
+    lib_path = compile_package(
+        SignalProcessing, signatures,
+        output_dir_test, "signal_test",
+        template = :portable,
+        verify = true,
+        generate_header = true
+    )
 
     println()
     println("Test build successful!")
@@ -188,7 +194,7 @@ try
     header_path = joinpath(output_dir_test, "signal_test.h")
     if isfile(header_path)
         println("Generated C header:")
-        println("-" ^ 70)
+        println("-"^70)
         header_content = read(header_path, String)
         # Show just the function declarations
         for line in split(header_content, '\n')
@@ -196,7 +202,7 @@ try
                 println("  " * strip(line))
             end
         end
-        println("-" ^ 70)
+        println("-"^70)
         println()
     end
 
@@ -211,7 +217,7 @@ end
 
 println()
 println("Part 4: Production Phase - Embedded System Build")
-println("-" ^ 70)
+println("-"^70)
 println()
 
 output_dir_prod = mktempdir()
@@ -221,12 +227,14 @@ try
     println()
 
     # Use embedded template with aggressive size optimization
-    lib_path = compile_package(SignalProcessing, signatures,
-                               output_dir_prod, "signal",
-                               template=:embedded,
-                               cflags=`-Os -flto -fdata-sections -ffunction-sections -Wl,--gc-sections`,
-                               generate_header=true,
-                               namespace="sp")  # Short namespace for embedded
+    lib_path = compile_package(
+        SignalProcessing, signatures,
+        output_dir_prod, "signal",
+        template = :embedded,
+        cflags = `-Os -flto -fdata-sections -ffunction-sections -Wl,--gc-sections`,
+        generate_header = true,
+        namespace = "sp"
+    )  # Short namespace for embedded
 
     println()
     println("Production build successful!")
@@ -235,7 +243,7 @@ try
 
     if isfile(lib_path)
         size_bytes = filesize(lib_path)
-        size_kb = round(size_bytes / 1024, digits=1)
+        size_kb = round(size_bytes / 1024, digits = 1)
         println("   Size: $size_kb KB ($size_bytes bytes)")
         println()
 
@@ -246,8 +254,8 @@ try
             run(`strip $stripped_path`)
 
             stripped_size = filesize(stripped_path)
-            stripped_kb = round(stripped_size / 1024, digits=1)
-            reduction = round((1 - stripped_size/size_bytes) * 100, digits=1)
+            stripped_kb = round(stripped_size / 1024, digits = 1)
+            reduction = round((1 - stripped_size / size_bytes) * 100, digits = 1)
 
             println("   After strip: $stripped_kb KB (-$reduction%)")
             println()
@@ -258,14 +266,14 @@ try
     header_path = joinpath(output_dir_prod, "signal.h")
     if isfile(header_path)
         println("Production header with 'sp_' namespace:")
-        println("-" ^ 70)
+        println("-"^70)
         header_content = read(header_path, String)
         for line in split(header_content, '\n')
             if contains(line, "sp_") && contains(line, "(")
                 println("  " * strip(line))
             end
         end
-        println("-" ^ 70)
+        println("-"^70)
         println()
     end
 
@@ -280,7 +288,7 @@ end
 
 println()
 println("Part 5: Performance Build - HPC Version")
-println("-" ^ 70)
+println("-"^70)
 println()
 
 output_dir_perf = mktempdir()
@@ -289,11 +297,13 @@ try
     println("Compiling for maximum performance...")
     println()
 
-    lib_path = compile_package(SignalProcessing, signatures,
-                               output_dir_perf, "signal_fast",
-                               template=:performance,
-                               cflags=`-O3 -march=native -ffast-math`,
-                               generate_header=true)
+    lib_path = compile_package(
+        SignalProcessing, signatures,
+        output_dir_perf, "signal_fast",
+        template = :performance,
+        cflags = `-O3 -march=native -ffast-math`,
+        generate_header = true
+    )
 
     println()
     println("Performance build successful!")
@@ -311,7 +321,7 @@ end
 
 println()
 println("Part 6: C Integration Example")
-println("-" ^ 70)
+println("-"^70)
 println()
 
 c_example = """
@@ -350,9 +360,9 @@ int main() {
 """
 
 println("Example C code using the compiled library:")
-println("-" ^ 70)
+println("-"^70)
 println(c_example)
-println("-" ^ 70)
+println("-"^70)
 println()
 
 # ============================================================================
@@ -360,9 +370,9 @@ println()
 # ============================================================================
 
 println()
-println("=" ^ 70)
+println("="^70)
 println("Complete Workflow Summary")
-println("=" ^ 70)
+println("="^70)
 println()
 
 println("Development Workflow Demonstrated:")
@@ -411,7 +421,7 @@ println()
 
 println()
 println("Part 8: Alternative CLI Workflow")
-println("-" ^ 70)
+println("-"^70)
 println()
 
 println("All of the above can be done via command-line tools:")
@@ -450,7 +460,7 @@ println()
 
 println()
 println("Part 9: Best Practices Demonstrated")
-println("-" ^ 70)
+println("-"^70)
 println()
 
 println("OK Use concrete types (Ptr{Float64}, Int, not Number)")
@@ -471,7 +481,7 @@ println()
 
 println()
 println("Part 10: Deployment Scenarios")
-println("-" ^ 70)
+println("-"^70)
 println()
 
 println("Embedded System (ARM Cortex-M):")
@@ -507,9 +517,9 @@ println()
 # ============================================================================
 
 println()
-println("=" ^ 70)
+println("="^70)
 println("WORKFLOW COMPLETE")
-println("=" ^ 70)
+println("="^70)
 println()
 
 println("This example demonstrated:")
@@ -541,4 +551,4 @@ println("  • docs/BINARY_SIZE_OPTIMIZATION.md")
 println("  • bin/README.md")
 println()
 
-println("=" ^ 70)
+println("="^70)

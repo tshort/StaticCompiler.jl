@@ -65,7 +65,7 @@ function analyze_escapes(f::Function, types::Tuple)
         end
 
         # Get code_typed output
-        typed_code = code_typed(f, types, optimize=false)
+        typed_code = code_typed(f, types, optimize = false)
 
         if !isempty(typed_code)
             ir, return_type = first(typed_code)
@@ -83,12 +83,12 @@ function analyze_escapes(f::Function, types::Tuple)
     catch e
         # If analysis fails, return empty report rather than erroring
         # This allows tests to continue even with unanalyzable functions
-        @debug "Escape analysis failed for $fname" exception=e
+        @debug "Escape analysis failed for $fname" exception = e
     end
 
     # Calculate metrics
     promotable = count(a -> a.can_promote && !a.escapes, allocations)
-    savings = sum(a -> a.can_promote && !a.escapes ? a.size_bytes : 0, allocations, init=0)
+    savings = sum(a -> a.can_promote && !a.escapes ? a.size_bytes : 0, allocations, init = 0)
 
     return EscapeAnalysisReport(allocations, savings, promotable, fname)
 end

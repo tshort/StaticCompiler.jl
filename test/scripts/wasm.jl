@@ -11,6 +11,6 @@ InitializeAllTargetMCs()
 
 fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
 
-target=StaticTarget("wasm32","","")
+target = StaticTarget("wasm32", "", "")
 
-StaticCompiler.generate_obj(fib, Tuple{Int64}, "./test", target=target)
+StaticCompiler.generate_obj(fib, Tuple{Int64}, "./test", target = target)

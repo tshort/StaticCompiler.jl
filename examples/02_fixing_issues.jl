@@ -102,11 +102,11 @@ println("Problem 4: Dynamic Dispatch")
 println("-"^70)
 
 abstract type Animal end
-struct Dog <: Animal 
+struct Dog <: Animal
     name::String
 end
 struct Cat <: Animal
-    name::String  
+    name::String
 end
 
 # BEFORE: Dynamic dispatch

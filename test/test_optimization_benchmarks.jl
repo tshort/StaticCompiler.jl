@@ -14,7 +14,7 @@ println("="^70)
 println()
 
 # Helper function to compile and measure
-function benchmark_optimization(func_unopt, func_opt, types, args, name::String; samples=20)
+function benchmark_optimization(func_unopt, func_opt, types, args, name::String; samples = 20)
     println("Benchmarking: $name")
 
     workdir = mktempdir()
@@ -36,7 +36,7 @@ function benchmark_optimization(func_unopt, func_opt, types, args, name::String;
         println("   Binary sizes:")
         println("      Unoptimized: $size_unopt bytes")
         println("      Optimized:   $size_opt bytes")
-        println("      Reduction:   $(round(size_reduction_pct, digits=2))%")
+        println("      Reduction:   $(round(size_reduction_pct, digits = 2))%")
 
         # Note: Runtime benchmarking of executables would require more complex setup
         # For now, we verify compilation works and measure binary size impact
@@ -57,7 +57,7 @@ function benchmark_optimization(func_unopt, func_opt, types, args, name::String;
             "error" => string(e)
         )
     finally
-        rm(workdir, recursive=true, force=true)
+        rm(workdir, recursive = true, force = true)
     end
 end
 
@@ -180,7 +180,7 @@ end
     @testset "Type specialization" begin
         println()
 
-        function generic_process(data::Vector{T}) where T <: Number
+        function generic_process(data::Vector{T}) where {T <: Number}
             result = zero(T)
             for x in data
                 result += x * x
@@ -316,7 +316,7 @@ end
 
         println("   Constants found: $(length(report.constants_found))")
         println("   Foldable expressions: $(report.foldable_expressions)")
-        println("   Code reduction potential: $(round(report.code_reduction_potential_pct, digits=1))%")
+        println("   Code reduction potential: $(round(report.code_reduction_potential_pct, digits = 1))%")
 
         @test report.foldable_expressions >= 0
         @test report.code_reduction_potential_pct >= 0

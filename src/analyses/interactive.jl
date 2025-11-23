@@ -144,33 +144,35 @@ function start_interactive()
         println()
     end
 
-    println()
+    return println()
 end
 
 function show_help()
-    println("""
-    Available Commands:
-    ──────────────────────────────────────────────────────────────────
+    return println(
+        """
+        Available Commands:
+        ──────────────────────────────────────────────────────────────────
 
-    analyze <function>(types)  Analyze a function with given types
-    suggest                    Get optimization suggestions
-    compare <f1> <f2>         Compare two functions
-    history                    Show analysis history
-    bookmark <name>           Bookmark current function
-    list                      List bookmarked functions
-    clear                     Clear session
-    help                      Show this help
-    quit/exit                 Exit interactive mode
+        analyze <function>(types)  Analyze a function with given types
+        suggest                    Get optimization suggestions
+        compare <f1> <f2>         Compare two functions
+        history                    Show analysis history
+        bookmark <name>           Bookmark current function
+        list                      List bookmarked functions
+        clear                     Clear session
+        help                      Show this help
+        quit/exit                 Exit interactive mode
 
-    Examples:
-    ──────────────────────────────────────────────────────────────────
+        Examples:
+        ──────────────────────────────────────────────────────────────────
 
-    analysis> analyze my_func(Int, Int)
-    analysis> suggest
-    analysis> bookmark critical_func
-    analysis> history
-    analysis> quit
-    """)
+        analysis> analyze my_func(Int, Int)
+        analysis> suggest
+        analysis> bookmark critical_func
+        analysis> history
+        analysis> quit
+        """
+    )
 end
 
 function show_history()
@@ -186,6 +188,7 @@ function show_history()
         status = report.ready_for_compilation ? "" : ""
         println("$i. $status $fname$types - $(report.score)/100")
     end
+    return
 end
 
 function list_bookmarks()
@@ -200,6 +203,7 @@ function list_bookmarks()
     for (name, (func, types)) in SESSION[].bookmarks
         println("  $name: $(nameof(func))$types")
     end
+    return
 end
 
 """
@@ -258,7 +262,7 @@ function interactive_suggest()
     f = SESSION[].current_function
     types = SESSION[].current_types
 
-    suggest_optimizations(f, types)
+    return suggest_optimizations(f, types)
 end
 
 """
@@ -278,7 +282,7 @@ function interactive_compare(f1::Function, t1::Tuple, f2::Function, t2::Tuple)
     r1 = quick_check(f1, t1)
     r2 = quick_check(f2, t2)
 
-    compare_reports(r1, r2)
+    return compare_reports(r1, r2)
 end
 
 export start_interactive, interactive_analyze, interactive_suggest, interactive_compare

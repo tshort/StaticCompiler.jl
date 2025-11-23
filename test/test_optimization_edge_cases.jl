@@ -175,7 +175,7 @@ end
 
     # Test 4: UnionAll types
     @testset "UnionAll types" begin
-        function generic_vector(v::Vector{T}) where T
+        function generic_vector(v::Vector{T}) where {T}
             return length(v)
         end
 

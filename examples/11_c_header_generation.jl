@@ -31,8 +31,10 @@ println()
 
 output_dir = mktempdir()
 try
-    lib_path = compile_shlib(add_numbers, (Int, Int), output_dir, "add",
-                             generate_header=true)
+    lib_path = compile_shlib(
+        add_numbers, (Int, Int), output_dir, "add",
+        generate_header = true
+    )
 
     println("Library compiled: $lib_path")
     println()
@@ -94,13 +96,15 @@ functions = [
     (add_int, (Int, Int)),
     (multiply_float, (Float64, Float64)),
     (compute_square, (Float32,)),
-    (is_positive, (Int,))
+    (is_positive, (Int,)),
 ]
 
 try
-    lib_path = compile_shlib(functions, output_dir2,
-                             filename="mathlib",
-                             generate_header=true)
+    lib_path = compile_shlib(
+        functions, output_dir2,
+        filename = "mathlib",
+        generate_header = true
+    )
 
     println("Library compiled: $lib_path")
     println()
@@ -129,7 +133,7 @@ println("-"^70)
 println()
 
 println("Julia Type          | C Type")
-println("-"*19 * "|" * "-"*20)
+println("-" * 19 * "|" * "-" * 20)
 println("Int8                | int8_t")
 println("Int16               | int16_t")
 println("Int32               | int32_t")
@@ -282,10 +286,12 @@ end
 output_dir3 = mktempdir()
 
 try
-    lib_path = compile_shlib(fast_multiply, (Int, Int), output_dir3, "fast",
-                             verify=true,          # Verify code quality
-                             min_score=80,
-                             generate_header=true) # Generate header
+    lib_path = compile_shlib(
+        fast_multiply, (Int, Int), output_dir3, "fast",
+        verify = true,          # Verify code quality
+        min_score = 80,
+        generate_header = true
+    ) # Generate header
 
     println("Function verified and compiled with header")
     println()
@@ -321,10 +327,12 @@ end
 
 try
     # With demangle=true (default)
-    lib1 = compile_shlib(my_function, (Int,), output_dir4, "demangled",
-                         filename="demangled",
-                         demangle=true,
-                         generate_header=true)
+    lib1 = compile_shlib(
+        my_function, (Int,), output_dir4, "demangled",
+        filename = "demangled",
+        demangle = true,
+        generate_header = true
+    )
 
     header1 = joinpath(output_dir4, "demangled.h")
     if isfile(header1)
@@ -339,10 +347,12 @@ try
     println()
 
     # With demangle=false
-    lib2 = compile_shlib(my_function, (Int,), output_dir4, "mangled",
-                         filename="mangled",
-                         demangle=false,
-                         generate_header=true)
+    lib2 = compile_shlib(
+        my_function, (Int,), output_dir4, "mangled",
+        filename = "mangled",
+        demangle = false,
+        generate_header = true
+    )
 
     header2 = joinpath(output_dir4, "mangled.h")
     if isfile(header2)
@@ -375,22 +385,26 @@ println()
 # Example of using the API directly
 funcs_for_header = [
     (add_int, (Int, Int)),
-    (multiply_float, (Float64, Float64))
+    (multiply_float, (Float64, Float64)),
 ]
 
 output_dir5 = mktempdir()
 
 try
     # First compile
-    lib_path = compile_shlib(funcs_for_header, output_dir5,
-                             filename="mylib",
-                             generate_header=false)  # Don't auto-generate
+    lib_path = compile_shlib(
+        funcs_for_header, output_dir5,
+        filename = "mylib",
+        generate_header = false
+    )  # Don't auto-generate
 
     # Then generate header manually with custom options
-    header_path = generate_c_header(funcs_for_header, output_dir5, "mylib",
-                                    demangle=true,
-                                    include_extern_c=true,
-                                    verbose=true)
+    header_path = generate_c_header(
+        funcs_for_header, output_dir5, "mylib",
+        demangle = true,
+        include_extern_c = true,
+        verbose = true
+    )
 
     println()
     println("Manually generated header: $header_path")

@@ -9,4 +9,4 @@ function interop(argc, argv)
 end
 
 # Attempt to compile
-path = compile_executable(interop, (Int64, Ptr{Ptr{UInt8}}), "./", cflags=`-ldl -lm`)
+path = compile_executable(interop, (Int64, Ptr{Ptr{UInt8}}), "./", cflags = `-ldl -lm`)

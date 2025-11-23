@@ -41,11 +41,11 @@ struct PackageCompilationSpec
 
     function PackageCompilationSpec(mod::Module, functions::Vector{FunctionSignature}, name::String)
         namespace = lowercase(string(nameof(mod)))
-        new(mod, functions, name, namespace)
+        return new(mod, functions, name, namespace)
     end
 
     function PackageCompilationSpec(mod::Module, functions::Vector{FunctionSignature}, name::String, namespace::String)
-        new(mod, functions, name, namespace)
+        return new(mod, functions, name, namespace)
     end
 end
 
@@ -94,7 +94,7 @@ julia> infer_common_signatures(myfunc)
  (Int64,)
 ```
 """
-function infer_common_signatures(f::Function, max_signatures::Int=5)
+function infer_common_signatures(f::Function, max_signatures::Int = 5)
     signatures = Tuple[]
 
     # Get all methods
@@ -175,12 +175,14 @@ lib_path = compile_package(MyMath, signatures, "./", "mymath")
 # - mymath.h with declarations
 ```
 """
-function compile_package(mod::Module, signatures::AbstractDict{Symbol, <:AbstractVector},
-                        output_path::String, lib_name::String;
-                        namespace::Union{String,Nothing}=nothing,
-                        template::Union{Symbol,Nothing}=nothing,
-                        target::StaticTarget=StaticTarget(),
-                        kwargs...)
+function compile_package(
+        mod::Module, signatures::AbstractDict{Symbol, <:AbstractVector},
+        output_path::String, lib_name::String;
+        namespace::Union{String, Nothing} = nothing,
+        template::Union{Symbol, Nothing} = nothing,
+        target::StaticTarget = StaticTarget(),
+        kwargs...
+    )
 
     # Default namespace to module name
     if isnothing(namespace)
@@ -230,12 +232,14 @@ function compile_package(mod::Module, signatures::AbstractDict{Symbol, <:Abstrac
     end
 
     # Compile all functions together
-    return compile_shlib(func_list, output_path;
-                        filename=lib_name,
-                        demangle=true,  # We handle naming ourselves
-                        template=template,
-                        target=target,
-                        kwargs...)
+    return compile_shlib(
+        func_list, output_path;
+        filename = lib_name,
+        demangle = true,  # We handle naming ourselves
+        template = template,
+        target = target,
+        kwargs...
+    )
 end
 
 """
@@ -274,11 +278,13 @@ signatures = Dict(
 lib_path = compile_package_exports(Calculator, signatures, "./", "calc")
 ```
 """
-function compile_package_exports(mod::Module, default_signatures::AbstractDict{Symbol, <:AbstractVector},
-                                output_path::String, lib_name::String;
-                                kwargs...)
+function compile_package_exports(
+        mod::Module, default_signatures::AbstractDict{Symbol, <:AbstractVector},
+        output_path::String, lib_name::String;
+        kwargs...
+    )
     # Get exported names
-    exported = names(mod; all=false, imported=false)
+    exported = names(mod; all = false, imported = false)
 
     # Filter signatures to only exported functions
     export_signatures = Dict{Symbol, Vector}()
@@ -333,10 +339,12 @@ macro compile_package(mod, path, name, sig_block)
     end
 
     return quote
-        compile_package($(esc(mod)),
-                       Dict{Symbol, Vector}($(sig_exprs...)),
-                       $(esc(path)),
-                       $(esc(name)))
+        compile_package(
+            $(esc(mod)),
+            Dict{Symbol, Vector}($(sig_exprs...)),
+            $(esc(path)),
+            $(esc(name))
+        )
     end
 end
 
@@ -355,8 +363,10 @@ The manifest includes:
 
 This is useful for documentation and programmatic library loading.
 """
-function generate_package_manifest(mod::Module, signatures::Dict, lib_name::String,
-                                   namespace::String, output_path::String)
+function generate_package_manifest(
+        mod::Module, signatures::Dict, lib_name::String,
+        namespace::String, output_path::String
+    )
     # Build manifest as text (simple JSON-like format)
     lines = String[]
     push!(lines, "{")

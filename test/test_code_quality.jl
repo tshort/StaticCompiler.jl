@@ -71,7 +71,7 @@ println()
 
         # Check that source files aren't too large
         src_dir = joinpath(pkg_root, "src")
-        for file in readdir(src_dir, join=true)
+        for file in readdir(src_dir, join = true)
             if endswith(file, ".jl")
                 lines = countlines(file)
                 # Warn if file is >2000 lines (not failing, just noting)

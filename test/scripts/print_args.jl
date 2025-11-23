@@ -3,7 +3,7 @@ using StaticTools
 
 function print_args(argc::Int, argv::Ptr{Ptr{UInt8}})
     printf(c"Argument count is %d:\n", argc)
-    for i=1:argc
+    for i in 1:argc
         # iᵗʰ input argument string
         pᵢ = unsafe_load(argv, i) # Get pointer
         strᵢ = MallocString(pᵢ) # Can wrap to get high-level interface

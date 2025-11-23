@@ -104,11 +104,13 @@ function good_func(x::Int)  # Good!
     return x * 3
 end
 
-suggestions = suggest_optimizations_batch([
-    (bad_func1, (Real,)),
-    (bad_func2, (Int,)),
-    (good_func, (Int,))
-])
+suggestions = suggest_optimizations_batch(
+    [
+        (bad_func1, (Real,)),
+        (bad_func2, (Int,)),
+        (good_func, (Int,)),
+    ]
+)
 println()
 
 # Example 7: safe_compile_shlib - Safe compilation with verification
@@ -129,8 +131,10 @@ function fibonacci(n::Int)
 end
 
 println("Attempting safe compilation (threshold=80):")
-lib_path = safe_compile_shlib(fibonacci, (Int,), tempdir(), "fibonacci_safe",
-                               threshold=80, export_report=true)
+lib_path = safe_compile_shlib(
+    fibonacci, (Int,), tempdir(), "fibonacci_safe",
+    threshold = 80, export_report = true
+)
 
 if lib_path !== nothing
     println("\nLibrary created:", lib_path)
@@ -148,8 +152,10 @@ function not_ready_func(x::Number)  # Abstract type
 end
 
 println("Attempting safe compilation (will fail):")
-result = safe_compile_shlib(not_ready_func, (Number,), tempdir(), "not_ready",
-                            threshold=90, export_report=false)
+result = safe_compile_shlib(
+    not_ready_func, (Number,), tempdir(), "not_ready",
+    threshold = 90, export_report = false
+)
 
 if result === nothing
     println("Compilation was prevented due to low score ")
@@ -163,8 +169,10 @@ println()
 
 println("Forcing compilation with force=true:")
 try
-    lib_path = safe_compile_shlib(not_ready_func, (Number,), tempdir(), "forced",
-                                  threshold=90, force=true, export_report=false)
+    lib_path = safe_compile_shlib(
+        not_ready_func, (Number,), tempdir(), "forced",
+        threshold = 90, force = true, export_report = false
+    )
     println("Forced compilation succeeded (may have issues at runtime)")
 catch e
     println("Even forced compilation failed due to fundamental issues")

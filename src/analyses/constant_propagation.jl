@@ -53,12 +53,12 @@ function analyze_constants(f::Function, types::Tuple)
     fname = nameof(f)
     constants = ConstantInfo[]
     foldable_count = 0
-    ssa_constants = Dict{Int,Bool}()
-    slot_constants = Dict{Int,Bool}()
+    ssa_constants = Dict{Int, Bool}()
+    slot_constants = Dict{Int, Bool}()
 
     try
         # Get typed IR
-        typed_code = code_typed(f, types, optimize=false)
+        typed_code = code_typed(f, types, optimize = false)
 
         if !isempty(typed_code)
             ir, return_type = first(typed_code)
@@ -75,11 +75,11 @@ function analyze_constants(f::Function, types::Tuple)
                     push!(constants, ConstantInfo(stmt, "line $idx", true))
                     foldable_count += 1
 
-                # Track slot reads so downstream SSA values know the slot value
+                    # Track slot reads so downstream SSA values know the slot value
                 elseif stmt isa Core.SlotNumber
                     is_constant_stmt = get(slot_constants, stmt.id, false)
 
-                # Check for expressions with constant operands
+                    # Check for expressions with constant operands
                 elseif isa(stmt, Expr)
                     if is_foldable_expression(stmt, ir, ssa_constants, slot_constants)
                         is_constant_stmt = true
@@ -108,7 +108,7 @@ function analyze_constants(f::Function, types::Tuple)
         end
 
     catch e
-        @debug "Constant propagation analysis failed for $fname" exception=e
+        @debug "Constant propagation analysis failed for $fname" exception = e
     end
 
     # Return empty report on failure
@@ -125,8 +125,8 @@ function is_constant_value(stmt)
 
     # Literal numbers, strings, symbols
     return isa(stmt, Number) || isa(stmt, String) || isa(stmt, Symbol) ||
-           isa(stmt, Bool) || isa(stmt, Nothing) ||
-           (isa(stmt, QuoteNode) && isa(stmt.value, Union{Number, String, Symbol}))
+        isa(stmt, Bool) || isa(stmt, Nothing) ||
+        (isa(stmt, QuoteNode) && isa(stmt.value, Union{Number, String, Symbol}))
 end
 
 """
@@ -139,7 +139,7 @@ function is_foldable_expression(expr::Expr, ir, ssa_constants, slot_constants)
     if expr.head == :(=) && length(expr.args) >= 2
         rhs = expr.args[2]
         rhs_constant = is_constant_reference(rhs, ir, ssa_constants, slot_constants) ||
-                       (isa(rhs, Expr) && is_foldable_call(rhs, ir, ssa_constants, slot_constants))
+            (isa(rhs, Expr) && is_foldable_call(rhs, ir, ssa_constants, slot_constants))
 
         if expr.args[1] isa Core.SlotNumber
             slot_constants[expr.args[1].id] = rhs_constant
@@ -172,6 +172,7 @@ function resolve_value(ir, value)
             return current
         end
     end
+    return
 end
 
 """
@@ -204,9 +205,11 @@ function is_foldable_function(func, ir, ssa_constants, slot_constants)
     if resolved isa GlobalRef
         fname = resolved.name
         # Common foldable functions
-        return fname in (:+, :-, :*, :/, :^, :<, :>, :<=, :>=, :(==), :(!=),
-                         :abs, :sqrt, :sin, :cos, :log, :exp,
-                         :min, :max, :div, :rem, :mod)
+        return fname in (
+            :+, :-, :*, :/, :^, :<, :>, :<=, :>=, :(==), :(!=),
+            :abs, :sqrt, :sin, :cos, :log, :exp,
+            :min, :max, :div, :rem, :mod,
+        )
     elseif resolved isa Core.SSAValue
         return is_foldable_function(resolved, ir, ssa_constants, slot_constants)
     end

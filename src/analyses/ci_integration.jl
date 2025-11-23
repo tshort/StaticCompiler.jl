@@ -36,7 +36,7 @@ function generate_ci_report(results::Dict{Symbol, CompilationReadinessReport}, o
     end
 
     # Sort by score
-    sorted = sort(collect(results), by=x->x[2].score, rev=true)
+    sorted = sort(collect(results), by = x -> x[2].score, rev = true)
 
     # Generate Markdown report
     md_path = output_path * ".md"
@@ -50,12 +50,12 @@ function generate_ci_report(results::Dict{Symbol, CompilationReadinessReport}, o
         println(io, "## Summary")
         println(io)
         println(io, "- **Total Functions**: $total")
-        println(io, "- **Ready for Compilation**: $ready ($ready/$total, $(round(Int, ready/total*100))%)")
+        println(io, "- **Ready for Compilation**: $ready ($ready/$total, $(round(Int, ready / total * 100))%)")
         println(io, "- **Average Score**: $avg_score/100")
         println(io)
 
         # Status badges
-        status = ready == total ? "All Ready" : ready >= total/2 ? "Partially Ready" : "Not Ready"
+        status = ready == total ? "All Ready" : ready >= total / 2 ? "Partially Ready" : "Not Ready"
         println(io, "**Status**: $status")
         println(io)
 
@@ -76,7 +76,7 @@ function generate_ci_report(results::Dict{Symbol, CompilationReadinessReport}, o
         if !isempty(issue_counts)
             println(io, "## Common Issues")
             println(io)
-            for (issue, count) in sort(collect(issue_counts), by=x->x[2], rev=true)
+            for (issue, count) in sort(collect(issue_counts), by = x -> x[2], rev = true)
                 println(io, "- **$issue**: $count function(s)")
             end
             println(io)
@@ -109,14 +109,14 @@ function generate_ci_report(results::Dict{Symbol, CompilationReadinessReport}, o
         "total_functions" => total,
         "ready_functions" => ready,
         "average_score" => avg_score,
-        "pass_rate" => round(ready/total*100, digits=2),
+        "pass_rate" => round(ready / total * 100, digits = 2),
         "functions" => Dict(
             string(name) => Dict(
-                "score" => report.score,
-                "ready" => report.ready_for_compilation,
-                "issues" => report.issues
-            )
-            for (name, report) in results
+                    "score" => report.score,
+                    "ready" => report.ready_for_compilation,
+                    "issues" => report.issues
+                )
+                for (name, report) in results
         ),
         "issue_summary" => issue_counts
     )
@@ -153,10 +153,12 @@ julia> results = batch_check([(func1, (Int,)), (func2, (Float64,))])
 julia> check_quality_gate(results, min_ready_percent=90, min_avg_score=80)
 ```
 """
-function check_quality_gate(results::Dict{Symbol, CompilationReadinessReport};
-                           min_ready_percent::Int=80,
-                           min_avg_score::Int=70,
-                           exit_on_fail::Bool=true)
+function check_quality_gate(
+        results::Dict{Symbol, CompilationReadinessReport};
+        min_ready_percent::Int = 80,
+        min_avg_score::Int = 70,
+        exit_on_fail::Bool = true
+    )
     total = length(results)
     ready = count(r -> r.ready_for_compilation, values(results))
     ready_percent = round(Int, ready / total * 100)
@@ -235,7 +237,7 @@ function generate_github_actions_summary(results::Dict{Symbol, CompilationReadin
     # Compiler Analysis Summary
 
     - **Total Functions**: $total
-    - **Ready for Compilation**: $ready/$total ($(round(Int, ready/total*100))%)
+    - **Ready for Compilation**: $ready/$total ($(round(Int, ready / total * 100))%)
     - **Average Score**: $avg_score/100
 
     ## Function Status
@@ -244,7 +246,7 @@ function generate_github_actions_summary(results::Dict{Symbol, CompilationReadin
     |----------|-------|--------|
     """
 
-    sorted = sort(collect(results), by=x->x[2].score, rev=true)
+    sorted = sort(collect(results), by = x -> x[2].score, rev = true)
     for (name, report) in sorted
         icon = report.ready_for_compilation ? "" : ""
         summary *= "| `$name` | $(report.score)/100 | $icon |\n"
@@ -253,7 +255,7 @@ function generate_github_actions_summary(results::Dict{Symbol, CompilationReadin
     # Write to GitHub Actions summary if available
     github_summary_file = get(ENV, "GITHUB_STEP_SUMMARY", nothing)
 
-    if github_summary_file !== nothing
+    return if github_summary_file !== nothing
         open(github_summary_file, "a") do io
             println(io, summary)
         end
@@ -281,9 +283,11 @@ julia> results = batch_check([(func1, (Int,)), (func2, (Float64,))])
 julia> annotate_github_actions(results)
 ```
 """
-function annotate_github_actions(results::Dict{Symbol, CompilationReadinessReport};
-                                error_threshold::Int=50,
-                                warning_threshold::Int=80)
+function annotate_github_actions(
+        results::Dict{Symbol, CompilationReadinessReport};
+        error_threshold::Int = 50,
+        warning_threshold::Int = 80
+    )
     annotations = 0
 
     for (name, report) in results

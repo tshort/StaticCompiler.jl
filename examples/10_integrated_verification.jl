@@ -37,8 +37,10 @@ println()
 # Compile with verification - this will automatically analyze the function
 # before compilation and only compile if the score is >= 80
 try
-    lib_path = compile_shlib(simple_sum, (Int,), tempdir(), "simple_sum",
-                             verify=true)  # Enable automatic verification
+    lib_path = compile_shlib(
+        simple_sum, (Int,), tempdir(), "simple_sum",
+        verify = true
+    )  # Enable automatic verification
     println("Success! Compiled to: $lib_path")
     println()
 catch e
@@ -59,9 +61,11 @@ println("Example 2a: Setting a high quality threshold (min_score=95)")
 println()
 
 try
-    lib_path = compile_shlib(simple_sum, (Int,), tempdir(), "simple_sum_strict",
-                             verify=true,
-                             min_score=95)  # Require very high quality
+    lib_path = compile_shlib(
+        simple_sum, (Int,), tempdir(), "simple_sum_strict",
+        verify = true,
+        min_score = 95
+    )  # Require very high quality
     println("Success! Function meets high standards.")
     println()
 catch e
@@ -89,9 +93,11 @@ println("Example 3a: Attempting to compile problematic code")
 println()
 
 try
-    lib_path = compile_shlib(allocating_function, (Int,), tempdir(), "bad_func",
-                             verify=true,
-                             min_score=80)
+    lib_path = compile_shlib(
+        allocating_function, (Int,), tempdir(), "bad_func",
+        verify = true,
+        min_score = 80
+    )
     println("Success (unexpectedly)!")
     println()
 catch e
@@ -113,9 +119,11 @@ println()
 
 report_dir = mktempdir()
 try
-    lib_path = compile_shlib(simple_sum, (Int,), report_dir, "simple_sum_report",
-                             verify=true,
-                             export_analysis=true)  # Export JSON report
+    lib_path = compile_shlib(
+        simple_sum, (Int,), report_dir, "simple_sum_report",
+        verify = true,
+        export_analysis = true
+    )  # Export JSON report
 
     println("Compiled successfully!")
     println("Analysis report saved to: $report_dir")
@@ -160,14 +168,16 @@ println()
 funcs = [
     (add_ints, (Int, Int)),
     (multiply_ints, (Int, Int)),
-    (subtract_ints, (Int, Int))
+    (subtract_ints, (Int, Int)),
 ]
 
 try
-    lib_path = compile_shlib(funcs, tempdir(),
-                             filename="math_ops",
-                             verify=true,        # Verify all functions
-                             min_score=80)
+    lib_path = compile_shlib(
+        funcs, tempdir(),
+        filename = "math_ops",
+        verify = true,        # Verify all functions
+        min_score = 80
+    )
     println("All functions passed and compiled successfully!")
     println("Library: $lib_path")
     println()
@@ -194,9 +204,11 @@ println("Example 6a: Compiling executable with verification")
 println()
 
 try
-    exe_path = compile_executable(hello_main, (), tempdir(), "hello_verified",
-                                  verify=true,
-                                  min_score=75)
+    exe_path = compile_executable(
+        hello_main, (), tempdir(), "hello_verified",
+        verify = true,
+        min_score = 75
+    )
     println("Executable compiled successfully!")
     println("Path: $exe_path")
     println()
@@ -255,10 +267,12 @@ println("Example 8a: Verification with suggestions")
 println()
 
 try
-    compile_shlib(suboptimal_function, (Float64,), tempdir(), "suboptimal",
-                  verify=true,
-                  min_score=90,
-                  suggest_fixes=true)  # Show suggestions on failure
+    compile_shlib(
+        suboptimal_function, (Float64,), tempdir(), "suboptimal",
+        verify = true,
+        min_score = 90,
+        suggest_fixes = true
+    )  # Show suggestions on failure
 catch e
     println("Verification failed with suggestions")
     println()

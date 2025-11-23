@@ -23,9 +23,11 @@ try
     println()
 
     # Run module-wide analysis
-    analysis = analyze_module(eval(MODULE_TO_ANALYZE),
-                             threshold=QUALITY_THRESHOLD,
-                             verbose=true)
+    analysis = analyze_module(
+        eval(MODULE_TO_ANALYZE),
+        threshold = QUALITY_THRESHOLD,
+        verbose = true
+    )
 
     # Generate reports
     results = analysis[:results]

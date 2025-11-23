@@ -23,7 +23,7 @@ function plot_size_reduction(results::Dict)
     end
 
     # Sort by reduction percentage
-    sort!(data, by=x->x[2], rev=true)
+    sort!(data, by = x -> x[2], rev = true)
 
     # Find max value for scaling
     max_reduction = maximum(x[2] for x in data)
@@ -32,15 +32,15 @@ function plot_size_reduction(results::Dict)
     # Plot
     for (opt, reduction) in data
         bar_length = Int(round(reduction * scale))
-        bar = "█" ^ bar_length
-        pct_str = lpad("$(round(reduction, digits=1))%", 6)
+        bar = "█"^bar_length
+        pct_str = lpad("$(round(reduction, digits = 1))%", 6)
         opt_str = rpad(opt, 25)
         println("  $opt_str │$bar $pct_str")
     end
 
     println()
     println("="^70)
-    println()
+    return println()
 end
 
 """
@@ -66,20 +66,20 @@ function plot_performance_improvement(results::Dict)
     end
 
     # Sort by speedup
-    sort!(data, by=x->x[2], rev=true)
+    sort!(data, by = x -> x[2], rev = true)
 
     # Plot
     for (opt, speedup) in data
         bar_length = Int(round((speedup - 1.0) * 10))  # Scale relative to 1x
-        bar = "█" ^ min(bar_length, 50)
-        speedup_str = lpad("$(round(speedup, digits=2))x", 8)
+        bar = "█"^min(bar_length, 50)
+        speedup_str = lpad("$(round(speedup, digits = 2))x", 8)
         opt_str = rpad(opt, 25)
         println("  $opt_str │$bar $speedup_str")
     end
 
     println()
     println("="^70)
-    println()
+    return println()
 end
 
 """
@@ -121,12 +121,12 @@ function plot_optimization_trends(history::Vector{Dict})
             pct = 0.0
         end
 
-        println("  Overall trend: $trend ($(round(abs(pct), digits=1))%)")
+        println("  Overall trend: $trend ($(round(abs(pct), digits = 1))%)")
     end
 
     println()
     println("="^70)
-    println()
+    return println()
 end
 
 """
@@ -167,7 +167,7 @@ function plot_regression_analysis(baseline::Dict, current::Dict)
     if !isempty(regressions)
         println("  REGRESSIONS ($(length(regressions))):")
         for (metric, pct) in regressions
-            println("     • $metric: $(round(pct, digits=1))% worse")
+            println("     • $metric: $(round(pct, digits = 1))% worse")
         end
         println()
     end
@@ -175,7 +175,7 @@ function plot_regression_analysis(baseline::Dict, current::Dict)
     if !isempty(improvements)
         println("  IMPROVEMENTS ($(length(improvements))):")
         for (metric, pct) in improvements
-            println("     • $metric: $(round(pct, digits=1))% better")
+            println("     • $metric: $(round(pct, digits = 1))% better")
         end
         println()
     end
@@ -198,7 +198,7 @@ function plot_regression_analysis(baseline::Dict, current::Dict)
     println("  Status: $status")
     println()
     println("="^70)
-    println()
+    return println()
 end
 
 """
@@ -206,7 +206,7 @@ end
 
 Generate a comprehensive benchmark report.
 """
-function generate_benchmark_report(results::Dict; output_file=nothing)
+function generate_benchmark_report(results::Dict; output_file = nothing)
     report = IOBuffer()
 
     # Header
@@ -235,11 +235,11 @@ function generate_benchmark_report(results::Dict; output_file=nothing)
     println(report, "DETAILED RESULTS")
     println(report, "-"^70)
 
-    for (opt, metrics) in sort(collect(results), by=x->x[1])
+    for (opt, metrics) in sort(collect(results), by = x -> x[1])
         println(report, "  $opt:")
         for (metric, value) in metrics
             value_str = if value isa Number
-                round(value, digits=2)
+                round(value, digits = 2)
             else
                 value
             end

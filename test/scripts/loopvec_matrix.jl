@@ -3,12 +3,12 @@ using StaticTools
 using LoopVectorization
 
 @inline function mul!(C::MallocArray, A::MallocArray, B::MallocArray)
-    @turbo for n ∈ axes(C, 2), m ∈ axes(C, 1)
+    @turbo for n in axes(C, 2), m in axes(C, 1)
         Cmn = zero(eltype(C))
-        for k ∈ indices((A,B), (2,1))
-            Cmn += A[m,k] * B[k,n]
+        for k in indices((A, B), (2, 1))
+            Cmn += A[m, k] * B[k, n]
         end
-        C[m,n] = Cmn
+        C[m, n] = Cmn
     end
     return C
 end
@@ -20,17 +20,17 @@ function loopvec_matrix(argc::Int, argv::Ptr{Ptr{UInt8}})
 
     # LHS
     A = MallocArray{Float64}(undef, rows, cols)
-    @turbo for i ∈ axes(A, 1)
-        for j ∈ axes(A, 2)
-           A[i,j] = i*j
+    @turbo for i in axes(A, 1)
+        for j in axes(A, 2)
+            A[i, j] = i * j
         end
     end
 
     # RHS
     B = MallocArray{Float64}(undef, cols, rows)
-    @turbo for i ∈ axes(B, 1)
-        for j ∈ axes(B, 2)
-           B[i,j] = i*j
+    @turbo for i in axes(B, 1)
+        for j in axes(B, 2)
+            B[i, j] = i * j
         end
     end
 
@@ -46,10 +46,10 @@ function loopvec_matrix(argc::Int, argv::Ptr{Ptr{UInt8}})
     # Clean up matrices
     free(A)
     free(B)
-    free(C)
+    return free(C)
 end
 
 # Attempt to compile
 target = StaticTarget()
 StaticCompiler.set_runtime!(target, true)
-path = compile_executable(loopvec_matrix, (Int64, Ptr{Ptr{UInt8}}), "./"; target=target)
+path = compile_executable(loopvec_matrix, (Int64, Ptr{Ptr{UInt8}}), "./"; target = target)

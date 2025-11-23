@@ -1,7 +1,7 @@
 function locate_pointers_and_runtime_calls(mod)
     i64 = LLVM.IntType(64)
     # d = IdDict{Any, Tuple{String, LLVM.GlobalVariable}}()
-    for func ∈ LLVM.functions(mod), bb ∈ LLVM.blocks(func), inst ∈ LLVM.instructions(bb)
+    for func in LLVM.functions(mod), bb in LLVM.blocks(func), inst in LLVM.instructions(bb)
         warned = false
         if isa(inst, LLVM.LoadInst) && occursin("inttoptr", string(inst))
             warned = inspect_pointers(mod, inst)
@@ -23,46 +23,51 @@ function locate_pointers_and_runtime_calls(mod)
                 ptr_val = convert(Int, ptr_arg)
                 ptr = Ptr{Cvoid}(ptr_val)
 
-                frames = ccall(:jl_lookup_code_address, Any, (Ptr{Cvoid}, Cint,), ptr, 0)
-                
+                frames = ccall(:jl_lookup_code_address, Any, (Ptr{Cvoid}, Cint), ptr, 0)
+
                 data_warnings(inst, frames)
                 warned = true
             end
         end
         if warned
-            @warn("LLVM function generated warnings due to raw pointers embedded in the code. This will likely cause errors or undefined behaviour.",
-                  func = func)
+            @warn(
+                "LLVM function generated warnings due to raw pointers embedded in the code. This will likely cause errors or undefined behaviour.",
+                func = func
+            )
         end
     end
+    return
 end
 
 function inspect_pointers(mod, inst)
     warned = false
     jl_t = (LLVM.StructType(LLVM.LLVMType[]))
-    for (i, arg) ∈ enumerate(LLVM.operands(inst))
+    for (i, arg) in enumerate(LLVM.operands(inst))
         if occursin("inttoptr", string(arg)) && arg isa LLVM.ConstantExpr
             op1 = LLVM.Value(LLVM.API.LLVMGetOperand(arg, 0))
             if op1 isa LLVM.ConstantExpr
                 op1 = LLVM.Value(LLVM.API.LLVMGetOperand(op1, 0))
             end
             ptr = Ptr{Cvoid}(convert(Int, op1))
-            frames = ccall(:jl_lookup_code_address, Any, (Ptr{Cvoid}, Cint,), ptr, 0)
+            frames = ccall(:jl_lookup_code_address, Any, (Ptr{Cvoid}, Cint), ptr, 0)
             data_warnings(inst, frames)
             warned = true
         end
     end
-    warned
+    return warned
 end
 
-data_warnings(inst, frames) = for frame ∈ frames
+data_warnings(inst, frames) = for frame in frames
     fn, file, line, linfo, fromC, inlined = frame
-    @warn("Found pointer references to julia data",
-          "llvm instruction" = inst,
-          name = fn,
-          file = file,
-          line = line,
-          fromC = fromC,
-          inlined = inlined)
+    @warn(
+        "Found pointer references to julia data",
+        "llvm instruction" = inst,
+        name = fn,
+        file = file,
+        line = line,
+        fromC = fromC,
+        inlined = inlined
+    )
 end
 
 llvmeltype(x::LLVM.Value) = eltype(LLVM.value_type(x))
@@ -76,7 +81,7 @@ function runtime_dependencies(mod::LLVM.Module)
             push!(deps, n)
         end
     end
-    unique(deps)
+    return unique(deps)
 end
 
 function strip_verifier_errors!(mod::LLVM.Module)
@@ -97,13 +102,13 @@ function strip_verifier_errors!(mod::LLVM.Module)
             # helpers return a BasicBlock directly instead of an iterable with length.
             nsucc = Int(LLVM.API.LLVMGetNumSuccessors(term))
             succs = LLVM.BasicBlock[]
-            for i in 0:nsucc-1
+            for i in 0:(nsucc - 1)
                 push!(succs, LLVM.BasicBlock(LLVM.API.LLVMGetSuccessor(term, i)))
             end
             if length(succs) == 2 && bb in succs
                 other = [s for s in succs if s !== bb]
                 isempty(other) && continue
-                @dispose builder=IRBuilder() begin
+                @dispose builder = IRBuilder() begin
                     position!(builder, term)
                     br!(builder, only(other))
                 end
@@ -111,4 +116,5 @@ function strip_verifier_errors!(mod::LLVM.Module)
             end
         end
     end
+    return
 end

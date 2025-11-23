@@ -109,18 +109,18 @@ using StaticTools
             count::Int
         end
 
-        function CircularBuffer{N}() where N
+        function CircularBuffer{N}() where {N}
             CircularBuffer{N}(MVector{N, Float32}(zeros(Float32, N)), 1, 0)
         end
 
-        function push_sample!(buffer::CircularBuffer{N}, value::Float32) where N
+        function push_sample!(buffer::CircularBuffer{N}, value::Float32) where {N}
             buffer.data[buffer.head] = value
             buffer.head = mod1(buffer.head + 1, N)
             buffer.count = min(buffer.count + 1, N)
             return buffer
         end
 
-        function get_average(buffer::CircularBuffer{N}) where N
+        function get_average(buffer::CircularBuffer{N}) where {N}
             if buffer.count == 0
                 return 0.0f0
             end
@@ -165,7 +165,7 @@ using StaticTools
         println("   Control loop:")
         println("      Constants found: $(length(const_report.constants_found))")
         println("      Foldable expressions: $(const_report.foldable_expressions)")
-        println("      Code reduction potential: $(round(const_report.code_reduction_potential_pct, digits=1))%")
+        println("      Code reduction potential: $(round(const_report.code_reduction_potential_pct, digits = 1))%")
 
         # More constants = smaller code
         @test const_report.foldable_expressions >= 0

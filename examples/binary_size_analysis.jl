@@ -29,7 +29,7 @@ try
 
     if isfile(exe_path)
         size_bytes = filesize(exe_path)
-        size_kb = round(size_bytes / 1024, digits=1)
+        size_kb = round(size_bytes / 1024, digits = 1)
 
         println("Compiled: $exe_path")
         println("   Size: $size_kb KB ($size_bytes bytes)")
@@ -90,13 +90,15 @@ println("OK No dynamic allocations")
 println()
 
 println("Current approach:")
-println("""
-    using StaticTools
-    function hello()
-        println(c"Hello, World!")  # ← StaticString, stack-allocated
-        return 0
-    end
-""")
+println(
+    """
+        using StaticTools
+        function hello()
+            println(c"Hello, World!")  # ← StaticString, stack-allocated
+            return 0
+        end
+    """
+)
 println()
 
 println("TECHNIQUE 2: Strip Debug Symbols")
@@ -121,9 +123,9 @@ if isfile(strip_test_path) && Sys.which("strip") !== nothing
         run(`strip $stripped_path`)
         stripped_size = filesize(stripped_path)
 
-        reduction = round((1 - stripped_size/original_size) * 100, digits=1)
-        original_kb = round(original_size / 1024, digits=1)
-        stripped_kb = round(stripped_size / 1024, digits=1)
+        reduction = round((1 - stripped_size / original_size) * 100, digits = 1)
+        original_kb = round(original_size / 1024, digits = 1)
+        stripped_kb = round(stripped_size / 1024, digits = 1)
 
         println("Example:")
         println("  Original: $original_kb KB")
@@ -141,10 +143,12 @@ println("-"^70)
 println("Use cflags to control optimization:")
 println()
 println("For size optimization:")
-println("""
-    compile_executable(hello, (), "./", "hello",
-                       cflags=`-Os`)  # Optimize for size
-""")
+println(
+    """
+        compile_executable(hello, (), "./", "hello",
+                           cflags=`-Os`)  # Optimize for size
+    """
+)
 println()
 println("  -Os  : Optimize for size")
 println("  -O2  : Optimize for speed (may increase size)")
@@ -155,10 +159,12 @@ println("TECHNIQUE 4: Link-Time Optimization (LTO)")
 println("-"^70)
 println("LTO can eliminate unused code across compilation units:")
 println()
-println("""
-    compile_executable(hello, (), "./", "hello",
-                       cflags=`-flto -Os`)
-""")
+println(
+    """
+        compile_executable(hello, (), "./", "hello",
+                           cflags=`-flto -Os`)
+    """
+)
 println()
 
 println("TECHNIQUE 5: Minimize Dependencies")
@@ -180,25 +186,29 @@ println("TECHNIQUE 6: Function Inlining Control")
 println("-"^70)
 println("Control what gets inlined:")
 println()
-println("""
-    @inline function small_func()
-        # Force inlining (reduces calls, may increase size)
-    end
+println(
+    """
+        @inline function small_func()
+            # Force inlining (reduces calls, may increase size)
+        end
 
-    @noinline function large_func()
-        # Prevent inlining (reduces duplication)
-    end
-""")
+        @noinline function large_func()
+            # Prevent inlining (reduces duplication)
+        end
+    """
+)
 println()
 
 println("TECHNIQUE 7: Dead Code Elimination")
 println("-"^70)
 println("Ensure unused code is eliminated:")
 println()
-println("""
-    compile_executable(hello, (), "./", "hello",
-                       cflags=`-fdata-sections -ffunction-sections -Wl,--gc-sections`)
-""")
+println(
+    """
+        compile_executable(hello, (), "./", "hello",
+                           cflags=`-fdata-sections -ffunction-sections -Wl,--gc-sections`)
+    """
+)
 println()
 println("  -fdata-sections       : Separate data sections")
 println("  -ffunction-sections   : Separate function sections")
@@ -235,7 +245,7 @@ for (name, func, types, kwargs) in versions
 
         if isfile(exe_path)
             size_bytes = filesize(exe_path)
-            size_kb = round(size_bytes / 1024, digits=1)
+            size_kb = round(size_bytes / 1024, digits = 1)
 
             push!(results, (name, size_kb, size_bytes))
             println("  $name: $size_kb KB")
@@ -308,10 +318,12 @@ println("3. Minimal C Runtime")
 println("-"^70)
 println("For embedded systems, use a minimal C runtime:")
 println()
-println("""
-    compile_executable(func, types, "./", "hello",
-                       cflags=`-nostdlib -Os`)
-""")
+println(
+    """
+        compile_executable(func, types, "./", "hello",
+                           cflags=`-nostdlib -Os`)
+    """
+)
 println()
 println("Requires implementing _start and avoiding libc.")
 println()
@@ -320,10 +332,12 @@ println("4. Function Merging")
 println("-"^70)
 println("Let the compiler merge identical functions:")
 println()
-println("""
-    compile_executable(func, types, "./", "hello",
-                       cflags=`-fmerge-all-constants -Os`)
-""")
+println(
+    """
+        compile_executable(func, types, "./", "hello",
+                           cflags=`-fmerge-all-constants -Os`)
+    """
+)
 println()
 
 # ============================================================================

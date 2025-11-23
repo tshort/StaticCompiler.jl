@@ -103,8 +103,10 @@ using StaticTools
         println()
 
         # Simple token bucket rate limiter check
-        function check_rate_limit(current_tokens::Int, last_refill::Int64,
-                                 now::Int64, refill_rate::Int)
+        function check_rate_limit(
+                current_tokens::Int, last_refill::Int64,
+                now::Int64, refill_rate::Int
+            )
             MAX_TOKENS = 100
             REFILL_INTERVAL = 1000  # milliseconds
 
@@ -129,7 +131,7 @@ using StaticTools
         println("   Rate limiter:")
         println("      Allocations: $(length(escape_report.allocations))")
         println("      Constants: $(length(const_report.constants_found))")
-        println("      Code reduction potential: $(round(const_report.code_reduction_potential_pct, digits=1))%")
+        println("      Code reduction potential: $(round(const_report.code_reduction_potential_pct, digits = 1))%")
 
         # Must be allocation-free for hot path
         @test length(escape_report.allocations) == 0
@@ -298,7 +300,7 @@ using StaticTools
         println("   Error handler:")
         println("      Constants: $(length(const_report.constants_found))")
         println("      Allocations: $(length(escape_report.allocations))")
-        println("      Code reduction: $(round(const_report.code_reduction_potential_pct, digits=1))%")
+        println("      Code reduction: $(round(const_report.code_reduction_potential_pct, digits = 1))%")
 
         @test !isnothing(const_report)
 

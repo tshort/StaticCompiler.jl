@@ -24,7 +24,7 @@ end
 
 function marginal_func(x::Int)
     # Has some dynamic calls but might be acceptable
-    return abs(x) + abs(x+1)
+    return abs(x) + abs(x + 1)
 end
 
 println("Example 1: Quick check on ready function")
@@ -46,7 +46,7 @@ functions = [
     (good_func, (Int, Int)),
     (bad_func_abstract, (Number,)),
     (bad_func_alloc, (Int,)),
-    (marginal_func, (Int,))
+    (marginal_func, (Int,)),
 ]
 
 results = batch_check(functions)
@@ -55,9 +55,9 @@ print_batch_summary(results)
 println("\nExample 4: Using quick_check in decision logic")
 println("-"^70)
 
-function check_and_compile(f, types, path="./")
+function check_and_compile(f, types, path = "./")
     report = quick_check(f, types)
-    
+
     if report.ready_for_compilation
         println("$(report.function_name) is ready (score: $(report.score)/100)")
         println("   Attempting compilation...")

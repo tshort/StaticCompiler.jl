@@ -8,17 +8,17 @@ function loopvec_product(argc::Int, argv::Ptr{Ptr{UInt8}})
     cols = argparse(Int64, argv, 3)            # Second command-line argument
 
     s = 0
-    @turbo for i=1:rows
-        for j=1:cols
-           s += i*j
+    @turbo for i in 1:rows
+        for j in 1:cols
+            s += i * j
         end
     end
     # Print result to stdout
     printf(s)
     # Also print to file
-    fp = fopen(c"product.tsv",c"w")
+    fp = fopen(c"product.tsv", c"w")
     printf(fp, s)
-    fclose(fp)
+    return fclose(fp)
 end
 
 # Attempt to compile

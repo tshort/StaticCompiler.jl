@@ -85,12 +85,12 @@ println("-"^70)
 functions_to_check = [
     (optimized_func, (Int, Int)),
     (needs_work, (Number,)),
-    (fibonacci, (Int,))
+    (fibonacci, (Int,)),
 ]
 
 results = batch_check(functions_to_check)
 println("Analyzed $(length(results)) functions")
-for (name, rep) in sort(collect(results), by=x->x[2].score, rev=true)
+for (name, rep) in sort(collect(results), by = x -> x[2].score, rev = true)
     status = rep.ready_for_compilation ? "" : ""
     println("  $status $name: $(rep.score)/100")
 end
@@ -111,8 +111,10 @@ println("="^70)
 println()
 
 println("Attempting safe compilation of fibonacci...")
-lib_path = safe_compile_shlib(fibonacci, (Int,), tempdir(), "fib_demo",
-                               threshold=80, export_report=false)
+lib_path = safe_compile_shlib(
+    fibonacci, (Int,), tempdir(), "fib_demo",
+    threshold = 80, export_report = false
+)
 
 if lib_path !== nothing
     println("Successfully compiled")
@@ -134,8 +136,10 @@ println()
 
 println("5.2 Track Quality Over Time")
 println("-"^70)
-track_quality_over_time(optimized_func, (Int, Int),
-                       tempdir() * "/quality_demo.json")
+track_quality_over_time(
+    optimized_func, (Int, Int),
+    tempdir() * "/quality_demo.json"
+)
 println()
 
 println("5.3 Compare Reports")
@@ -156,16 +160,18 @@ println()
 
 println("6.2 Quality Gate Check")
 println("-"^70)
-passed = check_quality_gate(results,
-                            min_ready_percent=60,
-                            min_avg_score=65,
-                            exit_on_fail=false)
+passed = check_quality_gate(
+    results,
+    min_ready_percent = 60,
+    min_avg_score = 65,
+    exit_on_fail = false
+)
 println()
 
 println("6.3 GitHub Actions Integration")
 println("-"^70)
 generate_github_actions_summary(results)
-annotate_github_actions(results, error_threshold=50, warning_threshold=80)
+annotate_github_actions(results, error_threshold = 50, warning_threshold = 80)
 println()
 
 # ============================================================================
@@ -186,7 +192,7 @@ println("Found $(length(functions)) functions")
 println()
 
 println("Analyzing entire module...")
-module_analysis = analyze_module(DemoModule, threshold=80, verbose=false)
+module_analysis = analyze_module(DemoModule, threshold = 80, verbose = false)
 println("Summary:")
 println("  Total: $(module_analysis[:summary][:total])")
 println("  Ready: $(module_analysis[:summary][:ready])")
@@ -222,7 +228,7 @@ println()
 
 println("9.1 Benchmark Analysis Performance")
 println("-"^70)
-bench_stats = benchmark_analysis(optimized_func, (Int, Int), samples=5)
+bench_stats = benchmark_analysis(optimized_func, (Int, Int), samples = 5)
 println()
 
 println("9.2 Track Quality History")

@@ -13,7 +13,7 @@ using CodeInfoTools: resolve
 
 struct StaticInterpreter <: AbstractInterpreter
     global_cache::CodeCache
-    method_table::Union{Nothing,Core.MethodTable}
+    method_table::Union{Nothing, Core.MethodTable}
 
     # Cache of inference results for this particular interpreter
     local_cache::Vector{InferenceResult}
@@ -24,7 +24,7 @@ struct StaticInterpreter <: AbstractInterpreter
     inf_params::InferenceParams
     opt_params::OptimizationParams
 
-    function StaticInterpreter(cache::CodeCache, mt::Union{Nothing,Core.MethodTable}, world::UInt, ip::InferenceParams, op::OptimizationParams)
+    function StaticInterpreter(cache::CodeCache, mt::Union{Nothing, Core.MethodTable}, world::UInt, ip::InferenceParams, op::OptimizationParams)
         @assert world <= Base.get_world_counter()
 
         return new(
@@ -62,7 +62,7 @@ Core.Compiler.lock_mi_inference(interp::StaticInterpreter, mi::MethodInstance) =
 Core.Compiler.unlock_mi_inference(interp::StaticInterpreter, mi::MethodInstance) = nothing
 
 function Core.Compiler.add_remark!(interp::StaticInterpreter, sv::InferenceState, msg)
-    @safe_debug "Inference remark during  static compilation of $(sv.linfo): $msg"
+    return @safe_debug "Inference remark during  static compilation of $(sv.linfo): $msg"
 end
 
 
@@ -88,10 +88,10 @@ end
 
 function Core.Compiler.InferenceState(result::InferenceResult, cache::Symbol, interp::StaticInterpreter)
     world = get_world_counter(interp)
-    src =  @static if VERSION >= v"1.10.0-DEV.873"
+    src = @static if VERSION >= v"1.10.0-DEV.873"
         Core.Compiler.retrieve_code_info(result.linfo, world)
     else
-         Core.Compiler.retrieve_code_info(result.linfo)
+        Core.Compiler.retrieve_code_info(result.linfo)
     end
     mi = result.linfo
     src = custom_pass!(interp, result, mi, src)
@@ -126,13 +126,17 @@ end
 
 # semi-concrete interepretation is broken with overlays (JuliaLang/julia#47349)
 @static if VERSION >= v"1.9.0-DEV.1248"
-function Core.Compiler.concrete_eval_eligible(interp::StaticInterpreter,
-    @nospecialize(f), result::Core.Compiler.MethodCallResult, arginfo::Core.Compiler.ArgInfo)
-    ret = @invoke Core.Compiler.concrete_eval_eligible(interp::AbstractInterpreter,
-        f::Any, result::Core.Compiler.MethodCallResult, arginfo::Core.Compiler.ArgInfo)
-    ret === false && return nothing
-    return ret
-end
+    function Core.Compiler.concrete_eval_eligible(
+            interp::StaticInterpreter,
+            @nospecialize(f), result::Core.Compiler.MethodCallResult, arginfo::Core.Compiler.ArgInfo
+        )
+        ret = @invoke Core.Compiler.concrete_eval_eligible(
+            interp::AbstractInterpreter,
+            f::Any, result::Core.Compiler.MethodCallResult, arginfo::Core.Compiler.ArgInfo
+        )
+        ret === false && return nothing
+        return ret
+    end
 end
 
 struct StaticCompilerParams <: AbstractCompilerParams
@@ -141,10 +145,12 @@ struct StaticCompilerParams <: AbstractCompilerParams
     cache::CodeCache
 end
 
-function StaticCompilerParams(; opt = false,
+function StaticCompilerParams(;
+        opt = false,
         optlevel = Base.JLOptions().opt_level,
         cache::Union{CodeCache, Nothing} = nothing,
-        cache_owner::Any = nothing)
+        cache_owner::Any = nothing
+    )
     cache = if cache === nothing
         if CodeCache === Core.Compiler.InternalCodeCache
             owner = cache_owner === nothing ? Ref{UInt}(rand(UInt)) : cache_owner

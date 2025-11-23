@@ -93,7 +93,7 @@ println()
 println("Example 6: Verify and compile final version")
 println("-"^70)
 
-if verify_compilation_readiness(calculate_sum_v4, (Int,), threshold=90)
+if verify_compilation_readiness(calculate_sum_v4, (Int,), threshold = 90)
     println("\nCompiling optimized function...")
     try
         lib_path = compile_shlib(calculate_sum_v4, (Int,), tempdir(), "calculate_sum")

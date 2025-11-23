@@ -6,12 +6,12 @@ const STACK_ROWS = 10
 const STACK_COLS = 5
 
 @inline function mul!(C::MallocArray, A::MallocArray, B::MallocArray)
-    @turbo for n ∈ axes(C, 2), m ∈ axes(C, 1)
+    @turbo for n in axes(C, 2), m in axes(C, 1)
         Cmn = zero(eltype(C))
-        for k ∈ indices((A,B), (2,1))
-            Cmn += A[m,k] * B[k,n]
+        for k in indices((A, B), (2, 1))
+            Cmn += A[m, k] * B[k, n]
         end
-        C[m,n] = Cmn
+        C[m, n] = Cmn
     end
     return C
 end
@@ -19,17 +19,17 @@ end
 function loopvec_matrix_stack()
     # LHS
     A = MallocArray{Float64}(undef, STACK_ROWS, STACK_COLS)
-    @turbo for i ∈ axes(A, 1)
-        for j ∈ axes(A, 2)
-           A[i,j] = i*j
+    @turbo for i in axes(A, 1)
+        for j in axes(A, 2)
+            A[i, j] = i * j
         end
     end
 
     # RHS
     B = MallocArray{Float64}(undef, STACK_COLS, STACK_ROWS)
-    @turbo for i ∈ axes(B, 1)
-        for j ∈ axes(B, 2)
-           B[i,j] = i*j
+    @turbo for i in axes(B, 1)
+        for j in axes(B, 2)
+            B[i, j] = i * j
         end
     end
 
@@ -42,10 +42,11 @@ function loopvec_matrix_stack()
     # Also print to file
     printdlm(c"table.tsv", C, '\t')
     fwrite(c"table.b", C)
-    free(A); free(B); free(C)
+    free(A); free(B)
+    return free(C)
 end
 
 # Attempt to compile with runtime linked
 target = StaticTarget()
 StaticCompiler.set_runtime!(target, true)
-path = compile_executable(loopvec_matrix_stack, (), "./"; target=target)
+path = compile_executable(loopvec_matrix_stack, (), "./"; target = target)

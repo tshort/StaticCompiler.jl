@@ -1,6 +1,6 @@
-libcexit(x::Int32) =  @symbolcall exit(x::Int32)::Nothing
+libcexit(x::Int32) = @symbolcall exit(x::Int32)::Nothing
 macro print_and_throw(err)
-    quote
+    return quote
         println($err)
         libcexit(Int32(1))
     end

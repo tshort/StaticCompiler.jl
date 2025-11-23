@@ -38,7 +38,7 @@ la = analyze_lifetimes(fibonacci, (Int,))
 println("\nAnalysis Results:")
 println("  Monomorphization:")
 println("    OK Abstract types: ", ma.has_abstract_types ? "YES" : "NO")
-println("    OK Specialization factor: ", round(ma.specialization_factor, digits=2))
+println("    OK Specialization factor: ", round(ma.specialization_factor, digits = 2))
 
 println("  Escape Analysis:")
 println("    OK Allocations: ", length(ea.allocations) == 0 ? "None" : "$(length(ea.allocations))")
@@ -50,9 +50,9 @@ println("  Lifetime:")
 println("    OK Memory leaks: ", la.potential_leaks == 0 ? "None" : "$(la.potential_leaks)")
 
 # Determine if ready
-ready = !ma.has_abstract_types && 
-        length(ea.allocations) == 0 && 
-        la.potential_leaks == 0
+ready = !ma.has_abstract_types &&
+    length(ea.allocations) == 0 &&
+    la.potential_leaks == 0
 
 println("\nCompilation Readiness: ", ready ? "READY" : "NOT READY")
 println()
@@ -61,35 +61,35 @@ if ready
     # Step 3: Compile to shared library
     println("STEP 3: Compile to Shared Library")
     println("-"^70)
-    
+
     try
         path = compile_shlib(fibonacci, (Int,), tempdir(), "fibonacci")
         println("Compilation successful!")
         println("   Library: $path")
         println()
-        
+
         # Step 4: Test the compiled function
         println("STEP 4: Test Compiled Function")
         println("-"^70)
-        
+
         # Load and call
         using Libdl
         lib = dlopen(path)
         fib_ptr = dlsym(lib, "fibonacci")
-        
+
         println("Testing fibonacci(10)...")
         result_julia = fibonacci(10)
         result_compiled = @ccall $fib_ptr(10::Int)::Int
-        
+
         println("  Julia result:    $result_julia")
         println("  Compiled result: $result_compiled")
         println("  Match: ", result_julia == result_compiled ? "YES" : "NO")
         println()
-        
+
         # Cleanup
         dlclose(lib)
-        rm(path, force=true)
-        
+        rm(path, force = true)
+
     catch e
         println("Compilation failed:")
         println("   ", e)
@@ -99,15 +99,15 @@ else
     println("STEP 3: Fix Issues")
     println("-"^70)
     println("Before compiling, you need to address:")
-    
+
     if ma.has_abstract_types
         println("  Abstract types - use concrete types")
     end
-    
+
     if length(ea.allocations) > 0
         println("  Heap allocations - use stack or manual memory")
     end
-    
+
     if la.potential_leaks > 0
         println("  Memory leaks - add free() calls")
     end
@@ -123,21 +123,21 @@ println()
 function sum_squares_manual(n::Int)
     # Allocate array manually
     arr = MallocArray{Int}(undef, n)
-    
+
     # Fill with squares
     for i in 1:n
         arr[i] = i * i
     end
-    
+
     # Compute sum
     result = 0
     for i in 1:n
         result += arr[i]
     end
-    
+
     # Free memory
     free(arr)
-    
+
     return result
 end
 
@@ -155,27 +155,27 @@ if !ma.has_abstract_types && la.potential_leaks == 0
     println("This function is ready for static compilation!")
     println("   (despite using manual memory management)")
     println()
-    
+
     try
         path = compile_shlib(sum_squares_manual, (Int,), tempdir(), "sum_squares")
         println("Compilation successful!")
         println("   Library: $path")
-        
+
         # Test it
         using Libdl
         lib = dlopen(path)
         func_ptr = dlsym(lib, "sum_squares_manual")
-        
+
         result_julia = sum_squares_manual(10)
         result_compiled = @ccall $func_ptr(10::Int)::Int
-        
+
         println("\nTesting sum_squares_manual(10):")
         println("  Julia result:    $result_julia")
         println("  Compiled result: $result_compiled")
         println("  Match: ", result_julia == result_compiled ? "YES" : "NO")
-        
+
         dlclose(lib)
-        rm(path, force=true)
+        rm(path, force = true)
     catch e
         println("Error: ", e)
     end

@@ -65,7 +65,7 @@ using StaticTools
             h = (b - a) / n
             result = 0.5 * (f(a) + f(b))
 
-            for i in 1:(n-1)
+            for i in 1:(n - 1)
                 x = a + i * h
                 result += f(x)
             end
@@ -109,7 +109,7 @@ using StaticTools
 
         # Calculate force between two particles (gravitational)
         function calculate_force(p1::Particle, p2::Particle)
-            G = 6.67430e-11  # Gravitational constant
+            G = 6.6743e-11  # Gravitational constant
 
             dx = p2.x - p1.x
             dy = p2.y - p1.y
@@ -119,7 +119,7 @@ using StaticTools
             r = sqrt(r_squared)
 
             # Avoid division by zero
-            if r < 1e-10
+            if r < 1.0e-10
                 return (0.0, 0.0, 0.0)
             end
 
@@ -156,8 +156,10 @@ using StaticTools
         println()
 
         # Simplified conjugate gradient iteration
-        function cg_iteration(r::Vector{Float64}, p::Vector{Float64},
-                             Ap::Vector{Float64}, alpha::Float64)
+        function cg_iteration(
+                r::Vector{Float64}, p::Vector{Float64},
+                Ap::Vector{Float64}, alpha::Float64
+            )
             n = length(r)
 
             # Update solution and residual
@@ -176,11 +178,15 @@ using StaticTools
         end
 
         # Analyze solver iteration
-        escape_report = analyze_escapes(cg_iteration,
-            (Vector{Float64}, Vector{Float64}, Vector{Float64}, Float64))
+        escape_report = analyze_escapes(
+            cg_iteration,
+            (Vector{Float64}, Vector{Float64}, Vector{Float64}, Float64)
+        )
 
-        mono_report = analyze_monomorphization(cg_iteration,
-            (Vector{Float64}, Vector{Float64}, Vector{Float64}, Float64))
+        mono_report = analyze_monomorphization(
+            cg_iteration,
+            (Vector{Float64}, Vector{Float64}, Vector{Float64}, Float64)
+        )
 
         println("   CG iteration:")
         println("      Allocations: $(length(escape_report.allocations))")
@@ -205,11 +211,15 @@ using StaticTools
         end
 
         # Analyze FFT operation
-        escape_report = analyze_escapes(fft_butterfly,
-            (ComplexF64, ComplexF64, ComplexF64))
+        escape_report = analyze_escapes(
+            fft_butterfly,
+            (ComplexF64, ComplexF64, ComplexF64)
+        )
 
-        devirt_report = analyze_devirtualization(fft_butterfly,
-            (ComplexF64, ComplexF64, ComplexF64))
+        devirt_report = analyze_devirtualization(
+            fft_butterfly,
+            (ComplexF64, ComplexF64, ComplexF64)
+        )
 
         println("   FFT butterfly:")
         println("      Allocations: $(length(escape_report.allocations))")
@@ -232,8 +242,8 @@ using StaticTools
             n = length(input)
             output = zeros(Float64, n)
 
-            for i in 2:(n-1)
-                output[i] = 0.25 * input[i-1] + 0.5 * input[i] + 0.25 * input[i+1]
+            for i in 2:(n - 1)
+                output[i] = 0.25 * input[i - 1] + 0.5 * input[i] + 0.25 * input[i + 1]
             end
 
             return output

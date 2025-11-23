@@ -70,14 +70,14 @@ functions_to_analyze = [
     (fast_multiply, (Int, Int)),
     (slow_process, (Number,)),
     (allocating_func, (Int,)),
-    (good_fibonacci, (Int,))
+    (good_fibonacci, (Int,)),
 ]
 
 println("Analyzing $(length(functions_to_analyze)) functions with caching...")
 results = batch_check_cached(functions_to_analyze)
 
 println("\nResults:")
-for (name, report) in sort(collect(results), by=x->x[2].score, rev=true)
+for (name, report) in sort(collect(results), by = x -> x[2].score, rev = true)
     status = report.ready_for_compilation ? "" : ""
     println("  $status $name: $(report.score)/100")
 end
@@ -111,10 +111,12 @@ println("-"^70)
 println()
 
 println("Checking if code meets quality standards...")
-passed = check_quality_gate(results,
-                            min_ready_percent=60,
-                            min_avg_score=70,
-                            exit_on_fail=false)
+passed = check_quality_gate(
+    results,
+    min_ready_percent = 60,
+    min_avg_score = 70,
+    exit_on_fail = false
+)
 
 if passed
     println("Would allow deployment ")
@@ -133,7 +135,7 @@ generate_github_actions_summary(results)
 println()
 
 println("Creating annotations for problematic functions...")
-count = annotate_github_actions(results, error_threshold=50, warning_threshold=80)
+count = annotate_github_actions(results, error_threshold = 50, warning_threshold = 80)
 println()
 
 # Example 6: Module scanning (using a simple test module)
@@ -168,7 +170,7 @@ println()
 
 # Analyze the entire module
 println("Analyzing entire module...")
-module_analysis = analyze_module(TestModule, threshold=80, verbose=false)
+module_analysis = analyze_module(TestModule, threshold = 80, verbose = false)
 
 println("\nModule Analysis Summary:")
 println("  Total functions:     $(module_analysis[:summary][:total])")
@@ -186,8 +188,8 @@ println("Current cache stats:")
 stats = cache_stats()
 println("  Entries: $(stats[:entries])")
 println("  Memory:  $(stats[:memory]) MB")
-println("  Oldest:  $(round(stats[:oldest], digits=1))s ago")
-println("  Newest:  $(round(stats[:newest], digits=1))s ago")
+println("  Oldest:  $(round(stats[:oldest], digits = 1))s ago")
+println("  Newest:  $(round(stats[:newest], digits = 1))s ago")
 println()
 
 println("Clearing cache...")
@@ -200,7 +202,7 @@ println("-"^70)
 println()
 
 println("Running analysis with automatic cache management...")
-result = with_cache(ttl=300.0) do
+result = with_cache(ttl = 300.0) do
     # Analysis work happens here
     report = quick_check_cached(good_fibonacci, (Int,))
     return report.score

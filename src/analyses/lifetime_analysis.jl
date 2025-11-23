@@ -68,6 +68,7 @@ function resolve_ir_value(ir, value)
             return current
         end
     end
+    return
 end
 
 function analyze_lifetimes(f::Function, types::Tuple)
@@ -79,7 +80,7 @@ function analyze_lifetimes(f::Function, types::Tuple)
 
     try
         # Get typed IR
-        typed_code = code_typed(f, types, optimize=false)
+        typed_code = code_typed(f, types, optimize = false)
 
         if !isempty(typed_code)
             ir, return_type = first(typed_code)
@@ -189,7 +190,7 @@ function analyze_lifetimes(f::Function, types::Tuple)
         end
 
     catch e
-        @debug "Lifetime analysis failed for $fname" exception=e
+        @debug "Lifetime analysis failed for $fname" exception = e
     end
 
     return LifetimeAnalysisReport(
@@ -281,7 +282,7 @@ function insert_auto_frees(report::LifetimeAnalysisReport)
     # Find allocations that need frees (not freed and potential leak)
     for alloc in report.allocations
         if !alloc.freed && alloc.potential_leak
-            push!(auto_frees, (location=alloc.location, type=alloc.type))
+            push!(auto_frees, (location = alloc.location, type = alloc.type))
         end
     end
 

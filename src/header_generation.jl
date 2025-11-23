@@ -41,29 +41,29 @@ function julia_to_c_type(jltype::Type)
     # Map Julia types to C types
     type_map = Dict{Type, String}(
         # Signed integers
-        Int8    => "int8_t",
-        Int16   => "int16_t",
-        Int32   => "int32_t",
-        Int64   => "int64_t",
-        Int     => sizeof(Int) == 8 ? "int64_t" : "int32_t",
+        Int8 => "int8_t",
+        Int16 => "int16_t",
+        Int32 => "int32_t",
+        Int64 => "int64_t",
+        Int => sizeof(Int) == 8 ? "int64_t" : "int32_t",
 
         # Unsigned integers
-        UInt8   => "uint8_t",
-        UInt16  => "uint16_t",
-        UInt32  => "uint32_t",
-        UInt64  => "uint64_t",
-        UInt    => sizeof(UInt) == 8 ? "uint64_t" : "uint32_t",
+        UInt8 => "uint8_t",
+        UInt16 => "uint16_t",
+        UInt32 => "uint32_t",
+        UInt64 => "uint64_t",
+        UInt => sizeof(UInt) == 8 ? "uint64_t" : "uint32_t",
 
         # Floating point
         Float32 => "float",
         Float64 => "double",
 
         # Boolean
-        Bool    => "bool",
+        Bool => "bool",
 
         # Void/Nothing
         Nothing => "void",
-        Cvoid   => "void",
+        Cvoid => "void",
     )
 
     # Look up the type
@@ -79,7 +79,7 @@ function julia_to_c_type(jltype::Type)
     end
 
     # Default fallback - warn the user
-    @warn "Unsupported type $jltype, using void*" maxlog=1
+    @warn "Unsupported type $jltype, using void*" maxlog = 1
     return "void*"
 end
 
@@ -104,8 +104,10 @@ julia> generate_function_declaration("my_func", (Int, Float64), Float64)
 "double my_func(int64_t arg0, double arg1);"
 ```
 """
-function generate_function_declaration(fname::String, argtypes::Tuple, rettype::Type;
-                                       demangle::Bool=true)
+function generate_function_declaration(
+        fname::String, argtypes::Tuple, rettype::Type;
+        demangle::Bool = true
+    )
     # Add julia_ prefix if not demangled
     c_fname = demangle ? fname : "julia_$fname"
 
@@ -121,7 +123,7 @@ function generate_function_declaration(fname::String, argtypes::Tuple, rettype::
         for (i, argtype) in enumerate(argtypes)
             c_type = julia_to_c_type(argtype)
             # Argument names: arg0, arg1, arg2, ...
-            push!(args, "$c_type arg$(i-1)")
+            push!(args, "$c_type arg$(i - 1)")
         end
         args_str = join(args, ", ")
     end
@@ -151,10 +153,12 @@ String containing complete header file content with:
 - extern "C" wrapper (if requested)
 - Function declarations
 """
-function generate_header_content(funcs::Vector, filename::String;
-                                 demangle::Bool=true,
-                                 include_extern_c::Bool=true,
-                                 comment::String="")
+function generate_header_content(
+        funcs::Vector, filename::String;
+        demangle::Bool = true,
+        include_extern_c::Bool = true,
+        comment::String = ""
+    )
     # Generate include guard name
     guard_name = uppercase(replace(filename, r"[^A-Za-z0-9_]" => "_")) * "_H"
 
@@ -270,10 +274,12 @@ Generated header: ./math.h
 julia> # Now you can #include "math.h" from C/C++
 ```
 """
-function generate_c_header(funcs::Union{Array,Tuple}, path::String, filename::String;
-                          demangle::Bool=true,
-                          include_extern_c::Bool=true,
-                          verbose::Bool=false)
+function generate_c_header(
+        funcs::Union{Array, Tuple}, path::String, filename::String;
+        demangle::Bool = true,
+        include_extern_c::Bool = true,
+        verbose::Bool = false
+    )
     # Prepare function information
     func_info = Tuple{String, Tuple, Type}[]
 
@@ -294,14 +300,16 @@ function generate_c_header(funcs::Union{Array,Tuple}, path::String, filename::St
                 println("  $fname$types -> $rettype")
             end
         catch e
-            @warn "Could not infer return type for $fname$types, skipping" exception=e
+            @warn "Could not infer return type for $fname$types, skipping" exception = e
         end
     end
 
     # Generate header content
     comment = "Automatically generated C header for Julia functions"
-    content = generate_header_content(func_info, filename;
-                                     demangle, include_extern_c, comment)
+    content = generate_header_content(
+        func_info, filename;
+        demangle, include_extern_c, comment
+    )
 
     # Write to file
     header_path = write_header_file(path, filename, content)

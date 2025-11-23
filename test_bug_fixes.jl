@@ -2,7 +2,7 @@
 # Simple test to verify bug fixes without requiring full StaticCompiler precompilation
 
 println("Testing Bug Fixes (Rounds 1-6)")
-println("=" ^ 60)
+println("="^60)
 
 # Test 1: cflags normalization logic (Rounds 5-6)
 println("\n✓ Test 1: cflags normalization (Rounds 5-6)")
@@ -86,12 +86,13 @@ println("\n✓ Test 3: Template override logic (Round 2)")
 println("  Testing: Union{Bool,Nothing}=nothing pattern")
 
 function apply_template_params(;
-    verify::Union{Bool,Nothing}=nothing,
-    min_score::Union{Int,Nothing}=nothing,
-    template::Union{Symbol,Nothing}=nothing)
+        verify::Union{Bool, Nothing} = nothing,
+        min_score::Union{Int, Nothing} = nothing,
+        template::Union{Symbol, Nothing} = nothing
+    )
 
     # Simulated template params
-    template_params = (verify=true, min_score=90)
+    template_params = (verify = true, min_score = 90)
 
     # Apply template defaults only if user didn't provide
     if !isnothing(template)
@@ -111,33 +112,33 @@ function apply_template_params(;
         min_score = 80
     end
 
-    return (verify=verify, min_score=min_score)
+    return (verify = verify, min_score = min_score)
 end
 
 # Test cases
 result_no_template = apply_template_params()
-result_template_only = apply_template_params(template=:production)
-result_override = apply_template_params(template=:production, verify=false)
-result_partial_override = apply_template_params(template=:production, min_score=50)
+result_template_only = apply_template_params(template = :production)
+result_override = apply_template_params(template = :production, verify = false)
+result_partial_override = apply_template_params(template = :production, min_score = 50)
 
 println("  No template → ", result_no_template)
-@assert result_no_template == (verify=false, min_score=80) "Default params failed"
+@assert result_no_template == (verify = false, min_score = 80) "Default params failed"
 println("    ✅ PASS: Default params applied")
 
 println("  Template only → ", result_template_only)
-@assert result_template_only == (verify=true, min_score=90) "Template params failed"
+@assert result_template_only == (verify = true, min_score = 90) "Template params failed"
 println("    ✅ PASS: Template params applied")
 
 println("  Template + verify override → ", result_override)
-@assert result_override == (verify=false, min_score=90) "Override failed"
+@assert result_override == (verify = false, min_score = 90) "Override failed"
 println("    ✅ PASS: User override wins")
 
 println("  Template + min_score override → ", result_partial_override)
-@assert result_partial_override == (verify=true, min_score=50) "Partial override failed"
+@assert result_partial_override == (verify = true, min_score = 50) "Partial override failed"
 println("    ✅ PASS: Partial override works")
 
 # Summary
-println("\n" * "=" ^ 60)
+println("\n" * "="^60)
 println("✅ ALL TESTS PASSED!")
 println("\nBug Fix Verification:")
 println("  Round 2: Template override logic ✅")

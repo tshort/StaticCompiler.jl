@@ -1,4 +1,4 @@
-function add_dllexport(funcs, ir_path; demangle=true)
+function add_dllexport(funcs, ir_path; demangle = true)
     ir = read(ir_path, String)
 
     for (f, _) in funcs
@@ -7,5 +7,5 @@ function add_dllexport(funcs, ir_path; demangle=true)
         ir = replace(ir, pattern => s"define dllexport\1")
     end
 
-    write(ir_path, ir)
+    return write(ir_path, ir)
 end

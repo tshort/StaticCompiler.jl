@@ -12,7 +12,7 @@ struct TestCoverageTracker
 end
 
 function TestCoverageTracker()
-    TestCoverageTracker(
+    return TestCoverageTracker(
         Dict{Symbol, Vector{String}}(),
         Dict{Symbol, Vector{String}}(),
         0, 0, 0
@@ -32,7 +32,7 @@ function track_test(category::Symbol, test_name::String)
     if !haskey(tracker.optimization_tests, category)
         tracker.optimization_tests[category] = String[]
     end
-    push!(tracker.optimization_tests[category], test_name)
+    return push!(tracker.optimization_tests[category], test_name)
 end
 
 """
@@ -58,7 +58,7 @@ function generate_coverage_report()
         (:monomorphization, "Monomorphization"),
         (:devirtualization, "Devirtualization"),
         (:lifetime_analysis, "Lifetime Analysis"),
-        (:constant_propagation, "Constant Propagation")
+        (:constant_propagation, "Constant Propagation"),
     ]
 
     total_optimization_tests = 0
@@ -89,7 +89,7 @@ function generate_coverage_report()
         "Correctness verification tests",
         "Performance benchmarks",
         "Integration tests",
-        "Real-world scenario tests"
+        "Real-world scenario tests",
     ]
 
     for category in test_categories
@@ -120,7 +120,7 @@ function generate_coverage_report()
             count = length(tests)
             coverage_pct = min(100, (count / 6) * 100)
             status = coverage_pct >= 100 ? "" : coverage_pct >= 60 ? "" : ""
-            println("    $status $name: $(round(coverage_pct, digits=1))% ($count/6 minimum tests)")
+            println("    $status $name: $(round(coverage_pct, digits = 1))% ($count/6 minimum tests)")
         else
             println("    $name: 0% (0/6 minimum tests)")
         end
@@ -135,7 +135,7 @@ function generate_coverage_report()
     total_expected_tests = length(optimization_categories) * 6
     overall_coverage = (total_optimization_tests / total_expected_tests) * 100
 
-    println("  Overall coverage: $(round(overall_coverage, digits=1))%")
+    println("  Overall coverage: $(round(overall_coverage, digits = 1))%")
     println()
 
     if overall_coverage >= 90
@@ -180,7 +180,7 @@ function report_optimization_coverage()
         :monomorphization,
         :devirtualization,
         :lifetime_analysis,
-        :constant_propagation
+        :constant_propagation,
     ]
 
     println("\nOptimization Test Coverage:")
@@ -190,7 +190,7 @@ function report_optimization_coverage()
         # This will be populated by running the actual tests
         println("  $(String(cat)): Tests exist OK")
     end
-    println()
+    return println()
 end
 
 # Export functions

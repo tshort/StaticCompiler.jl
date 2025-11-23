@@ -66,32 +66,32 @@ println()
 for (name, func, types) in functions_to_check
     println("Checking: $name")
     println("-"^70)
-    
+
     # Run all analyses
     ma = analyze_monomorphization(func, types)
     ea = analyze_escapes(func, types)
     da = analyze_devirtualization(func, types)
     la = analyze_lifetimes(func, types)
-    
+
     # Determine compilation readiness
     issues = String[]
-    
+
     if ma.has_abstract_types
         push!(issues, "Abstract types")
     end
-    
+
     if length(ea.allocations) > 0
         push!(issues, "$(length(ea.allocations)) heap allocation(s)")
     end
-    
+
     if da.total_dynamic_calls > 3  # Some dynamic calls are OK
         push!(issues, "$(da.total_dynamic_calls) dynamic calls")
     end
-    
+
     if la.potential_leaks > 0
         push!(issues, "$(la.potential_leaks) memory leak(s)")
     end
-    
+
     # Calculate readiness score
     score = 100
     score -= ma.has_abstract_types ? 40 : 0
@@ -99,9 +99,9 @@ for (name, func, types) in functions_to_check
     score -= min(da.total_dynamic_calls * 2, 20)
     score -= la.potential_leaks * 10
     score = max(0, score)
-    
+
     ready = isempty(issues)
-    
+
     # Display results
     if ready
         println("  READY (score: $score/100)")
@@ -111,19 +111,21 @@ for (name, func, types) in functions_to_check
             println("     • $issue")
         end
     end
-    
+
     # Store results
-    push!(results, (
-        name = name,
-        ready = ready,
-        score = score,
-        issues = issues,
-        abstract_types = ma.has_abstract_types,
-        allocations = length(ea.allocations),
-        dynamic_calls = da.total_dynamic_calls,
-        leaks = la.potential_leaks
-    ))
-    
+    push!(
+        results, (
+            name = name,
+            ready = ready,
+            score = score,
+            issues = issues,
+            abstract_types = ma.has_abstract_types,
+            allocations = length(ea.allocations),
+            dynamic_calls = da.total_dynamic_calls,
+            leaks = la.potential_leaks,
+        )
+    )
+
     println()
 end
 
@@ -168,12 +170,12 @@ end
 println("="^70)
 println("PRIORITY RANKING (by score)")
 println("="^70)
-sorted_results = sort(results, by=r->r.score, rev=true)
+sorted_results = sort(results, by = r -> r.score, rev = true)
 
 for (i, r) in enumerate(sorted_results)
     status = r.ready ? "" : ""
     bar_len = div(r.score, 2)  # Scale to 50 chars
-    bar = "█"^bar_len * "░"^(50-bar_len)
+    bar = "█"^bar_len * "░"^(50 - bar_len)
     separator = "│"
     println("$i. $status $(rpad(r.name, 20)) $separator$bar$separator $(r.score)/100")
 end

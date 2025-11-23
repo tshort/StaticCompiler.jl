@@ -39,7 +39,7 @@ julia> stats = benchmark_analysis(my_func, (Int,), samples=10)
 julia> println("Mean time: \$(stats[:mean])s")
 ```
 """
-function benchmark_analysis(f::Function, types::Tuple; samples::Int=5)
+function benchmark_analysis(f::Function, types::Tuple; samples::Int = 5)
     fname = nameof(f)
 
     println("Benchmarking analysis of $fname...")
@@ -58,7 +58,7 @@ function benchmark_analysis(f::Function, types::Tuple; samples::Int=5)
         elapsed = time() - start_time
         push!(times, elapsed)
 
-        print("  Sample $i/$samples: $(round(elapsed * 1000, digits=2))ms\r")
+        print("  Sample $i/$samples: $(round(elapsed * 1000, digits = 2))ms\r")
     end
     println()
 
@@ -83,11 +83,11 @@ function benchmark_analysis(f::Function, types::Tuple; samples::Int=5)
 
     println()
     println("Results:")
-    println("  Min:    $(round(stats[:min] * 1000, digits=2))ms")
-    println("  Max:    $(round(stats[:max] * 1000, digits=2))ms")
-    println("  Mean:   $(round(stats[:mean] * 1000, digits=2))ms")
-    println("  Median: $(round(stats[:median] * 1000, digits=2))ms")
-    println("  Std:    $(round(stats[:std] * 1000, digits=2))ms")
+    println("  Min:    $(round(stats[:min] * 1000, digits = 2))ms")
+    println("  Max:    $(round(stats[:max] * 1000, digits = 2))ms")
+    println("  Mean:   $(round(stats[:mean] * 1000, digits = 2))ms")
+    println("  Median: $(round(stats[:median] * 1000, digits = 2))ms")
+    println("  Std:    $(round(stats[:std] * 1000, digits = 2))ms")
     println()
 
     return stats
@@ -115,8 +115,10 @@ julia> stats = benchmark_compilation(my_func, (Int,), "/tmp", "my_lib")
 julia> println("Mean compilation time: \$(stats[:mean])s")
 ```
 """
-function benchmark_compilation(f::Function, types::Tuple, path::String, name::String;
-                               samples::Int=3)
+function benchmark_compilation(
+        f::Function, types::Tuple, path::String, name::String;
+        samples::Int = 3
+    )
     fname = nameof(f)
 
     println("Benchmarking compilation of $fname...")
@@ -137,11 +139,11 @@ function benchmark_compilation(f::Function, types::Tuple, path::String, name::St
             elapsed = time() - start_time
             push!(times, elapsed)
             successes += 1
-            println("  Sample $i/$samples: $(round(elapsed, digits=2))s ")
+            println("  Sample $i/$samples: $(round(elapsed, digits = 2))s ")
         catch e
             elapsed = time() - start_time
             push!(times, elapsed)
-            println("  Sample $i/$samples: $(round(elapsed, digits=2))s (failed)")
+            println("  Sample $i/$samples: $(round(elapsed, digits = 2))s (failed)")
         end
     end
     println()
@@ -165,10 +167,10 @@ function benchmark_compilation(f::Function, types::Tuple, path::String, name::St
     )
 
     println("Results:")
-    println("  Success rate: $successes/$samples ($(round(successes/samples*100, digits=1))%)")
-    println("  Min time:     $(round(stats[:min], digits=2))s")
-    println("  Max time:     $(round(stats[:max], digits=2))s")
-    println("  Mean time:    $(round(stats[:mean], digits=2))s")
+    println("  Success rate: $successes/$samples ($(round(successes / samples * 100, digits = 1))%)")
+    println("  Min time:     $(round(stats[:min], digits = 2))s")
+    println("  Max time:     $(round(stats[:max], digits = 2))s")
+    println("  Mean time:    $(round(stats[:mean], digits = 2))s")
     println()
 
     return stats
@@ -188,8 +190,10 @@ julia> comparison = compare_performance(old_version, new_version, (Int,))
 julia> println("Speedup: \$(comparison[:speedup])x")
 ```
 """
-function compare_performance(old_func::Function, new_func::Function, types::Tuple;
-                            samples::Int=10)
+function compare_performance(
+        old_func::Function, new_func::Function, types::Tuple;
+        samples::Int = 10
+    )
     println("="^70)
     println("PERFORMANCE COMPARISON")
     println("="^70)
@@ -200,13 +204,13 @@ function compare_performance(old_func::Function, new_func::Function, types::Tupl
 
     # Benchmark old version
     println("Benchmarking $old_name (old version)...")
-    old_stats = benchmark_analysis(old_func, types; samples=samples)
+    old_stats = benchmark_analysis(old_func, types; samples = samples)
 
     println()
 
     # Benchmark new version
     println("Benchmarking $new_name (new version)...")
-    new_stats = benchmark_analysis(new_func, types; samples=samples)
+    new_stats = benchmark_analysis(new_func, types; samples = samples)
 
     # Compare
     speedup = old_stats[:mean] / new_stats[:mean]
@@ -218,16 +222,16 @@ function compare_performance(old_func::Function, new_func::Function, types::Tupl
     println("="^70)
     println()
     println("Old ($old_name):")
-    println("  Mean: $(round(old_stats[:mean] * 1000, digits=2))ms")
+    println("  Mean: $(round(old_stats[:mean] * 1000, digits = 2))ms")
     println()
     println("New ($new_name):")
-    println("  Mean: $(round(new_stats[:mean] * 1000, digits=2))ms")
+    println("  Mean: $(round(new_stats[:mean] * 1000, digits = 2))ms")
     println()
 
     if speedup > 1.0
-        println("Improvement: $(round(improvement, digits=1))% faster ($(round(speedup, digits=2))x speedup)")
+        println("Improvement: $(round(improvement, digits = 1))% faster ($(round(speedup, digits = 2))x speedup)")
     elseif speedup < 1.0
-        println(" Regression: $(round(-improvement, digits=1))% slower ($(round(1/speedup, digits=2))x slowdown)")
+        println(" Regression: $(round(-improvement, digits = 1))% slower ($(round(1 / speedup, digits = 2))x slowdown)")
     else
         println("->  No significant change")
     end
@@ -308,7 +312,7 @@ function track_quality_over_time(f::Function, types::Tuple, history_file::String
     # Show trend if we have enough data
     if length(history) >= 2
         scores = [h["score"] for h in history]
-        recent_trend = scores[end] - scores[end-1]
+        recent_trend = scores[end] - scores[end - 1]
 
         if recent_trend > 0
             println("   Recent trend: ⬆ +$recent_trend points")
@@ -380,7 +384,7 @@ function plot_quality_history(history_file::String)
         # Trend indicator
         trend = ""
         if i > 1
-            diff = score - scores[i-1]
+            diff = score - scores[i - 1]
             trend = diff > 0 ? " ⬆" : diff < 0 ? " ⬇" : " ➡"
         end
 
@@ -402,7 +406,7 @@ function plot_quality_history(history_file::String)
     end
 
     println()
-    println("="^70)
+    return println("="^70)
 end
 
 export benchmark_analysis, benchmark_compilation, compare_performance

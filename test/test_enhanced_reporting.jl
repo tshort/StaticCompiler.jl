@@ -24,7 +24,7 @@ end
 
 Generate a comprehensive test summary report.
 """
-function generate_test_summary_report(results::Vector{TestReport}; output_file=nothing)
+function generate_test_summary_report(results::Vector{TestReport}; output_file = nothing)
     report = IOBuffer()
 
     println(report, "="^80)
@@ -45,9 +45,9 @@ function generate_test_summary_report(results::Vector{TestReport}; output_file=n
     println(report, "-"^80)
     println(report, "  Total test suites: $(length(results))")
     println(report, "  Total tests: $total_tests")
-    println(report, "  Passed: $total_passed ($(round(100*total_passed/total_tests, digits=1))%)")
+    println(report, "  Passed: $total_passed ($(round(100 * total_passed / total_tests, digits = 1))%)")
     println(report, "  Failed: $total_failed")
-    println(report, "  Total duration: $(round(total_duration/1000, digits=2))s")
+    println(report, "  Total duration: $(round(total_duration / 1000, digits = 2))s")
     println(report)
 
     # Detailed results
@@ -56,7 +56,7 @@ function generate_test_summary_report(results::Vector{TestReport}; output_file=n
 
     for result in results
         status = result.failed == 0 ? "PASS" : "FAIL"
-        duration_str = lpad("$(round(result.duration_ms/1000, digits=2))s", 8)
+        duration_str = lpad("$(round(result.duration_ms / 1000, digits = 2))s", 8)
         println(report, "  $status  $(rpad(result.name, 40)) $duration_str  ($(result.passed) passed, $(result.failed) failed)")
     end
 
@@ -132,7 +132,7 @@ end
     sample_results = [
         TestReport("Core Tests", 31, 0, 1234.5, now()),
         TestReport("Integration Tests", 14, 0, 5678.9, now()),
-        TestReport("Optimization Tests", 27, 0, 2345.6, now())
+        TestReport("Optimization Tests", 27, 0, 2345.6, now()),
     ]
 
     @testset "Test summary generation" begin
@@ -158,7 +158,7 @@ end
         @test isfile(output_file)
 
         # Cleanup
-        rm(output_file, force=true)
+        rm(output_file, force = true)
 
         println("  OK JUnit XML generated")
     end

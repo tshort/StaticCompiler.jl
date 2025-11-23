@@ -8,7 +8,7 @@ if VERSION >= v"1.9"
     function bumper_test(N::Int)
         buf = AllocBuffer(MallocVector, sizeof(Float64) * N)
         s = 0.0
-        for i ∈ 1:N
+        for i in 1:N
             # some excuse to reuse the same memory a bunch of times
             @no_escape buf begin
                 v = @alloc(Float64, N)
@@ -17,13 +17,13 @@ if VERSION >= v"1.9"
             end
         end
         free(buf)
-        s
+        return s
     end
 
     @testset "Bumper.jl integration" begin
         target = StaticTarget()
         StaticCompiler.set_runtime!(target, true)
-        path = compile_shlib(bumper_test, (Int,), "./"; target=target)
+        path = compile_shlib(bumper_test, (Int,), "./"; target = target)
         ptr = Libdl.dlopen(path, Libdl.RTLD_LOCAL)
 
         fptr = Libdl.dlsym(ptr, "bumper_test")
@@ -75,7 +75,7 @@ end
             # Test ascii output
             # @test parsedlm(Int, c"table.tsv", '\t') == (1:5)*(1:5)' broken=Sys.isapple()
             # Test binary output
-            @test fread!(szeros(Int, 5,5), c"table.b") == (1:5)*(1:5)'
+            @test fread!(szeros(Int, 5, 5), c"table.b") == (1:5) * (1:5)'
         else
             @test_broken run_ok
         end
@@ -235,7 +235,7 @@ end
             # Check ascii output
             # @test parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.isapple()
             # Check binary output
-            @test fread!(szeros(5,5), c"table.b") == A' * A
+            @test fread!(szeros(5, 5), c"table.b") == A' * A
         else
             @test_broken run_ok
         end
@@ -266,7 +266,7 @@ end
         @test isa(status, Base.Process) && status.exitcode == 0
         A = (1:10) * (1:5)'
         # @test parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.isapple()
-        @test fread!(szeros(5,5), c"table.b") == A' * A
+        @test fread!(szeros(5, 5), c"table.b") == A' * A
     end
 
 

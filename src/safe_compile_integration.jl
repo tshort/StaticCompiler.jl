@@ -33,8 +33,10 @@ Compilation successful
 "./my_func.so"
 ```
 """
-function safe_compile_shlib(f::Function, tt::Tuple, path::String, name::String;
-                            threshold::Int=80, force::Bool=false, export_report::Bool=true)
+function safe_compile_shlib(
+        f::Function, tt::Tuple, path::String, name::String;
+        threshold::Int = 80, force::Bool = false, export_report::Bool = true
+    )
     fname = nameof(f)
 
     # Run analysis
@@ -47,7 +49,7 @@ function safe_compile_shlib(f::Function, tt::Tuple, path::String, name::String;
         try
             export_report(report, report_path)
         catch e
-            @warn "Could not export analysis report" exception=e
+            @warn "Could not export analysis report" exception = e
         end
     end
 
@@ -143,8 +145,10 @@ julia> exe_path = safe_compile_executable(main, (), "./", "myapp",
                                           threshold=95)
 ```
 """
-function safe_compile_executable(f::Function, tt::Tuple, path::String, name::String;
-                                 threshold::Int=80, force::Bool=false, export_report::Bool=true)
+function safe_compile_executable(
+        f::Function, tt::Tuple, path::String, name::String;
+        threshold::Int = 80, force::Bool = false, export_report::Bool = true
+    )
     fname = nameof(f)
 
     # Run analysis
@@ -157,7 +161,7 @@ function safe_compile_executable(f::Function, tt::Tuple, path::String, name::Str
         try
             export_report(report, report_path)
         catch e
-            @warn "Could not export analysis report" exception=e
+            @warn "Could not export analysis report" exception = e
         end
     end
 

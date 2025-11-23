@@ -20,10 +20,10 @@ julia> funcs = scan_module(MyPackage)
 julia> println("Found \$(length(funcs)) functions")
 ```
 """
-function scan_module(mod::Module; include_base::Bool=false, min_methods::Int=1)
+function scan_module(mod::Module; include_base::Bool = false, min_methods::Int = 1)
     functions = Function[]
 
-    for name in names(mod; all=true, imported=false)
+    for name in names(mod; all = true, imported = false)
         # Skip internal names and non-exported symbols
         if startswith(string(name), "#") || startswith(string(name), "@")
             continue
@@ -73,8 +73,8 @@ julia> for (func, signatures) in func_types
        end
 ```
 """
-function scan_module_with_types(mod::Module; include_base::Bool=false)
-    functions = scan_module(mod; include_base=include_base)
+function scan_module_with_types(mod::Module; include_base::Bool = false)
+    functions = scan_module(mod; include_base = include_base)
     func_with_types = Tuple{Function, Vector{Tuple}}[]
 
     for func in functions
@@ -126,7 +126,7 @@ julia> println("Analyzed \$(length(analysis[:results])) functions")
 julia> println("Problematic: \$(length(analysis[:problematic]))")
 ```
 """
-function analyze_module(mod::Module; threshold::Int=80, include_base::Bool=false, verbose::Bool=true)
+function analyze_module(mod::Module; threshold::Int = 80, include_base::Bool = false, verbose::Bool = true)
     if verbose
         println("="^70)
         println("MODULE ANALYSIS: $mod")
@@ -135,7 +135,7 @@ function analyze_module(mod::Module; threshold::Int=80, include_base::Bool=false
         println("Scanning for functions...")
     end
 
-    func_types = scan_module_with_types(mod; include_base=include_base)
+    func_types = scan_module_with_types(mod; include_base = include_base)
 
     if verbose
         println("Found $(length(func_types)) functions with analyzable signatures")
@@ -184,7 +184,7 @@ function analyze_module(mod::Module; threshold::Int=80, include_base::Bool=false
 
         if !isempty(problematic)
             println("Functions needing attention:")
-            for (name, report) in sort(collect(problematic), by=x->x[2].score)
+            for (name, report) in sort(collect(problematic), by = x -> x[2].score)
                 println("  • $name (score: $(report.score)/100)")
                 for issue in report.issues
                     println("    - $issue")
@@ -222,7 +222,7 @@ julia> comparison = compare_modules(MyPackageV1, MyPackageV2)
 julia> println("Improvement: \$(comparison[:improvement])%")
 ```
 """
-function compare_modules(mod1::Module, mod2::Module; threshold::Int=80, verbose::Bool=true)
+function compare_modules(mod1::Module, mod2::Module; threshold::Int = 80, verbose::Bool = true)
     if verbose
         println("="^70)
         println("MODULE COMPARISON")
@@ -231,13 +231,13 @@ function compare_modules(mod1::Module, mod2::Module; threshold::Int=80, verbose:
         println("Analyzing $mod1...")
     end
 
-    analysis1 = analyze_module(mod1; threshold=threshold, verbose=false)
+    analysis1 = analyze_module(mod1; threshold = threshold, verbose = false)
 
     if verbose
         println("Analyzing $mod2...")
     end
 
-    analysis2 = analyze_module(mod2; threshold=threshold, verbose=false)
+    analysis2 = analyze_module(mod2; threshold = threshold, verbose = false)
 
     # Calculate improvements
     score1 = analysis1[:summary][:average_score]
@@ -256,11 +256,11 @@ function compare_modules(mod1::Module, mod2::Module; threshold::Int=80, verbose:
         println()
         println("Module 1 ($mod1):")
         println("  Average score: $score1/100")
-        println("  Ready rate:    $(round(ready1, digits=1))%")
+        println("  Ready rate:    $(round(ready1, digits = 1))%")
         println()
         println("Module 2 ($mod2):")
         println("  Average score: $score2/100")
-        println("  Ready rate:    $(round(ready2, digits=1))%")
+        println("  Ready rate:    $(round(ready2, digits = 1))%")
         println()
         println("Change:")
 
@@ -268,7 +268,7 @@ function compare_modules(mod1::Module, mod2::Module; threshold::Int=80, verbose:
         ready_arrow = ready_diff > 0 ? "⬆" : ready_diff < 0 ? "⬇" : "➡"
 
         println("  Score:  $score_arrow $(abs(score_diff)) points")
-        println("  Ready:  $ready_arrow $(round(abs(ready_diff), digits=1))%")
+        println("  Ready:  $ready_arrow $(round(abs(ready_diff), digits = 1))%")
         println()
 
         if score_diff > 0 && ready_diff > 0

@@ -60,7 +60,7 @@ function analyze_devirtualization(f::Function, types::Tuple)
 
     try
         # Get typed IR
-        typed_code = code_typed(f, types, optimize=false)
+        typed_code = code_typed(f, types, optimize = false)
 
         if !isempty(typed_code)
             ir, return_type = first(typed_code)
@@ -84,12 +84,14 @@ function analyze_devirtualization(f::Function, types::Tuple)
                             # Potentially dynamic call
                             can_devirt = all_types_concrete(types)
 
-                            push!(call_sites, CallSiteInfo(
-                                call_name,
-                                "line $idx",
-                                num_targets,
-                                can_devirt
-                            ))
+                            push!(
+                                call_sites, CallSiteInfo(
+                                    call_name,
+                                    "line $idx",
+                                    num_targets,
+                                    can_devirt
+                                )
+                            )
                         end
                     end
                 end
@@ -97,7 +99,7 @@ function analyze_devirtualization(f::Function, types::Tuple)
         end
 
     catch e
-        @debug "Devirtualization analysis failed for $fname" exception=e
+        @debug "Devirtualization analysis failed for $fname" exception = e
     end
 
     total_calls = length(call_sites)

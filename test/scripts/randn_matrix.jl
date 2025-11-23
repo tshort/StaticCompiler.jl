@@ -8,15 +8,15 @@ function randn_matrix(argc::Int, argv::Ptr{Ptr{UInt8}})
 
     M = MallocArray{Float64}(undef, rows, cols)
     rng = MarsagliaPolar(static_rng())
-    @inbounds for i=1:rows
-        for j=1:cols
-            M[i,j] = randn(rng)
+    @inbounds for i in 1:rows
+        for j in 1:cols
+            M[i, j] = randn(rng)
         end
     end
     printf(M)
-    free(M)
+    return free(M)
 end
 
 # Attempt to compile
 # cflags=`-lm`: need to explicitly include libm math library on linux
-path = compile_executable(randn_matrix, (Int64, Ptr{Ptr{UInt8}}), "./", cflags=`-lm`)
+path = compile_executable(randn_matrix, (Int64, Ptr{Ptr{UInt8}}), "./", cflags = `-lm`)
