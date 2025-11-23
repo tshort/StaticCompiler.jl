@@ -57,8 +57,9 @@ set_compiler!(target::StaticTarget, compiler::String) = (target.compiler = compi
 
 set_runtime!(target::StaticTarget, julia_runtime::Bool) = (target.julia_runtime = julia_runtime)
 
-# Swap to the runtime-friendly method table when the Julia runtime is available unless the user
-# explicitly requested a different table.
+# Pick an appropriate method table. If the caller didn't supply one, fall back to the
+# device-overlay table or, for runtime-linked builds, the empty runtime table. If a table
+# is explicitly provided, respect it to avoid dropping overlays unexpectedly.
 select_method_table(mt, target::StaticTarget) =
     (target.julia_runtime && mt === method_table) ? runtime_method_table : mt
 
@@ -99,7 +100,7 @@ module StaticRuntime
     # the runtime library
     signal_exception() = return
     # Allocate raw memory when the Julia runtime is not available.
-    malloc(sz) = ccall("extern malloc", llvmcall, Ptr{Cvoid}, (Csize_t,), sz)
+    malloc(sz) = ccall(:malloc, llvmcall, Ptr{Cvoid}, (Csize_t,), sz)
     report_oom(sz) = return
     report_exception(ex) = return
     report_exception_name(ex) = return
@@ -132,7 +133,9 @@ GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, Stati
 GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = true
 
 GPUCompiler.uses_julia_runtime(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = job.config.target.julia_runtime
-GPUCompiler.imaging_mode(target::StaticCompilerTarget) = target.julia_runtime
+@static if isdefined(GPUCompiler, :imaging_mode)
+    GPUCompiler.imaging_mode(target::StaticCompilerTarget) = target.julia_runtime
+end
 GPUCompiler.get_interpreter(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) =
     StaticInterpreter(job.config.params.cache, GPUCompiler.method_table(job), job.world,
                         GPUCompiler.inference_params(job), GPUCompiler.optimization_params(job))
