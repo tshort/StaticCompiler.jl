@@ -12,7 +12,7 @@ using LLD_jll
 using Bumper
 
 addprocs(1)
-# @everywhere using StaticCompiler, StrideArraysCore
+@everywhere using StaticCompiler, StrideArraysCore
 
 const GROUP = get(ENV, "GROUP", "All")
 

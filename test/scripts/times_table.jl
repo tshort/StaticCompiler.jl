@@ -16,7 +16,7 @@ function times_table(argc::Int, argv::Ptr{Ptr{UInt8}})
     printf(M)
     # Also print to file
     fwrite(c"table.b", M)
-    printdlm(c"table.tsv", M)
+    # printdlm(c"table.tsv", M)
     # Clean up matrix
     free(M)
 end

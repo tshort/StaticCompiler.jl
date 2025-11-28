@@ -68,12 +68,8 @@ end
 @device_override @noinline Core.throw_inexacterror(f::Symbol, ::Type{T}, val) where {T} =
     @print_and_throw c"Inexact conversion"
 
-# abstractarray.jl 
-# Base.throw_boundserror is removed since v1.11
-if VERSION < v"1.11"
-    @device_override @noinline Base.throw_boundserror(A, I) =
-        @print_and_throw c"Out-of-bounds array access"
-end
+@device_override @noinline Base.throw_boundserror(A, I) =
+    @print_and_throw c"Out-of-bounds array access"
 
 # trig.jl
 @device_override @noinline Base.Math.sincos_domain_error(x) =

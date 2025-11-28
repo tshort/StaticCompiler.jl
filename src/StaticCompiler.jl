@@ -1,5 +1,3 @@
-#__precompile__(false)
-
 module StaticCompiler
 using InteractiveUtils
 using GPUCompiler: GPUCompiler
@@ -596,15 +594,7 @@ function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), file
       obj_path = joinpath(path, "$filenamebase.o")
       obj = GPUCompiler.JuliaContext() do ctx
         fakejob, _ = static_job(f, tt; target, kwargs...)
-    @static if VERSION < v"1.9"
-        obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
-    else
-        @static if pkgversion(GPUCompiler) < v"1.3.0"
-            obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
-        else
-            obj, _ = GPUCompiler.emit_asm(fakejob, mod, LLVM.API.LLVMObjectFile)
-        end
-    end
+        obj, _ = GPUCompiler.emit_asm(fakejob, mod, LLVM.API.LLVMObjectFile)
         obj 
       end
       open(obj_path, "w") do io

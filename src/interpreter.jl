@@ -8,14 +8,7 @@ using CodeInfoTools
 using CodeInfoTools: resolve
 
 
-const HAS_INTEGRATED_CACHE = GPUCompiler.HAS_INTEGRATED_CACHE
-@static if HAS_INTEGRATED_CACHE
-    const CodeCache = Nothing
-
-else
-    using GPUCompiler: CodeCache
-end
-
+const CodeCache = Nothing
 # https://github.com/JuliaGPU/GPUCompiler.jl/src/jlgen.jl8#L322
 # as from struct GPUInterpreter <: CC.AbstractInterpreter 
 struct StaticInterpreter <: AbstractInterpreter
@@ -23,11 +16,7 @@ struct StaticInterpreter <: AbstractInterpreter
     world::UInt
     method_table::Union{Nothing,Core.MethodTable}
 
-    @static if HAS_INTEGRATED_CACHE
-        token::Any
-    else
-        code_cache::CodeCache # global cache
-    end
+    token::Any
 
     # Cache of inference results for this particular interpreter
     local_cache::Vector{InferenceResult}
@@ -49,11 +38,7 @@ Core.Compiler.OptimizationParams(interp::StaticInterpreter) = interp.opt_params
 # Core.Compiler.get_world_counter(interp::StaticInterpreter) = interp.world
 GPUCompiler.get_inference_world(interp::StaticInterpreter) = interp.world
 Core.Compiler.get_inference_cache(interp::StaticInterpreter) = interp.local_cache
-@static if HAS_INTEGRATED_CACHE
-    Core.Compiler.cache_owner(interp::StaticInterpreter) = interp.token
-else
-    Core.Compiler.code_cache(interp::StaticInterpreter) = WorldView(interp.code_cache, interp.world)
-end
+Core.Compiler.cache_owner(interp::StaticInterpreter) = interp.token
 
 # No need to do any locking since we're not putting our results into the runtime cache
 Core.Compiler.lock_mi_inference(interp::StaticInterpreter, mi::MethodInstance) = nothing
@@ -85,18 +70,10 @@ end
 
 function Core.Compiler.InferenceState(result::InferenceResult, cache::Symbol, interp::StaticInterpreter)
     world = get_inference_world(interp)
-    src = @static if VERSION >= v"1.10.0-DEV.873"
-        Core.Compiler.retrieve_code_info(result.linfo, world)
-    else
-        Core.Compiler.retrieve_code_info(result.linfo)
-    end
+    src = Core.Compiler.retrieve_code_info(result.linfo, world)
     mi = result.linfo
     src = custom_pass!(interp, result, mi, src)
-    src === nothing && return @static if VERSION < v"1.11"
-        Core.Compiler.validate_code_in_debug_mode(result.linfo, src, "lowered")
-    else
-        Core.Compiler.maybe_validate_code(result.linfo, src, "lowered")
-    end
+    src === nothing && return Core.Compiler.maybe_validate_code(result.linfo, src, "lowered")
     return InferenceState(result, src, cache, interp)
 end
 
@@ -109,27 +86,20 @@ end
 
 if isdefined(Base.Experimental, Symbol("@overlay"))
     using Core.Compiler: OverlayMethodTable
-    if v"1.8-beta2" <= VERSION < v"1.9-" || VERSION >= v"1.9.0-DEV.120"
-        Core.Compiler.method_table(interp::StaticInterpreter) =
+    Core.Compiler.method_table(interp::StaticInterpreter) =
             OverlayMethodTable(interp.world, interp.method_table)
-    else
-        Core.Compiler.method_table(interp::StaticInterpreter, sv::InferenceState) =
-            OverlayMethodTable(interp.world, interp.method_table)
-    end
 else
     Core.Compiler.method_table(interp::StaticInterpreter, sv::InferenceState) =
         WorldOverlayMethodTable(interp.world)
 end
 
 # semi-concrete interepretation is broken with overlays (JuliaLang/julia#47349)
-@static if VERSION >= v"1.9.0-DEV.1248"
-    function Core.Compiler.concrete_eval_eligible(interp::StaticInterpreter,
-        @nospecialize(f), result::Core.Compiler.MethodCallResult, arginfo::Core.Compiler.ArgInfo)
-        ret = @invoke Core.Compiler.concrete_eval_eligible(interp::AbstractInterpreter,
-            f::Any, result::Core.Compiler.MethodCallResult, arginfo::Core.Compiler.ArgInfo)
-        ret === false && return nothing
-        return ret
-    end
+function Core.Compiler.concrete_eval_eligible(interp::StaticInterpreter,
+    @nospecialize(f), result::Core.Compiler.MethodCallResult, arginfo::Core.Compiler.ArgInfo)
+    ret = @invoke Core.Compiler.concrete_eval_eligible(interp::AbstractInterpreter,
+        f::Any, result::Core.Compiler.MethodCallResult, arginfo::Core.Compiler.ArgInfo)
+    ret === false && return nothing
+    return ret
 end
 
 struct StaticCompilerParams <: AbstractCompilerParams

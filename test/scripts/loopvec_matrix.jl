@@ -3,11 +3,9 @@ using StaticTools
 using LoopVectorization
 
 @inline function mul!(C::MallocArray, A::MallocArray, B::MallocArray)
-    #@turbo for n ∈ indices((C,B), 2), m ∈ indices((C,A), 1)
-    @turbo for n ∈ indices(C, 2), m ∈ indices(C, 1)
+    @turbo for n ∈ indices((C,B), 2), m ∈ indices((C,A), 1)
         Cmn = zero(eltype(C))
-        # for k ∈ indices((A,B), (2,1))
-        for k ∈ indices(A, 2)
+        for k ∈ indices((A,B), (2,1))
             Cmn += A[m,k] * B[k,n]
         end
         C[m,n] = Cmn
@@ -41,7 +39,7 @@ function loopvec_matrix(argc::Int, argv::Ptr{Ptr{UInt8}})
     mul!(C, B, A)
 
     # Print to stdout
-    printf(c"C matric = \n")
+    printf(c"C matrix = \n")
     print(C)
     # Also print to file
     printdlm(c"table.tsv", C, '\t')

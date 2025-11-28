@@ -91,14 +91,8 @@ GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, Stati
 GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = true
 
 GPUCompiler.uses_julia_runtime(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = job.config.target.julia_runtime
-@static if HAS_INTEGRATED_CACHE
-    GPUCompiler.get_interpreter(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) =
-        StaticInterpreter(job.world, GPUCompiler.method_table(job), GPUCompiler.ci_cache_token(job), inference_params(job), optimization_params(job))
-else
-    GPUCompiler.ci_cache(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) = job.config.params.cache
-    GPUCompiler.get_interpreter(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) =
-        StaticInterpreter(job.world, GPUCompiler.method_table(job), job.config.params.cache, inference_params(job), optimization_params(job))
-end
+GPUCompiler.get_interpreter(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) =
+    StaticInterpreter(job.world, GPUCompiler.method_table(job), GPUCompiler.ci_cache_token(job), inference_params(job), optimization_params(job))
 GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget})) = job.config.target.method_table
 
 
