@@ -31,7 +31,7 @@ end
 
 macro print_and_throw(err)
     quote
-        printf($err)
+        println($err)
         libcexit(Int32(1))
     end
 end
