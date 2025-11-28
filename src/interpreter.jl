@@ -103,7 +103,9 @@ end
 Core.Compiler.may_optimize(interp::StaticInterpreter) = true
 Core.Compiler.may_compress(interp::StaticInterpreter) = true
 Core.Compiler.may_discard_trees(interp::StaticInterpreter) = true
-Core.Compiler.verbose_stmt_info(interp::StaticInterpreter) = false
+if isdefined(Core.Compiler, :verbose_stmt_inf)
+    Core.Compiler.verbose_stmt_info(interp::StaticInterpreter) = false
+end
 
 if isdefined(Base.Experimental, Symbol("@overlay"))
     using Core.Compiler: OverlayMethodTable

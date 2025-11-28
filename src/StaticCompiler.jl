@@ -495,10 +495,17 @@ function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::St
             name!(modfunc,fname[d:end])
         end
     end
+    @dispose pb = NewPMPassBuilder(merge_functions=true) begin
+        add!(pb, NewPMModulePassManager()) do pass_manager
+            run!(pb, mod)
+        end
+    end
+    #=
     LLVM.ModulePassManager() do pass_manager #remove duplicate functions
         LLVM.merge_functions!(pass_manager)
         LLVM.run!(pass_manager, mod)
     end
+    =#
     return mod
 end
 
