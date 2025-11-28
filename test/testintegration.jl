@@ -20,12 +20,12 @@ function bumper_test(N::Int)
 end
 
 @testset "Bumper.jl integration" begin
-    # path = compile_shlib(bumper_test, (Int,), "./")
-    # ptr = Libdl.dlopen(path, Libdl.RTLD_LOCAL)
+    path = compile_shlib(bumper_test, (Int,), "./")
+    ptr = Libdl.dlopen(path, Libdl.RTLD_LOCAL)
 
-    # fptr = Libdl.dlsym(ptr, "bumper_test")
+    fptr = Libdl.dlsym(ptr, "bumper_test")
 
-    @test bumper_test(8) isa AbstractFloat
+    @test bumper_test(8) == @ccall($fptr(8::Int)::Float64)
 end
 
 @testset "Standalone Executable Integration" begin

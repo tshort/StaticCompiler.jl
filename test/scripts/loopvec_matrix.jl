@@ -42,7 +42,7 @@ function loopvec_matrix(argc::Int, argv::Ptr{Ptr{UInt8}})
     printf(c"C matrix = \n")
     print(C)
     # Also print to file
-    printdlm(c"table.tsv", C, '\t')
+    # printdlm(c"table.tsv", C, '\t')
     fwrite(c"table.b", C)
     # Clean up matrices
     free(A)
