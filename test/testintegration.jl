@@ -3,7 +3,6 @@ testpath = pwd()
 scratch = tempdir()
 cd(scratch)
 
-# Bumper uses PackageExtensions to work with StaticCompiler, so let's just skip this test on 1.8
 function bumper_test(N::Int)
     buf = AllocBuffer(MallocVector, sizeof(Float64) * N)
     s = 0.0
@@ -46,8 +45,9 @@ end
             @warn "Could not compile $testpath/scripts/times_table.jl"
             println(e)
         end
-        @test isa(status, Base.Process)
-        @test isa(status, Base.Process) && status.exitcode == 0
+        # re-enable once StaticTools has been adapted to use opaque pointers
+        @test_broken isa(status, Base.Process)
+        @test_broken isa(status, Base.Process) && status.exitcode == 0
 
         # Attempt to run
         println("5x5 times table:")
@@ -58,8 +58,10 @@ end
             @warn "Could not run $(scratch)/times_table"
             println(e)
         end
-        @test isa(status, Base.Process)
-        @test isa(status, Base.Process) && status.exitcode == 0
+
+        # re-enable once StaticTools has been adapted to use opaque pointers
+        @test_broken isa(status, Base.Process)
+        @test_broken isa(status, Base.Process) && status.exitcode == 0
         # Test ascii output
         # @test parsedlm(Int, c"table.tsv", '\t') == (1:5)*(1:5)' broken=Sys.isapple()
         # Test binary output
@@ -177,7 +179,7 @@ end
             end
             @test_broken isa(status, Base.Process)
             @test_broken isa(status, Base.Process) && status.exitcode == 0
-            # @test_broken parsedlm(c"product.tsv",'\t')[] == 3025
+            @test_broken parsedlm(c"product.tsv",'\t')[] == 3025
         end
     end
 
@@ -207,7 +209,7 @@ end
         @test_broken isa(status, Base.Process) && status.exitcode == 0
         A = (1:10) * (1:5)'
         # Check ascii output
-        # @test_broken parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.isapple()
+        @test_broken parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.isapple()
         # Check binary output
         @test_broken fread!(szeros(5,5), c"table.b") == A' * A
     end
@@ -237,7 +239,7 @@ end
         @test_broken isa(status, Base.Process)
         @test_broken isa(status, Base.Process) && status.exitcode == 0
         A = (1:10) * (1:5)'
-        # @test_broken parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.isapple()
+        @test_broken parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.isapple()
     end
 
 

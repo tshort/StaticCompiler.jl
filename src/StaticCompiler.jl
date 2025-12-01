@@ -498,12 +498,6 @@ function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::St
             run!(pb, mod)
         end
     end
-    #=
-    LLVM.ModulePassManager() do pass_manager #remove duplicate functions
-        LLVM.merge_functions!(pass_manager)
-        LLVM.run!(pass_manager, mod)
-    end
-    =#
     return mod
 end
 
@@ -536,7 +530,7 @@ The defaults compile to the native target.
 If `demangle` is set to `false`, compiled function names are prepended with "julia_".
 
 ### Examples
-```julia
+```
 julia> fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
 fib (generic function with 1 method)
 

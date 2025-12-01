@@ -8,9 +8,6 @@ using CodeInfoTools
 using CodeInfoTools: resolve
 
 
-const CodeCache = Nothing
-# https://github.com/JuliaGPU/GPUCompiler.jl/src/jlgen.jl8#L322
-# as from struct GPUInterpreter <: CC.AbstractInterpreter 
 struct StaticInterpreter <: AbstractInterpreter
     # The world age we're working inside of
     world::UInt
@@ -24,10 +21,8 @@ struct StaticInterpreter <: AbstractInterpreter
     # Parameters for inference and optimization
     inf_params::InferenceParams
     opt_params::OptimizationParams
-    # token_or_cache = token::Any, code_cache::CodeCache
     function StaticInterpreter(world::UInt, mt::Union{Nothing,Core.MethodTable}, token_or_cache, ip::InferenceParams, op::OptimizationParams)
         @assert world <= Base.get_world_counter()
-        # mt = get_method_table_view(world, mt)
         local_cache = Vector{Core.Compiler.InferenceResult}() # Initially empty cache
         return new(world, mt, token_or_cache, local_cache, ip, op)
     end
@@ -35,7 +30,6 @@ end
 
 Core.Compiler.InferenceParams(interp::StaticInterpreter) = interp.inf_params
 Core.Compiler.OptimizationParams(interp::StaticInterpreter) = interp.opt_params
-# Core.Compiler.get_world_counter(interp::StaticInterpreter) = interp.world
 GPUCompiler.get_inference_world(interp::StaticInterpreter) = interp.world
 Core.Compiler.get_inference_cache(interp::StaticInterpreter) = interp.local_cache
 Core.Compiler.cache_owner(interp::StaticInterpreter) = interp.token
@@ -105,12 +99,10 @@ end
 struct StaticCompilerParams <: AbstractCompilerParams
     opt::Bool
     optlevel::Int
-    cache::CodeCache
 end
 
 function StaticCompilerParams(; opt=false,
-    optlevel=Base.JLOptions().opt_level,
-    cache=CodeCache()
+    optlevel=Base.JLOptions().opt_level
 )
-    return StaticCompilerParams(opt, optlevel, cache)
+    return StaticCompilerParams(opt, optlevel)
 end

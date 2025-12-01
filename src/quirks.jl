@@ -18,11 +18,6 @@ with a more compileable replacement.
 ```
 """
 macro device_override(ex)
-    ex = macroexpand(__module__, ex)
-    if Meta.isexpr(ex, :call)
-        @show ex = eval(ex)
-        error()
-    end
     code = quote
         $Base.Experimental.@overlay($StaticCompiler.method_table, $ex)
     end

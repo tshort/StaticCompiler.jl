@@ -107,11 +107,6 @@ function static_job(@nospecialize(func), @nospecialize(types);
     tm = target.tm
     gputarget = StaticCompilerTarget(LLVM.triple(tm), LLVM.cpu(tm), LLVM.features(tm), target.julia_runtime, method_table)
     params = StaticCompilerParams()
-    @static if pkgversion(GPUCompiler) < v"1"
-        config = GPUCompiler.CompilerConfig(gputarget, params; name = name, kernel = kernel)
-        return StaticCompiler.CompilerJob(source, config), kwargs
-    else
-        config = GPUCompiler.CompilerConfig(gputarget, params; name = name, kernel = kernel, kwargs...)
-        return StaticCompiler.CompilerJob(source, config), Dict{}()
-    end
+    config = GPUCompiler.CompilerConfig(gputarget, params; name = name, kernel = kernel, kwargs...)
+    return StaticCompiler.CompilerJob(source, config), Dict{}()
 end
