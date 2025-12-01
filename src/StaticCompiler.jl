@@ -19,10 +19,10 @@ export static_code_llvm, static_code_typed, static_llvm_module, static_code_nati
 export @device_override, @print_and_throw
 export StaticTarget
 
+include("quirks.jl")
 include("interpreter.jl")
 include("target.jl")
 include("pointer_warning.jl")
-include("quirks.jl")
 include("dllexport.jl")
 
 fix_name(f::Function) = fix_name(string(nameof(f)))
@@ -450,9 +450,9 @@ function static_llvm_module(f, tt, name=fix_name(f); demangle=true, target::Stat
     if !demangle
         name = "julia_"*name
     end
-    job, kwargs = static_job(f, tt; name, target, kwargs...)
+    job, kwargs = static_job(f, tt; name, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
     m = GPUCompiler.JuliaContext() do context
-        m, _ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, libraries=false)
+        m, _ = GPUCompiler.compile(:llvm, job; kwargs...)
         locate_pointers_and_runtime_calls(m)
         m
     end
@@ -467,8 +467,8 @@ function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::St
         if !demangle
             name_f = "julia_"*name_f
         end
-        job, kwargs = static_job(f, tt; name = name_f, target, kwargs...)
-        mod,_ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, libraries=false)
+        job, kwargs = static_job(f, tt; name = name_f, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
+        mod,_ = GPUCompiler.compile(:llvm, job; kwargs...)
         if length(funcs) > 1
             for func in funcs[2:end]
                 f,tt = func
@@ -476,8 +476,8 @@ function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::St
                 if !demangle
                     name_f = "julia_"*name_f
                 end
-                job, kwargs = static_job(f, tt; name = name_f, target, kwargs...)
-                tmod,_ = GPUCompiler.codegen(:llvm, job; strip=true, only_entry=false, validate=false, libraries=false)
+                job, kwargs = static_job(f, tt; name = name_f, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
+                tmod,_ = GPUCompiler.compile(:llvm, job; kwargs...)
                 link!(mod,tmod)
             end
         end
@@ -493,9 +493,10 @@ function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::St
             name!(modfunc,fname[d:end])
         end
     end
-    LLVM.ModulePassManager() do pass_manager #remove duplicate functions
-        LLVM.merge_functions!(pass_manager)
-        LLVM.run!(pass_manager, mod)
+    @dispose pb = NewPMPassBuilder(merge_functions=true) begin
+        add!(pb, NewPMModulePassManager()) do pass_manager
+            run!(pb, mod)
+        end
     end
     return mod
 end
@@ -529,7 +530,7 @@ The defaults compile to the native target.
 If `demangle` is set to `false`, compiled function names are prepended with "julia_".
 
 ### Examples
-```julia
+```
 julia> fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
 fib (generic function with 1 method)
 
@@ -587,8 +588,8 @@ function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), file
       obj_path = joinpath(path, "$filenamebase.o")
       obj = GPUCompiler.JuliaContext() do ctx
         fakejob, _ = static_job(f, tt; target, kwargs...)
-        obj, _ = GPUCompiler.emit_asm(fakejob, mod; strip=strip_asm, validate=false, format=LLVM.API.LLVMObjectFile)
-        obj
+        obj, _ = GPUCompiler.emit_asm(fakejob, mod, LLVM.API.LLVMObjectFile)
+        obj 
       end
       open(obj_path, "w") do io
           write(io, obj)

@@ -1,10 +1,36 @@
-libcexit(x::Int32) =  @symbolcall exit(x::Int32)::Nothing
+@static if isdefined(Base.Experimental, Symbol("@overlay"))
+    Base.Experimental.@MethodTable(method_table)
+    Base.Experimental.@MethodTable(empty_table)
+else
+    const method_table = nothing
+end
+
+"""
+```julia
+@device_override old_bad_method(arg1::Type1, arg2::Type2) = new_good_method(arg1, arg2)
+```
+Override a non-static-compilable method (e.g. `old_bad_method(::Type1, ::Type2)`)
+with a more compileable replacement.
+### Examples
+```
+@device_override @noinline Core.throw_inexacterror(f::Symbol, ::Type{T}, val) where {T} =
+    @print_and_throw c"Inexact conversion"
+```
+"""
+macro device_override(ex)
+    code = quote
+        $Base.Experimental.@overlay($StaticCompiler.method_table, $ex)
+    end
+    return esc(code)
+end
+
 macro print_and_throw(err)
     quote
         println($err)
         libcexit(Int32(1))
     end
 end
+libcexit(x::Int32) =  @symbolcall exit(x::Int32)::Nothing
 
 # math.jl
 @device_override @noinline Base.Math.throw_complex_domainerror(f::Symbol, x) =
@@ -37,7 +63,6 @@ end
 @device_override @noinline Core.throw_inexacterror(f::Symbol, ::Type{T}, val) where {T} =
     @print_and_throw c"Inexact conversion"
 
-# abstractarray.jl
 @device_override @noinline Base.throw_boundserror(A, I) =
     @print_and_throw c"Out-of-bounds array access"
 

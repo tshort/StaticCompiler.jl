@@ -39,9 +39,11 @@ function loopvec_matrix(argc::Int, argv::Ptr{Ptr{UInt8}})
     mul!(C, B, A)
 
     # Print to stdout
-    printf(C)
+    printf(c"C matrix = \n")
+    print(C)
     # Also print to file
-    printdlm(c"table.tsv", C, '\t')
+    # Re-enable when StaticTools has been adapted for opaque pointers
+    # printdlm(c"table.tsv", C, '\t')
     fwrite(c"table.b", C)
     # Clean up matrices
     free(A)

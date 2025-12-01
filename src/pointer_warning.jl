@@ -30,8 +30,9 @@ function locate_pointers_and_runtime_calls(mod)
             end
         end
         if warned
+            lines = split(string(func),"\n")
             @warn("LLVM function generated warnings due to raw pointers embedded in the code. This will likely cause errors or undefined behaviour.",
-                  func = func)
+                  func = join(lines[1:min(20, end)], "\n")) # just print the first 20 lines
         end
     end
 end

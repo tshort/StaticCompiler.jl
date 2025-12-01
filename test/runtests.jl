@@ -6,7 +6,7 @@ using LoopVectorization
 using ManualMemory
 using Distributed
 using StaticTools
-using StrideArraysCore
+# using StrideArraysCore
 using MacroTools
 using LLD_jll
 using Bumper
@@ -17,7 +17,7 @@ addprocs(1)
 const GROUP = get(ENV, "GROUP", "All")
 
 if GROUP == "Core" || GROUP == "All"
-    include("testcore.jl")
+   include("testcore.jl")
 end
 
 if GROUP == "Integration" || GROUP == "All"
