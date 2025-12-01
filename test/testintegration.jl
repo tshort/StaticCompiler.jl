@@ -45,9 +45,8 @@ end
             @warn "Could not compile $testpath/scripts/times_table.jl"
             println(e)
         end
-        # re-enable once StaticTools has been adapted to use opaque pointers
-        @test_broken isa(status, Base.Process)
-        @test_broken isa(status, Base.Process) && status.exitcode == 0
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
 
         # Attempt to run
         println("5x5 times table:")
@@ -58,12 +57,10 @@ end
             @warn "Could not run $(scratch)/times_table"
             println(e)
         end
-
-        # re-enable once StaticTools has been adapted to use opaque pointers
-        @test_broken isa(status, Base.Process)
-        @test_broken isa(status, Base.Process) && status.exitcode == 0
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
         # Test ascii output
-        # @test parsedlm(Int, c"table.tsv", '\t') == (1:5)*(1:5)' broken=Sys.isapple()
+        @test_broken parsedlm(Int, c"table.tsv", '\t') == (1:5)*(1:5)' broken=Sys.isapple()
         # Test binary output
         @test fread!(szeros(Int, 5,5), c"table.b") == (1:5)*(1:5)'
     end
