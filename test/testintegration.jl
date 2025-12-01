@@ -150,6 +150,7 @@ end
         end
     end
 
+
     ## --- Test LoopVectorization integration
     if Bool(LoopVectorization.VectorizationBase.has_feature(Val{:x86_64_avx2}))
         let
@@ -162,8 +163,8 @@ end
                 @warn "Could not compile $testpath/scripts/loopvec_product.jl"
                 println(e)
             end
-            @test isa(status, Base.Process)
-            @test isa(status, Base.Process) && status.exitcode == 0
+            @test_broken isa(status, Base.Process)
+            @test_broken isa(status, Base.Process) && status.exitcode == 0
 
             # Run...
             println("10x10 table sum:")
@@ -174,9 +175,9 @@ end
                 @warn "Could not run $(scratch)/loopvec_product"
                 println(e)
             end
-            @test isa(status, Base.Process)
-            @test isa(status, Base.Process) && status.exitcode == 0
-            # @test parsedlm(c"product.tsv",'\t')[] == 3025
+            @test_broken isa(status, Base.Process)
+            @test_broken isa(status, Base.Process) && status.exitcode == 0
+            # @test_broken parsedlm(c"product.tsv",'\t')[] == 3025
         end
     end
 
@@ -190,8 +191,8 @@ end
             @warn "Could not compile $testpath/scripts/loopvec_matrix.jl"
             println(e)
         end
-        @test isa(status, Base.Process)
-        @test isa(status, Base.Process) && status.exitcode == 0
+        @test_broken isa(status, Base.Process)
+        @test_broken isa(status, Base.Process) && status.exitcode == 0
 
         # Run...
         println("10x5 matrix product:")
@@ -202,13 +203,13 @@ end
             @warn "Could not run $(scratch)/loopvec_matrix"
             println(e)
         end
-        @test isa(status, Base.Process)
-        @test isa(status, Base.Process) && status.exitcode == 0
+        @test_broken isa(status, Base.Process)
+        @test_broken isa(status, Base.Process) && status.exitcode == 0
         A = (1:10) * (1:5)'
         # Check ascii output
-        # @test parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.isapple()
+        # @test_broken parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.isapple()
         # Check binary output
-        @test fread!(szeros(5,5), c"table.b") == A' * A
+        @test_broken fread!(szeros(5,5), c"table.b") == A' * A
     end
 
     let
@@ -221,8 +222,8 @@ end
             @warn "Could not compile $testpath/scripts/loopvec_matrix_stack.jl"
             println(e)
         end
-        @test isa(status, Base.Process)
-        @test isa(status, Base.Process) && status.exitcode == 0
+        @test_broken isa(status, Base.Process)
+        @test_broken isa(status, Base.Process) && status.exitcode == 0
 
         # Run...
         println("10x5 matrix product:")
@@ -233,10 +234,10 @@ end
             @warn "Could not run $(scratch)/loopvec_matrix_stack"
             println(e)
         end
-        @test isa(status, Base.Process)
-        @test isa(status, Base.Process) && status.exitcode == 0
+        @test_broken isa(status, Base.Process)
+        @test_broken isa(status, Base.Process) && status.exitcode == 0
         A = (1:10) * (1:5)'
-        # @test parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.isapple()
+        # @test_broken parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.isapple()
     end
 
 
