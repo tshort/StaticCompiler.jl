@@ -513,11 +513,7 @@ function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::St
                     modfunc.name = fname[d:end]
                 end
             end
-            @dispose pb = PassBuilder(merge_functions=true) begin
-                add!(pb, ModulePassManager()) do pass_manager
-                    run!(pb, mod)
-                end
-            end
+            run!(MergeFunctionsPass(), mod)
         catch
             dispose(mod)
             rethrow()
