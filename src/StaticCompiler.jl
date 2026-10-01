@@ -584,7 +584,9 @@ function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), file
       return path, ir_path
     else
       obj_path = joinpath(path, "$filenamebase.o")
-      obj = GPUCompiler.JuliaContext() do ctx
+      # emit code in the module's context, so that what code generation adds to the
+      # module belongs to it
+      obj = context!(mod.context) do
         fakejob, _ = static_job(f, tt; target, kwargs...)
         obj, _ = GPUCompiler.emit_asm(fakejob, mod, LLVM.CodeGenFileType.Object)
         obj 
