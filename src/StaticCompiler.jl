@@ -443,7 +443,15 @@ function static_code_native(@nospecialize(f), @nospecialize(tt), fname=fix_name(
     GPUCompiler.code_native(stdout, job; libraries=false, kwargs...)
 end
 
-# Return an LLVM module
+"""
+```julia
+static_llvm_module(f, tt, name=fix_name(f); demangle=true, target::StaticTarget=StaticTarget(), kwargs...)
+```
+Compile the method of `f` for the argument types `tt` to an `LLVM.Module`.
+
+The caller owns the returned module: dispose of it (`LLVM.dispose(mod)`) when done, or hand it
+to an operation that consumes it (like `LLVM.link!(dst, mod)`).
+"""
 function static_llvm_module(f, tt, name=fix_name(f); demangle=true, target::StaticTarget=StaticTarget(), kwargs...)
     if !demangle
         name = "julia_"*name
@@ -451,13 +459,27 @@ function static_llvm_module(f, tt, name=fix_name(f); demangle=true, target::Stat
     job, kwargs = static_job(f, tt; name, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
     m = GPUCompiler.JuliaContext() do context
         m, _ = GPUCompiler.compile(:llvm, job; kwargs...)
-        locate_pointers_and_runtime_calls(m)
+        try
+            locate_pointers_and_runtime_calls(m)
+        catch
+            dispose(m)
+            rethrow()
+        end
         m
     end
     return m
 end
 
-#Return an LLVM module for multiple functions
+"""
+```julia
+static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::StaticTarget=StaticTarget(), kwargs...)
+```
+Compile the methods of an array of tuples `(f, tt)` of functions and argument types to a
+single `LLVM.Module`.
+
+The caller owns the returned module: dispose of it (`LLVM.dispose(mod)`) when done, or hand it
+to an operation that consumes it (like `LLVM.link!(dst, mod)`).
+"""
 function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::StaticTarget=StaticTarget(), kwargs...)
     f,tt = funcs[1]
     mod = GPUCompiler.JuliaContext() do context
@@ -467,34 +489,40 @@ function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::St
         end
         job, kwargs = static_job(f, tt; name = name_f, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
         mod,_ = GPUCompiler.compile(:llvm, job; kwargs...)
-        if length(funcs) > 1
-            for func in funcs[2:end]
-                f,tt = func
-                name_f = fix_name(f)
-                if !demangle
-                    name_f = "julia_"*name_f
+        try
+            if length(funcs) > 1
+                for func in funcs[2:end]
+                    f,tt = func
+                    name_f = fix_name(f)
+                    if !demangle
+                        name_f = "julia_"*name_f
+                    end
+                    job, kwargs = static_job(f, tt; name = name_f, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
+                    tmod,_ = GPUCompiler.compile(:llvm, job; kwargs...)
+                    # consumes `tmod`, also when linking fails
+                    link!(mod,tmod)
                 end
-                job, kwargs = static_job(f, tt; name = name_f, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
-                tmod,_ = GPUCompiler.compile(:llvm, job; kwargs...)
-                link!(mod,tmod)
             end
+            locate_pointers_and_runtime_calls(mod)
+            # Just to be sure
+            for (modfunc, func) in zip(mod.functions, funcs)
+                fname = modfunc.name
+                expectedname = (demangle ? "" : "julia_") * fix_name(func)
+                d = prefixlen(fname) - prefixlen(expectedname) + 1
+                if d > 1
+                    modfunc.name = fname[d:end]
+                end
+            end
+            @dispose pb = PassBuilder(merge_functions=true) begin
+                add!(pb, ModulePassManager()) do pass_manager
+                    run!(pb, mod)
+                end
+            end
+        catch
+            dispose(mod)
+            rethrow()
         end
-        locate_pointers_and_runtime_calls(mod)
         mod
-    end
-    # Just to be sure
-    for (modfunc, func) in zip(mod.functions, funcs)
-        fname = modfunc.name
-        expectedname = (demangle ? "" : "julia_") * fix_name(func)
-        d = prefixlen(fname) - prefixlen(expectedname) + 1
-        if d > 1
-            modfunc.name = fname[d:end]
-        end
-    end
-    @dispose pb = PassBuilder(merge_functions=true) begin
-        add!(pb, ModulePassManager()) do pass_manager
-            run!(pb, mod)
-        end
     end
     return mod
 end
@@ -574,27 +602,27 @@ function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), file
                         kwargs...)
     f, tt = funcs[1]
     mkpath(path)
-    mod = static_llvm_module(funcs; demangle, kwargs...)
-
-    if emit_llvm_only # (Required on Windows)
-      ir_path = joinpath(path, "$filenamebase.ll")
-      open(ir_path, "w") do io
-        write(io, string(mod))
+    @dispose mod=static_llvm_module(funcs; demangle, kwargs...) begin
+      if emit_llvm_only # (Required on Windows)
+        ir_path = joinpath(path, "$filenamebase.ll")
+        open(ir_path, "w") do io
+          write(io, string(mod))
+        end
+        return path, ir_path
+      else
+        obj_path = joinpath(path, "$filenamebase.o")
+        # emit code in the module's context, so that what code generation adds to the
+        # module belongs to it
+        obj = context!(mod.context) do
+          fakejob, _ = static_job(f, tt; target, kwargs...)
+          obj, _ = GPUCompiler.emit_asm(fakejob, mod, LLVM.CodeGenFileType.Object)
+          obj 
+        end
+        open(obj_path, "w") do io
+            write(io, obj)
+        end
+        return path, obj_path
       end
-      return path, ir_path
-    else
-      obj_path = joinpath(path, "$filenamebase.o")
-      # emit code in the module's context, so that what code generation adds to the
-      # module belongs to it
-      obj = context!(mod.context) do
-        fakejob, _ = static_job(f, tt; target, kwargs...)
-        obj, _ = GPUCompiler.emit_asm(fakejob, mod, LLVM.CodeGenFileType.Object)
-        obj 
-      end
-      open(obj_path, "w") do io
-          write(io, obj)
-      end
-      return path, obj_path
     end
 end
 
