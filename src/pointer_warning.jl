@@ -42,9 +42,9 @@ function inspect_pointers(mod, inst)
     jl_t = (LLVM.StructType(LLVM.LLVMType[]))
     for (i, arg) ∈ enumerate(inst.operands)
         if occursin("inttoptr", string(arg)) && arg isa LLVM.ConstantExpr
-            op1 = LLVM.Value(LLVM.API.LLVMGetOperand(arg, 0))
+            op1 = arg.operands[1]
             if op1 isa LLVM.ConstantExpr
-                op1 = LLVM.Value(LLVM.API.LLVMGetOperand(op1, 0))
+                op1 = op1.operands[1]
             end
             ptr = Ptr{Cvoid}(convert(Int, op1))
             frames = ccall(:jl_lookup_code_address, Any, (Ptr{Cvoid}, Cint,), ptr, 0)

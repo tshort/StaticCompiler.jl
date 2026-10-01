@@ -27,7 +27,7 @@ mutable struct StaticTarget
 end
 
 clean_triple(platform::Platform) = arch(platform) * os_str(platform) * libc_str(platform)
-StaticTarget() = StaticTarget(HostPlatform(), unsafe_string(LLVM.API.LLVMGetHostCPUName()), unsafe_string(LLVM.API.LLVMGetHostCPUFeatures()))
+StaticTarget() = StaticTarget(HostPlatform(), LLVM.host_cpu_name(), LLVM.host_cpu_features())
 StaticTarget(platform::Platform) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform)), nothing, false)
 StaticTarget(platform::Platform, cpu::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform); cpu), nothing, false)
 StaticTarget(platform::Platform, cpu::String, features::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform); cpu, features), nothing, false)
@@ -86,7 +86,7 @@ function GPUCompiler.llvm_machine(target::StaticCompilerTarget)
 
     t = LLVM.Target(triple=triple)
 
-    tm = LLVM.TargetMachine(t, triple; target.cpu, target.features, reloc=LLVM.API.LLVMRelocPIC)
+    tm = LLVM.TargetMachine(t, triple; target.cpu, target.features, reloc=LLVM.RelocMode.PIC)
     LLVM.asm_verbosity!(tm, true)
 
     return tm

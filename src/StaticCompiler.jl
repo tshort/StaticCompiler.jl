@@ -586,7 +586,7 @@ function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), file
       obj_path = joinpath(path, "$filenamebase.o")
       obj = GPUCompiler.JuliaContext() do ctx
         fakejob, _ = static_job(f, tt; target, kwargs...)
-        obj, _ = GPUCompiler.emit_asm(fakejob, mod, LLVM.API.LLVMObjectFile)
+        obj, _ = GPUCompiler.emit_asm(fakejob, mod, LLVM.CodeGenFileType.Object)
         obj 
       end
       open(obj_path, "w") do io
