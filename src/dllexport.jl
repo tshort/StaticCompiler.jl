@@ -1,11 +1,10 @@
-function add_dllexport(funcs, ir_path; demangle=true)
-    ir = read(ir_path, String)
-
+# export the compiled entry points from a Windows DLL
+function add_dllexport!(mod::LLVM.Module, funcs; demangle=true)
     for (f, _) in funcs
         name_f = (demangle ? "" : "julia_") * fix_name(f)
-        pattern = Regex("^define(.*?@$name_f\\()", "m")
-        ir = replace(ir, pattern => s"define dllexport\1")
+        llvmf = get(mod.functions, name_f, nothing)
+        if llvmf !== nothing && !isdeclaration(llvmf)
+            llvmf.dllstorage = LLVM.DLLStorageClass.Export
+        end
     end
-
-    write(ir_path, ir)
 end

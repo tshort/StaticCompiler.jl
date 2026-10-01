@@ -402,7 +402,8 @@ function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), file
         lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
     end
 
-    _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, emit_llvm_only=llvm_to_clang, kwargs...)
+    _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, emit_llvm_only=llvm_to_clang,
+                                     dllexport=llvm_to_clang && Sys.iswindows(), kwargs...)
     # Pick a Clang
     if !isnothing(target.compiler)
         cc = `$(target.compiler)`
@@ -413,7 +414,6 @@ function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), file
     if llvm_to_clang # (required on Windows)
         # Use clang (llc) to generate an executable from the LLVM IR
         cclang = if Sys.iswindows()
-            add_dllexport(funcs, obj_or_ir_path; demangle)
             `clang`
         elseif Sys.isapple()
             `clang`
@@ -581,6 +581,7 @@ generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), filenamebase:
              target::StaticTarget=StaticTarget(),
              demangle = false,
              emit_llvm_only = false,
+             dllexport = false,
              strip_llvm = false,
              strip_asm  = true,
              kwargs...)
@@ -592,17 +593,21 @@ which will be compiled.
 `target` can be used to change the output target. This is useful for compiling to WebAssembly and embedded targets.
 This is a struct of the type StaticTarget()
 The defaults compile to the native target.
+
+If `dllexport` is set, the functions are exported from a Windows DLL.
 """
 function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), filenamebase::String="obj";
                         target::StaticTarget=StaticTarget(),
                         demangle = true,
                         emit_llvm_only = false,
+                        dllexport = false,
                         strip_llvm = false,
                         strip_asm = true,
                         kwargs...)
     f, tt = funcs[1]
     mkpath(path)
     @dispose mod=static_llvm_module(funcs; demangle, kwargs...) begin
+      dllexport && add_dllexport!(mod, funcs; demangle)
       if emit_llvm_only # (Required on Windows)
         ir_path = joinpath(path, "$filenamebase.ll")
         open(ir_path, "w") do io
