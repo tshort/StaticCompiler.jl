@@ -1,9 +1,7 @@
 module StaticCompiler
 using InteractiveUtils
 using GPUCompiler: GPUCompiler
-using LLVM
-using LLVM.Interop
-using LLVM: API
+using LLVM, LLVM.IR, LLVM.Passes
 using Libdl: Libdl, dlsym, dlopen
 using Base: RefValue
 using Serialization: serialize, deserialize
@@ -485,16 +483,16 @@ function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::St
         mod
     end
     # Just to be sure
-    for (modfunc, func) in zip(functions(mod), funcs)
-        fname = name(modfunc)
+    for (modfunc, func) in zip(mod.functions, funcs)
+        fname = modfunc.name
         expectedname = (demangle ? "" : "julia_") * fix_name(func)
         d = prefixlen(fname) - prefixlen(expectedname) + 1
         if d > 1
-            name!(modfunc,fname[d:end])
+            modfunc.name = fname[d:end]
         end
     end
-    @dispose pb = NewPMPassBuilder(merge_functions=true) begin
-        add!(pb, NewPMModulePassManager()) do pass_manager
+    @dispose pb = PassBuilder(merge_functions=true) begin
+        add!(pb, ModulePassManager()) do pass_manager
             run!(pb, mod)
         end
     end

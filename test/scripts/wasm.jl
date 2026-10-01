@@ -3,11 +3,11 @@
 
 using StaticCompiler
 using LLVM
-InitializeAllTargets()
-InitializeAllTargetInfos()
-InitializeAllAsmPrinters()
-InitializeAllAsmParsers()
-InitializeAllTargetMCs()
+LLVM.InitializeAllTargets()
+LLVM.InitializeAllTargetInfos()
+LLVM.InitializeAllAsmPrinters()
+LLVM.InitializeAllAsmParsers()
+LLVM.InitializeAllTargetMCs()
 
 fib(n) = n <= 1 ? n : fib(n - 1) + fib(n - 2)
 

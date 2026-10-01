@@ -1,7 +1,7 @@
 function locate_pointers_and_runtime_calls(mod)
     i64 = LLVM.IntType(64)
     # d = IdDict{Any, Tuple{String, LLVM.GlobalVariable}}()
-    for func ∈ LLVM.functions(mod), bb ∈ LLVM.blocks(func), inst ∈ LLVM.instructions(bb)
+    for func ∈ mod.functions, bb ∈ func.blocks, inst ∈ bb.instructions
         warned = false
         if isa(inst, LLVM.LoadInst) && occursin("inttoptr", string(inst))
             warned = inspect_pointers(mod, inst)
@@ -9,17 +9,17 @@ function locate_pointers_and_runtime_calls(mod)
             @debug "Inspecting StoreInst" inst
             warned = inspect_pointers(mod, inst)
         elseif inst isa LLVM.RetInst && occursin("inttoptr", string(inst))
-            @debug "Inspecting RetInst" inst LLVM.operands(inst)
+            @debug "Inspecting RetInst" inst inst.operands
             warned = inspect_pointers(mod, inst)
         elseif isa(inst, LLVM.BitCastInst) && occursin("inttoptr", string(inst))
-            @debug "Inspecting BitCastInst" inst LLVM.operands(inst)
+            @debug "Inspecting BitCastInst" inst inst.operands
             warned = inspect_pointers(mod, inst)
         elseif isa(inst, LLVM.CallInst)
-            @debug "Inspecting CallInst" inst LLVM.operands(inst)
-            dest = LLVM.called_operand(inst)
-            if occursin("inttoptr", string(dest)) && length(LLVM.operands(dest)) > 0
-                @debug "Inspecting CallInst inttoptr" dest LLVM.operands(dest) LLVM.operands(inst)
-                ptr_arg = first(LLVM.operands(dest))
+            @debug "Inspecting CallInst" inst inst.operands
+            dest = inst.called_operand
+            if occursin("inttoptr", string(dest)) && length(dest.operands) > 0
+                @debug "Inspecting CallInst inttoptr" dest dest.operands inst.operands
+                ptr_arg = first(dest.operands)
                 ptr_val = convert(Int, ptr_arg)
                 ptr = Ptr{Cvoid}(ptr_val)
 
@@ -40,7 +40,7 @@ end
 function inspect_pointers(mod, inst)
     warned = false
     jl_t = (LLVM.StructType(LLVM.LLVMType[]))
-    for (i, arg) ∈ enumerate(LLVM.operands(inst))
+    for (i, arg) ∈ enumerate(inst.operands)
         if occursin("inttoptr", string(arg)) && arg isa LLVM.ConstantExpr
             op1 = LLVM.Value(LLVM.API.LLVMGetOperand(arg, 0))
             if op1 isa LLVM.ConstantExpr
@@ -66,7 +66,6 @@ data_warnings(inst, frames) = for frame ∈ frames
           inlined = inlined)
 end
 
-llvmeltype(x::LLVM.Value) = eltype(LLVM.value_type(x))
 
 
 

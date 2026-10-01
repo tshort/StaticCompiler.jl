@@ -29,12 +29,12 @@ end
 clean_triple(platform::Platform) = arch(platform) * os_str(platform) * libc_str(platform)
 StaticTarget() = StaticTarget(HostPlatform(), unsafe_string(LLVM.API.LLVMGetHostCPUName()), unsafe_string(LLVM.API.LLVMGetHostCPUFeatures()))
 StaticTarget(platform::Platform) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform)), nothing, false)
-StaticTarget(platform::Platform, cpu::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform), cpu), nothing, false)
-StaticTarget(platform::Platform, cpu::String, features::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform), cpu, features), nothing, false)
+StaticTarget(platform::Platform, cpu::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform); cpu), nothing, false)
+StaticTarget(platform::Platform, cpu::String, features::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform); cpu, features), nothing, false)
 
 function StaticTarget(triple::String, cpu::String, features::String)
     platform = tryparse(Platform, triple)
-    StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = triple), triple, cpu, features), nothing)
+    StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = triple), triple; cpu, features), nothing)
 end
 
 """
@@ -86,8 +86,8 @@ function GPUCompiler.llvm_machine(target::StaticCompilerTarget)
 
     t = LLVM.Target(triple=triple)
 
-    tm = LLVM.TargetMachine(t, triple, target.cpu, target.features, reloc=LLVM.API.LLVMRelocPIC)
-    GPUCompiler.asm_verbosity!(tm, true)
+    tm = LLVM.TargetMachine(t, triple; target.cpu, target.features, reloc=LLVM.API.LLVMRelocPIC)
+    LLVM.asm_verbosity!(tm, true)
 
     return tm
 end
@@ -112,7 +112,7 @@ function static_job(@nospecialize(func), @nospecialize(types);
 )
     source = GPUCompiler.methodinstance(typeof(func), Base.to_tuple_type(types))
     tm = target.tm
-    gputarget = StaticCompilerTarget(LLVM.triple(tm), LLVM.cpu(tm), LLVM.features(tm), target.julia_runtime, method_table)
+    gputarget = StaticCompilerTarget(tm.triple, tm.cpu, tm.features, target.julia_runtime, method_table)
     params = StaticCompilerParams()
     config = GPUCompiler.CompilerConfig(gputarget, params; name = name, kernel = kernel, kwargs...)
     return GPUCompiler.CompilerJob(source, config), Dict{}()
