@@ -57,6 +57,17 @@ struct StaticCompilerTarget{MT} <: GPUCompiler.AbstractCompilerTarget
     method_table::MT
 end
 
+struct StaticCompilerParams <: GPUCompiler.AbstractCompilerParams
+    opt::Bool
+    optlevel::Int
+end
+
+function StaticCompilerParams(; opt=false,
+    optlevel=Base.JLOptions().opt_level
+)
+    return StaticCompilerParams(opt, optlevel)
+end
+
 module StaticRuntime
     # the runtime library
     signal_exception() = return
@@ -81,8 +92,6 @@ function GPUCompiler.llvm_machine(target::StaticCompilerTarget)
     return tm
 end
 
-GPUCompiler.runtime_slug(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = "static_$(job.config.target.cpu)-$(hash(job.config.target.features))"
-
 GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = StaticRuntime
 GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) = StaticRuntime
 
@@ -91,8 +100,6 @@ GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, Stati
 GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = true
 
 GPUCompiler.uses_julia_runtime(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = job.config.target.julia_runtime
-GPUCompiler.get_interpreter(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) =
-    StaticInterpreter(job.world, GPUCompiler.method_table(job), GPUCompiler.ci_cache_token(job), inference_params(job), optimization_params(job))
 GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget})) = job.config.target.method_table
 
 
@@ -103,10 +110,10 @@ function static_job(@nospecialize(func), @nospecialize(types);
     method_table=method_table,
     kwargs...
 )
-    source = methodinstance(typeof(func), Base.to_tuple_type(types))
+    source = GPUCompiler.methodinstance(typeof(func), Base.to_tuple_type(types))
     tm = target.tm
     gputarget = StaticCompilerTarget(LLVM.triple(tm), LLVM.cpu(tm), LLVM.features(tm), target.julia_runtime, method_table)
     params = StaticCompilerParams()
     config = GPUCompiler.CompilerConfig(gputarget, params; name = name, kernel = kernel, kwargs...)
-    return StaticCompiler.CompilerJob(source, config), Dict{}()
+    return GPUCompiler.CompilerJob(source, config), Dict{}()
 end

@@ -20,7 +20,6 @@ export @device_override, @print_and_throw
 export StaticTarget
 
 include("quirks.jl")
-include("interpreter.jl")
 include("target.jl")
 include("pointer_warning.jl")
 include("dllexport.jl")
