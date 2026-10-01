@@ -388,6 +388,7 @@ julia> ccall(("test", "example/test.dylib"), Float64, (Int64,), 100_000)
 """
 function generate_shlib(f::Function, tt, path::String=tempname(), name=fix_name(f), filename=name; target=StaticTarget(), kwargs...)
     generate_shlib(((f, tt),), path, filename; target, kwargs...)
+    path, name
 end
 # As above, but taking an array of functions and returning a single shlib
 function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), filename::String="libfoo";
@@ -426,7 +427,7 @@ function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), file
         run(`$cc -shared $cflags $obj_or_ir_path -o $lib_path `)
     end
 
-    path, name
+    path, filename
 end
 
 function static_code_llvm(@nospecialize(func), @nospecialize(types); target::StaticTarget=StaticTarget(), kwargs...)
