@@ -1,9 +1,7 @@
 module StaticCompiler
 using InteractiveUtils
 using GPUCompiler: GPUCompiler
-using LLVM
-using LLVM.Interop
-using LLVM: API
+using LLVM, LLVM.IR, LLVM.Passes
 using Libdl: Libdl, dlsym, dlopen
 using Base: RefValue
 using Serialization: serialize, deserialize
@@ -20,7 +18,6 @@ export @device_override, @print_and_throw
 export StaticTarget
 
 include("quirks.jl")
-include("interpreter.jl")
 include("target.jl")
 include("pointer_warning.jl")
 include("dllexport.jl")
@@ -389,6 +386,7 @@ julia> ccall(("test", "example/test.dylib"), Float64, (Int64,), 100_000)
 """
 function generate_shlib(f::Function, tt, path::String=tempname(), name=fix_name(f), filename=name; target=StaticTarget(), kwargs...)
     generate_shlib(((f, tt),), path, filename; target, kwargs...)
+    path, name
 end
 # As above, but taking an array of functions and returning a single shlib
 function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), filename::String="libfoo";
@@ -404,7 +402,8 @@ function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), file
         lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
     end
 
-    _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, emit_llvm_only=llvm_to_clang, kwargs...)
+    _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, emit_llvm_only=llvm_to_clang,
+                                     dllexport=llvm_to_clang && Sys.iswindows(), kwargs...)
     # Pick a Clang
     if !isnothing(target.compiler)
         cc = `$(target.compiler)`
@@ -415,7 +414,6 @@ function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), file
     if llvm_to_clang # (required on Windows)
         # Use clang (llc) to generate an executable from the LLVM IR
         cclang = if Sys.iswindows()
-            add_dllexport(funcs, obj_or_ir_path; demangle)
             `clang`
         elseif Sys.isapple()
             `clang`
@@ -427,7 +425,7 @@ function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), file
         run(`$cc -shared $cflags $obj_or_ir_path -o $lib_path `)
     end
 
-    path, name
+    path, filename
 end
 
 function static_code_llvm(@nospecialize(func), @nospecialize(types); target::StaticTarget=StaticTarget(), kwargs...)
@@ -445,30 +443,85 @@ function static_code_native(@nospecialize(f), @nospecialize(tt), fname=fix_name(
     GPUCompiler.code_native(stdout, job; libraries=false, kwargs...)
 end
 
-# Return an LLVM module
+const CONTEXT_DOC = """
+The module belongs to the active thread-safe context, so call this function in a
+`GPUCompiler.JuliaContext() do ctx ... end` block, and dispose of the module (or hand it to an
+operation that consumes it, like `LLVM.link!(dst, mod)`) before the block ends. Without an
+active thread-safe context, a new one is created for the module, which is never disposed of
+(i.e., every such call leaks a context)."""
+
+"""
+```julia
+static_llvm_module(f, tt, name=fix_name(f); demangle=true, target::StaticTarget=StaticTarget(), kwargs...)
+```
+Compile the method of `f` for the argument types `tt` to an `LLVM.Module`, which the caller
+owns.
+
+$CONTEXT_DOC
+"""
 function static_llvm_module(f, tt, name=fix_name(f); demangle=true, target::StaticTarget=StaticTarget(), kwargs...)
+    with_module_context() do
+        compile_llvm_module(f, tt, name; demangle, target, kwargs...)
+    end
+end
+
+"""
+```julia
+static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::StaticTarget=StaticTarget(), kwargs...)
+```
+Compile the methods of an array of tuples `(f, tt)` of functions and argument types to a
+single `LLVM.Module`, which the caller owns.
+
+$CONTEXT_DOC
+"""
+function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::StaticTarget=StaticTarget(), kwargs...)
+    with_module_context() do
+        compile_llvm_module(funcs; demangle, target, kwargs...)
+    end
+end
+
+# call `f` with the plain context of the active thread-safe context active, or of a new
+# thread-safe context that is never disposed of, so that the modules `f` returns stay valid
+function with_module_context(f)
+    ts_ctx = LLVM.ts_context(; throw_error=false)
+    ts_ctx === nothing || return context!(f, LLVM.context(ts_ctx))
+    ts_ctx = GPUCompiler.JuliaContext() # activates it
+    ret = try
+        context!(f, LLVM.context(ts_ctx))
+    catch
+        # nothing was returned that could use the context
+        dispose(ts_ctx)
+        rethrow()
+    end
+    LLVM.deactivate(ts_ctx)
+    return ret
+end
+
+# compile to a module in the active (Julia) context, which must outlive the module
+function compile_llvm_module(f, tt, name=fix_name(f); demangle=true, target::StaticTarget=StaticTarget(), kwargs...)
     if !demangle
         name = "julia_"*name
     end
     job, kwargs = static_job(f, tt; name, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
-    m = GPUCompiler.JuliaContext() do context
-        m, _ = GPUCompiler.compile(:llvm, job; kwargs...)
+    m, _ = GPUCompiler.compile(:llvm, job; kwargs...)
+    try
         locate_pointers_and_runtime_calls(m)
-        m
+    catch
+        dispose(m)
+        rethrow()
     end
     return m
 end
 
-#Return an LLVM module for multiple functions
-function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::StaticTarget=StaticTarget(), kwargs...)
+function compile_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::StaticTarget=StaticTarget(), kwargs...)
     f,tt = funcs[1]
-    mod = GPUCompiler.JuliaContext() do context
-        name_f = fix_name(f)
-        if !demangle
-            name_f = "julia_"*name_f
-        end
-        job, kwargs = static_job(f, tt; name = name_f, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
-        mod,_ = GPUCompiler.compile(:llvm, job; kwargs...)
+    name_f = fix_name(f)
+    if !demangle
+        name_f = "julia_"*name_f
+    end
+    job, kwargs = static_job(f, tt; name = name_f, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
+    mod,_ = GPUCompiler.compile(:llvm, job; kwargs...)
+    try
         if length(funcs) > 1
             for func in funcs[2:end]
                 f,tt = func
@@ -478,25 +531,24 @@ function static_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::St
                 end
                 job, kwargs = static_job(f, tt; name = name_f, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
                 tmod,_ = GPUCompiler.compile(:llvm, job; kwargs...)
+                # consumes `tmod`, also when linking fails
                 link!(mod,tmod)
             end
         end
         locate_pointers_and_runtime_calls(mod)
-        mod
-    end
-    # Just to be sure
-    for (modfunc, func) in zip(functions(mod), funcs)
-        fname = name(modfunc)
-        expectedname = (demangle ? "" : "julia_") * fix_name(func)
-        d = prefixlen(fname) - prefixlen(expectedname) + 1
-        if d > 1
-            name!(modfunc,fname[d:end])
+        # Just to be sure
+        for (modfunc, func) in zip(mod.functions, funcs)
+            fname = modfunc.name
+            expectedname = (demangle ? "" : "julia_") * fix_name(func)
+            d = prefixlen(fname) - prefixlen(expectedname) + 1
+            if d > 1
+                modfunc.name = fname[d:end]
+            end
         end
-    end
-    @dispose pb = NewPMPassBuilder(merge_functions=true) begin
-        add!(pb, NewPMModulePassManager()) do pass_manager
-            run!(pb, mod)
-        end
+        run!(MergeFunctionsPass(), mod)
+    catch
+        dispose(mod)
+        rethrow()
     end
     return mod
 end
@@ -555,6 +607,7 @@ generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), filenamebase:
              target::StaticTarget=StaticTarget(),
              demangle = false,
              emit_llvm_only = false,
+             dllexport = false,
              strip_llvm = false,
              strip_asm  = true,
              kwargs...)
@@ -566,35 +619,39 @@ which will be compiled.
 `target` can be used to change the output target. This is useful for compiling to WebAssembly and embedded targets.
 This is a struct of the type StaticTarget()
 The defaults compile to the native target.
+
+If `dllexport` is set, the functions are exported from a Windows DLL.
 """
 function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), filenamebase::String="obj";
                         target::StaticTarget=StaticTarget(),
                         demangle = true,
                         emit_llvm_only = false,
+                        dllexport = false,
                         strip_llvm = false,
                         strip_asm = true,
                         kwargs...)
     f, tt = funcs[1]
     mkpath(path)
-    mod = static_llvm_module(funcs; demangle, kwargs...)
-
-    if emit_llvm_only # (Required on Windows)
-      ir_path = joinpath(path, "$filenamebase.ll")
-      open(ir_path, "w") do io
-        write(io, string(mod))
+    # compile and generate code in one context, which the module can't outlive
+    GPUCompiler.JuliaContext() do context
+      @dispose mod=compile_llvm_module(funcs; demangle, kwargs...) begin
+        dllexport && add_dllexport!(mod, funcs; demangle)
+        if emit_llvm_only # (Required on Windows)
+          ir_path = joinpath(path, "$filenamebase.ll")
+          open(ir_path, "w") do io
+            write(io, string(mod))
+          end
+          return path, ir_path
+        else
+          obj_path = joinpath(path, "$filenamebase.o")
+          fakejob, _ = static_job(f, tt; target, kwargs...)
+          obj, _ = GPUCompiler.emit_asm(fakejob, mod, LLVM.CodeGenFileType.Object)
+          open(obj_path, "w") do io
+              write(io, obj)
+          end
+          return path, obj_path
+        end
       end
-      return path, ir_path
-    else
-      obj_path = joinpath(path, "$filenamebase.o")
-      obj = GPUCompiler.JuliaContext() do ctx
-        fakejob, _ = static_job(f, tt; target, kwargs...)
-        obj, _ = GPUCompiler.emit_asm(fakejob, mod, LLVM.API.LLVMObjectFile)
-        obj 
-      end
-      open(obj_path, "w") do io
-          write(io, obj)
-      end
-      return path, obj_path
     end
 end
 
