@@ -19,7 +19,7 @@ StaticTools = "86c06d3c-3f03-46de-9781-57580aa96d0a"
 GPUCompiler = "2"
 LLVM = "10"
 MacroTools = "0.5"
-StaticTools = "0.8"
+StaticTools = "0.8, 0.9"
 julia = "1.11"
 
 [extras]
