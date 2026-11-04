@@ -317,19 +317,23 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
                             )
     # Choice of compiler
     isnothing(cc) && (cc = isnothing(target.compiler) ? clang() : `$(target.compiler)`)
-    # Prepare objects or IR
+
+    # Prepare objects or (if llvm_to_clang is set) IR
     exec_path = joinpath(path, filename)
     _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, emit_llvm_only=llvm_to_clang, kwargs...)
+
+    # Update paths and flags given options
+    fn = demangle ? "$name" : "julia_$name"
+    Sys.iswindows() && (exec_path *= ".exe")
+    llvm_to_clang && (cflags = `-Wno-override-module $cflags`)
 
     # Compile!
     if Sys.isapple() && !llvm_to_clang
         # Apple no longer uses _start, so we can just specify a custom entry
-        entry = demangle ? "_$name" : "_julia_$name"
-        run(`$cc -e $entry $cflags $obj_or_ir_path -o $exec_path`)
+        run(`$cc -e _$fn $cflags $obj_or_ir_path -o $exec_path`)
     else
-        fn = demangle ? "$name" : "julia_$name"
         # Write a minimal wrapper to avoid having to specify a custom entry
-        wrapper_path = joinpath(path, "wrapper.c")
+        wrapper_path = joinpath(path, "wrapper$(rand(UInt)).c")
         f = open(wrapper_path, "w")
         print(f, """int $fn(int argc, char** argv);
         void* __stack_chk_guard = (void*) $(rand(UInt) >> 1);
@@ -339,18 +343,15 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
             return $fn(argc, argv);
         }""")
         close(f)
-        if llvm_to_clang # (required on Windows)
-            # Use clang (llc) to generate an executable from the LLVM IR
-            Sys.iswindows() && (exec_path *= ".exe")
-            run(`$(clang()) -Wno-override-module $wrapper_path $obj_or_ir_path -o $exec_path`)
-        else
-            run(`$cc $wrapper_path $cflags $obj_or_ir_path -o $exec_path`)
-        end
+
+        # Depending on whether llvm_to_clang is set, 
+        # this may either be compiling from LLVM IR or just linking object files
+        run(`$cc $wrapper_path $cflags $obj_or_ir_path -o $exec_path`)
 
         # Clean up
         rm(wrapper_path)
     end
-    path, name
+    return path, name
 end
 
 
@@ -396,7 +397,6 @@ julia> ccall(("test", "example/test.dylib"), Float64, (Int64,), 100_000)
 """
 function generate_shlib(f::Function, tt, path::String=tempname(), name=fix_name(f), filename=name; target=StaticTarget(), kwargs...)
     generate_shlib(((f, tt),), path, filename; target, kwargs...)
-    path, name
 end
 # As above, but taking an array of functions and returning a single shlib
 function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), filename::String="libfoo";
@@ -409,19 +409,17 @@ function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), file
     )
     # Choice of compiler
     isnothing(cc) && (cc = isnothing(target.compiler) ? clang() : `$(target.compiler)`)
-    # Prepare objects or IR
+
+    # Prepare objects or (if llvm_to_clang is set) IR
     lib_path = joinpath(path, "$filename.$(dlext(target))")
     _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, emit_llvm_only=llvm_to_clang,
                                      dllexport=Sys.iswindows(), kwargs...)
+                                     
     # Compile!
-    if llvm_to_clang # (required on Windows)
-        # Use clang (llc) to generate an executable from the LLVM IR
-        run(`$(clang()) -shared -Wno-override-module $obj_or_ir_path -o $lib_path`)
-    else
-        run(`$cc -shared $cflags $obj_or_ir_path -o $lib_path `)
-    end
+    llvm_to_clang && (cflags = `-Wno-override-module $cflags`)
+    run(`$cc -shared $cflags $obj_or_ir_path -o $lib_path `)
 
-    path, filename
+    return path, filename
 end
 
 function static_code_llvm(@nospecialize(func), @nospecialize(types); target::StaticTarget=StaticTarget(), kwargs...)
