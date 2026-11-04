@@ -66,6 +66,14 @@ end
 @device_override @noinline Base.throw_boundserror(A, I) =
     @print_and_throw c"Out-of-bounds array access"
 
+# used by `checkbounds` on recent Julia versions (nightly / 1.15+)
+@static if isdefined(Base, :_throw_boundserror_indices)
+    @device_override @noinline Base._throw_boundserror_indices(A) =
+        @print_and_throw c"Out-of-bounds array access"
+    @device_override @noinline Base._throw_boundserror_indices(A, i1, I...) =
+        @print_and_throw c"Out-of-bounds array access"
+end
+
 # trig.jl
 @device_override @noinline Base.Math.sincos_domain_error(x) =
     @print_and_throw c"sincos(x) is only defined for finite x."
