@@ -34,7 +34,7 @@ StaticTarget(platform::Platform, cpu::String, features::String) = StaticTarget(p
 
 function StaticTarget(triple::String, cpu::String, features::String)
     platform = tryparse(Platform, triple)
-    StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = triple), triple; cpu, features), nothing)
+    StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = triple), triple; cpu, features), nothing, false)
 end
 
 """

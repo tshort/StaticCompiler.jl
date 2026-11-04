@@ -255,11 +255,8 @@ function generate_shlib_fptr(f, tt, path::String=tempname(), name=fix_name(f), f
                             temp::Bool=true,
                             kwargs...)
 
-    generate_shlib(f, tt, false, path, name; kwargs...)
-    lib_path = joinpath(abspath(path), "$filename.$(Libdl.dlext)")
-    ptr = Libdl.dlopen(lib_path, Libdl.RTLD_LOCAL)
-    fptr = Libdl.dlsym(ptr, name)
-    @assert fptr != C_NULL
+    generate_shlib(f, tt, path, name, filename; kwargs...)
+    fptr = generate_shlib_fptr(path, name, filename)
     if temp
         atexit(()->rm(path; recursive=true))
     end
@@ -439,7 +436,7 @@ function static_code_typed(@nospecialize(func), @nospecialize(types); target::St
 end
 
 function static_code_native(@nospecialize(f), @nospecialize(tt), fname=fix_name(f); target::StaticTarget=StaticTarget(), kwargs...)
-    job, kwargs = static_job(f, tt; fname, target, kwargs...)
+    job, kwargs = static_job(f, tt; name=fname, target, kwargs...)
     GPUCompiler.code_native(stdout, job; libraries=false, kwargs...)
 end
 
@@ -513,37 +510,13 @@ function compile_llvm_module(f, tt, name=fix_name(f); demangle=true, target::Sta
     return m
 end
 
-function compile_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::StaticTarget=StaticTarget(), kwargs...)
-    f,tt = funcs[1]
-    name_f = fix_name(f)
-    if !demangle
-        name_f = "julia_"*name_f
-    end
-    job, kwargs = static_job(f, tt; name = name_f, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
-    mod,_ = GPUCompiler.compile(:llvm, job; kwargs...)
+function compile_llvm_module(funcs::Union{Array,Tuple}; kwargs...)
+    (f, tt), rest... = funcs
+    mod = compile_llvm_module(f, tt; kwargs...)
     try
-        if length(funcs) > 1
-            for func in funcs[2:end]
-                f,tt = func
-                name_f = fix_name(f)
-                if !demangle
-                    name_f = "julia_"*name_f
-                end
-                job, kwargs = static_job(f, tt; name = name_f, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
-                tmod,_ = GPUCompiler.compile(:llvm, job; kwargs...)
-                # consumes `tmod`, also when linking fails
-                link!(mod,tmod)
-            end
-        end
-        locate_pointers_and_runtime_calls(mod)
-        # Just to be sure
-        for (modfunc, func) in zip(mod.functions, funcs)
-            fname = modfunc.name
-            expectedname = (demangle ? "" : "julia_") * fix_name(func)
-            d = prefixlen(fname) - prefixlen(expectedname) + 1
-            if d > 1
-                modfunc.name = fname[d:end]
-            end
+        for (f, tt) in rest
+            # consumes the module, also when linking fails
+            link!(mod, compile_llvm_module(f, tt; kwargs...))
         end
         run!(MergeFunctionsPass(), mod)
     catch
@@ -551,15 +524,6 @@ function compile_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::S
         rethrow()
     end
     return mod
-end
-
-function prefixlen(s)
-    m = match(r"^(?:julia_)+", s)
-    if m isa RegexMatch
-        length(m.match)
-    else
-        0
-    end
 end
 
 """
@@ -634,7 +598,7 @@ function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), file
     mkpath(path)
     # compile and generate code in one context, which the module can't outlive
     GPUCompiler.JuliaContext() do context
-      @dispose mod=compile_llvm_module(funcs; demangle, kwargs...) begin
+      @dispose mod=compile_llvm_module(funcs; demangle, target, kwargs...) begin
         dllexport && add_dllexport!(mod, funcs; demangle)
         if emit_llvm_only # (Required on Windows)
           ir_path = joinpath(path, "$filenamebase.ll")
