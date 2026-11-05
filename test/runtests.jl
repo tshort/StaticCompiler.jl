@@ -18,6 +18,7 @@ const GROUP = get(ENV, "GROUP", "All")
 
 if GROUP == "Core" || GROUP == "All"
    include("testcore.jl")
+   include("testquirks.jl")
 end
 
 if GROUP == "Integration" || GROUP == "All"
