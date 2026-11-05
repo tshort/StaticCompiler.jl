@@ -54,17 +54,18 @@ end
     @test r.exitcode == 0
 
 
-    @inline function _puts(s::Ptr{UInt8}) # Can't use Base.println because it allocates
+    @inline function _puts(s::Ptr{UInt8})
         Base.llvmcall(("""
         ; External declaration of the puts function
         declare i32 @puts(i8* nocapture) nounwind
 
-        define i32 @main(i64) {
+        define i32 @main(i8* %str) #0 {
         entry:
-           %ptr = inttoptr i64 %0 to i8*
-           %status = call i32 (i8*) @puts(i8* %ptr)
+           %status = call i32 (i8*) @puts(i8* %str)
            ret i32 %status
         }
+
+        attributes #0 = { alwaysinline nounwind ssp uwtable }
         """, "main"), Int32, Tuple{Ptr{UInt8}}, s)
     end
 
