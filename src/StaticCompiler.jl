@@ -496,11 +496,20 @@ function with_module_context(f)
 end
 
 # compile to a module in the active (Julia) context, which must outlive the module
-function compile_llvm_module(f, tt, name=fix_name(f); demangle=true, target::StaticTarget=StaticTarget(), llvm_postprocess=nothing, kwargs...)
+function compile_llvm_module(f, tt, name=fix_name(f); 
+        target::StaticTarget=StaticTarget(), 
+        demangle=true, 
+        strip=true,
+        only_entry=false, 
+        validate=false, 
+        libraries=false, 
+        llvm_postprocess=nothing, 
+        kwargs...,
+    )
     if !demangle
         name = "julia_"*name
     end
-    job, kwargs = static_job(f, tt; name, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
+    job, kwargs = static_job(f, tt; name, target, strip, only_entry, validate, libraries, kwargs...)
     m, _ = GPUCompiler.compile(:llvm, job; kwargs...)
     try
         isnothing(llvm_postprocess) || llvm_postprocess(m)
