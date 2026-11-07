@@ -5,7 +5,7 @@ using LLVM, LLVM.IR, LLVM.Passes
 using Libdl: Libdl, dlsym, dlopen
 using Base: RefValue
 using Serialization: serialize, deserialize
-using Clang_jll: clang
+using Clang_jll: Clang_jll
 using LLD_jll: lld
 using StaticTools
 using StaticTools: @symbolcall, @c_str, println
@@ -25,18 +25,48 @@ include("dllexport.jl")
 fix_name(f::Function) = fix_name(string(nameof(f)))
 fix_name(s) = String(GPUCompiler.safe_name(s))
 
+# Generally prefer Clang_jll clang (which should probably be at least as new as Julia's LLVM)
+# and fall back to the system one on platforms where Clang_jll is not available or not expected to work
+function clang()
+    Clang_jll.is_available() || return `clang` # Fall back to system clang if Clang_jll is not available
+    cmd = Clang_jll.clang()
+    # Clang_jll may not know where to find the macOS SDK (e.g. for `-lSystem`)
+    if Sys.isapple() && !haskey(ENV, "SDKROOT") 
+        isnothing(Sys.which("xcrun")) && return `clang` # Fall back to system clang if we can't figure out the SDK path
+        cmd = addenv(cmd, "SDKROOT" => readchomp(`xcrun --show-sdk-path`))
+    end
+    return cmd
+end
+
+# shared library extension of the target (that of the host, unless cross-compiling)
+dlext(target::StaticTarget) = isnothing(target.platform) ? Libdl.dlext : platform_dlext(target.platform)
+
+
+# Check that `f(types...)` is compilable to a native entry point, returning the tuple type of `types`
+function check_signature(f, types; target::StaticTarget=StaticTarget(), kwargs...)
+    tt = Base.to_tuple_type(types)
+    isconcretetype(tt) || error("input type signature `$types` is not concrete")
+
+    rt = last(only(static_code_typed(f, tt; target, kwargs...)))
+    isconcretetype(rt) || error("`$f$types` did not infer to a concrete type. Got `$rt`")
+    nativetype = isprimitivetype(rt) || isa(rt, Ptr)
+    nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
+    return tt
+end
 
 """
 ```julia
-compile_executable(f::Function, types::Tuple, path::String, [name::String=string(nameof(f))];
+compile_executable(f::Function, types::Tuple, [path::String=pwd()], [name::String=string(nameof(f))];
     filename::String=name,
-    cflags=``, # Specify libraries you would like to link against, and other compiler options here
-    also_expose=[],
+    also_expose = [],
     target::StaticTarget=StaticTarget(),
+    cc = nothing,                           # Compiler, may specify to override defaults
+    cflags = ``,                            # Specify libraries you would like to link against, and other compiler options here
     llvm_to_clang = Sys.iswindows(),
-    method_table=StaticCompiler.method_table,
+    method_table = StaticCompiler.method_table,
     kwargs...
 )
+    
 ```
 Attempt to compile a standalone executable that runs function `f` with a type signature given by the tuple of `types`.
 If there are extra methods you would like to protect from name mangling in the produced binary for whatever reason,
@@ -98,31 +128,27 @@ Hello, world!
 ```
 """
 function compile_executable(f::Function, types=(), path::String=pwd(), name=fix_name(f);
-                            also_expose=Tuple{Function, Tuple{DataType}}[], target::StaticTarget=StaticTarget(),
+                            also_expose=Tuple{Function, Tuple{DataType}}[], 
                             kwargs...)
-    compile_executable(vcat([(f, types)], also_expose), path, name; target, kwargs...)
+    compile_executable(vcat([(f, types)], also_expose), path, name; kwargs...)
 end
 
 function compile_executable(funcs::Union{Array,Tuple}, path::String=pwd(), name=fix_name(first(first(funcs)));
-        filename = name,
-        demangle = true,
-        cflags = ``,
+        filename::String = name,
         target::StaticTarget=StaticTarget(),
+        demangle = true,
+        cc = nothing,
+        cflags = ``,
         llvm_to_clang = Sys.iswindows(),
         kwargs...
     )
 
     (f, types) = funcs[1]
-    tt = Base.to_tuple_type(types)
+    tt = check_signature(f, types; target, kwargs...)
     isexecutableargtype = tt == Tuple{} || tt == Tuple{Int, Ptr{Ptr{UInt8}}}
     isexecutableargtype || @warn "input type signature $types should be either `()` or `(Int, Ptr{Ptr{UInt8}})` for standard executables"
 
-    rt = last(only(static_code_typed(f, tt; target, kwargs...)))
-    isconcretetype(rt) || error("`$f$types` did not infer to a concrete type. Got `$rt`")
-    nativetype = isprimitivetype(rt) || isa(rt, Ptr)
-    nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
-
-    generate_executable(funcs, path, name, filename; demangle, cflags, target, llvm_to_clang, kwargs...)
+    generate_executable(funcs, path, name, filename; target, demangle, cc, cflags, llvm_to_clang, kwargs...)
     Sys.iswindows() && (filename *= ".exe")
     joinpath(abspath(path), filename)
 end
@@ -131,17 +157,21 @@ end
 ```julia
 compile_shlib(f::Function, types::Tuple, [path::String=pwd()], [name::String=string(nameof(f))];
     filename::String=name,
-    cflags=``,
-    method_table=StaticCompiler.method_table,
     target::StaticTarget=StaticTarget(),
+    demangle=true,
+    cc = nothing,   # Compiler, may specify to override defaults
+    cflags = ``,    # Specify libraries you would like to link against, and other compiler options here
+    llvm_to_clang = Sys.iswindows(),
+    method_table = StaticCompiler.method_table,
     kwargs...)
 
 compile_shlib(funcs::Array, [path::String=pwd()];
     filename="libfoo",
-    demangle=true,
-    cflags=``,
-    method_table=StaticCompiler.method_table,
     target::StaticTarget=StaticTarget(),
+    cc = nothing,   # Compiler, may specify to override defaults
+    cflags = ``,    # Specify libraries you would like to link against, and other compiler options here
+    llvm_to_clang = Sys.iswindows(),
+    method_table = StaticCompiler.method_table,
     kwargs...)
 ```
 As `compile_executable`, but compiling to a standalone `.dylib`/`.so` shared library.
@@ -174,35 +204,28 @@ julia> ccall(("test", "test.dylib"), Float64, (Int64,), 100_000)
 ```
 """
 function compile_shlib(f::Function, types=(), path::String=pwd(), name=fix_name(f);
-        filename=name,
-        target::StaticTarget=StaticTarget(),
+        filename = name,
         kwargs...
     )
-    compile_shlib(((f, types),), path; filename, target, kwargs...)
+    compile_shlib(((f, types),), path; filename, kwargs...)
 end
 # As above, but taking an array of functions and returning a single shlib
 function compile_shlib(funcs::Union{Array,Tuple}, path::String=pwd();
         filename = "libfoo",
-        demangle = true,
-        cflags = ``,
         target::StaticTarget=StaticTarget(),
+        demangle = true,
+        cc = nothing,
+        cflags = ``,
         llvm_to_clang = Sys.iswindows(),
         kwargs...
     )
-    for func in funcs
-        f, types = func
-        tt = Base.to_tuple_type(types)
-        isconcretetype(tt) || error("input type signature `$types` is not concrete")
-
-        rt = last(only(static_code_typed(f, tt; target, kwargs...)))
-        isconcretetype(rt) || error("`$f$types` did not infer to a concrete type. Got `$rt`")
-        nativetype = isprimitivetype(rt) || isa(rt, Ptr)
-        nativetype || @warn "Return type `$rt` of `$f$types` does not appear to be a native type. Consider returning only a single value of a native machine type (i.e., a single float, int/uint, bool, or pointer). \n\nIgnoring this warning may result in Undefined Behavior!"
+    for (f, types) in funcs
+        check_signature(f, types; target, kwargs...)
     end
 
-    generate_shlib(funcs, path, filename; demangle, cflags, target, llvm_to_clang, kwargs...)
+    generate_shlib(funcs, path, filename; target, demangle, cc, cflags, llvm_to_clang, kwargs...)
 
-    joinpath(abspath(path), filename * "." * Libdl.dlext)
+    joinpath(abspath(path), filename * "." * dlext(target))
 end
 
 
@@ -255,11 +278,8 @@ function generate_shlib_fptr(f, tt, path::String=tempname(), name=fix_name(f), f
                             temp::Bool=true,
                             kwargs...)
 
-    generate_shlib(f, tt, false, path, name; kwargs...)
-    lib_path = joinpath(abspath(path), "$filename.$(Libdl.dlext)")
-    ptr = Libdl.dlopen(lib_path, Libdl.RTLD_LOCAL)
-    fptr = Libdl.dlsym(ptr, name)
-    @assert fptr != C_NULL
+    generate_shlib(f, tt, path, name, filename; kwargs...)
+    fptr = generate_shlib_fptr(path, name, filename)
     if temp
         atexit(()->rm(path; recursive=true))
     end
@@ -288,59 +308,50 @@ Hello, world!
 """
 generate_executable(f, tt, args...; kwargs...) = generate_executable(((f, tt),), args...; kwargs...)
 function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fix_name(first(first(funcs))), filename=name;
-                             demangle = true,
-                             cflags = ``,
                              target::StaticTarget=StaticTarget(),
+                             demangle = true,
+                             cc = nothing,
+                             cflags = ``,
                              llvm_to_clang::Bool = Sys.iswindows(),
                              kwargs...
-                             )
+                            )
+    # Choice of compiler
+    isnothing(cc) && (cc = isnothing(target.compiler) ? clang() : `$(target.compiler)`)
+
+    # Prepare objects or (if llvm_to_clang is set) IR
     exec_path = joinpath(path, filename)
     _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, emit_llvm_only=llvm_to_clang, kwargs...)
-    # Pick a compiler
-    if !isnothing(target.compiler)
-        cc = `$(target.compiler)`
-    else
-        cc = Sys.isapple() ? `cc` : clang()
-    end
+
+    # Update paths and flags given options
+    fn = demangle ? "$name" : "julia_$name"
+    Sys.iswindows() && (exec_path *= ".exe")
+    llvm_to_clang && (cflags = `-Wno-override-module $cflags`)
 
     # Compile!
     if Sys.isapple() && !llvm_to_clang
         # Apple no longer uses _start, so we can just specify a custom entry
-        entry = demangle ? "_$name" : "_julia_$name"
-        run(`$cc -e $entry $cflags $obj_or_ir_path -o $exec_path`)
+        run(`$cc -e _$fn $cflags $obj_or_ir_path -o $exec_path`)
     else
-        fn = demangle ? "$name" : "julia_$name"
         # Write a minimal wrapper to avoid having to specify a custom entry
-        wrapper_path = joinpath(path, "wrapper.c")
+        wrapper_path = joinpath(path, "wrapper$(rand(UInt)).c")
         f = open(wrapper_path, "w")
         print(f, """int $fn(int argc, char** argv);
         void* __stack_chk_guard = (void*) $(rand(UInt) >> 1);
 
         int main(int argc, char** argv)
         {
-            $fn(argc, argv);
-            return 0;
+            return $fn(argc, argv);
         }""")
         close(f)
-        if llvm_to_clang # (required on Windows)
-            # Use clang (llc) to generate an executable from the LLVM IR
-            cclang = if Sys.iswindows()
-                exec_path *= ".exe"
-                `clang`
-            elseif Sys.isapple()
-                `clang`
-            else
-                clang()
-            end
-            run(`$cclang -Wno-override-module $wrapper_path $obj_or_ir_path -o $exec_path`)
-        else
-            run(`$cc $wrapper_path $cflags $obj_or_ir_path -o $exec_path`)
-        end
+
+        # Depending on whether llvm_to_clang is set, 
+        # this may either be compiling from LLVM IR or just linking object files
+        run(`$cc $wrapper_path $cflags $obj_or_ir_path -o $exec_path`)
 
         # Clean up
         rm(wrapper_path)
     end
-    path, name
+    return path, name
 end
 
 
@@ -386,46 +397,29 @@ julia> ccall(("test", "example/test.dylib"), Float64, (Int64,), 100_000)
 """
 function generate_shlib(f::Function, tt, path::String=tempname(), name=fix_name(f), filename=name; target=StaticTarget(), kwargs...)
     generate_shlib(((f, tt),), path, filename; target, kwargs...)
-    path, name
 end
 # As above, but taking an array of functions and returning a single shlib
 function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), filename::String="libfoo";
-        demangle = true,
-        cflags = ``,
         target::StaticTarget=StaticTarget(),
+        demangle = true,
+        cc = nothing,
+        cflags = ``,
         llvm_to_clang::Bool = Sys.iswindows(),
         kwargs...
     )
-    if !isnothing(target.platform)
-        lib_path = joinpath(path, "$filename.$(platform_dlext(target.platform))")
-    else
-        lib_path = joinpath(path, "$filename.$(Libdl.dlext)")
-    end
+    # Choice of compiler
+    isnothing(cc) && (cc = isnothing(target.compiler) ? clang() : `$(target.compiler)`)
 
+    # Prepare objects or (if llvm_to_clang is set) IR
+    lib_path = joinpath(path, "$filename.$(dlext(target))")
     _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, emit_llvm_only=llvm_to_clang,
-                                     dllexport=llvm_to_clang && Sys.iswindows(), kwargs...)
-    # Pick a Clang
-    if !isnothing(target.compiler)
-        cc = `$(target.compiler)`
-    else
-        cc = Sys.isapple() ? `cc` : clang()
-    end
+                                     dllexport=Sys.iswindows(), kwargs...)
+                                     
     # Compile!
-    if llvm_to_clang # (required on Windows)
-        # Use clang (llc) to generate an executable from the LLVM IR
-        cclang = if Sys.iswindows()
-            `clang`
-        elseif Sys.isapple()
-            `clang`
-        else
-            clang()
-        end
-        run(`$cclang -shared -Wno-override-module $obj_or_ir_path -o $lib_path`)
-    else
-        run(`$cc -shared $cflags $obj_or_ir_path -o $lib_path `)
-    end
+    llvm_to_clang && (cflags = `-Wno-override-module $cflags`)
+    run(`$cc -shared $cflags $obj_or_ir_path -o $lib_path `)
 
-    path, filename
+    return path, filename
 end
 
 function static_code_llvm(@nospecialize(func), @nospecialize(types); target::StaticTarget=StaticTarget(), kwargs...)
@@ -439,7 +433,7 @@ function static_code_typed(@nospecialize(func), @nospecialize(types); target::St
 end
 
 function static_code_native(@nospecialize(f), @nospecialize(tt), fname=fix_name(f); target::StaticTarget=StaticTarget(), kwargs...)
-    job, kwargs = static_job(f, tt; fname, target, kwargs...)
+    job, kwargs = static_job(f, tt; name=fname, target, kwargs...)
     GPUCompiler.code_native(stdout, job; libraries=false, kwargs...)
 end
 
@@ -513,37 +507,13 @@ function compile_llvm_module(f, tt, name=fix_name(f); demangle=true, target::Sta
     return m
 end
 
-function compile_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::StaticTarget=StaticTarget(), kwargs...)
-    f,tt = funcs[1]
-    name_f = fix_name(f)
-    if !demangle
-        name_f = "julia_"*name_f
-    end
-    job, kwargs = static_job(f, tt; name = name_f, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
-    mod,_ = GPUCompiler.compile(:llvm, job; kwargs...)
+function compile_llvm_module(funcs::Union{Array,Tuple}; kwargs...)
+    (f, tt), rest... = funcs
+    mod = compile_llvm_module(f, tt; kwargs...)
     try
-        if length(funcs) > 1
-            for func in funcs[2:end]
-                f,tt = func
-                name_f = fix_name(f)
-                if !demangle
-                    name_f = "julia_"*name_f
-                end
-                job, kwargs = static_job(f, tt; name = name_f, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
-                tmod,_ = GPUCompiler.compile(:llvm, job; kwargs...)
-                # consumes `tmod`, also when linking fails
-                link!(mod,tmod)
-            end
-        end
-        locate_pointers_and_runtime_calls(mod)
-        # Just to be sure
-        for (modfunc, func) in zip(mod.functions, funcs)
-            fname = modfunc.name
-            expectedname = (demangle ? "" : "julia_") * fix_name(func)
-            d = prefixlen(fname) - prefixlen(expectedname) + 1
-            if d > 1
-                modfunc.name = fname[d:end]
-            end
+        for (f, tt) in rest
+            # consumes the module, also when linking fails
+            link!(mod, compile_llvm_module(f, tt; kwargs...))
         end
         run!(MergeFunctionsPass(), mod)
     catch
@@ -553,22 +523,11 @@ function compile_llvm_module(funcs::Union{Array,Tuple}; demangle=true, target::S
     return mod
 end
 
-function prefixlen(s)
-    m = match(r"^(?:julia_)+", s)
-    if m isa RegexMatch
-        length(m.match)
-    else
-        0
-    end
-end
-
 """
 ```julia
 generate_obj(f, tt, path::String = tempname(), filenamebase::String="obj";
              target::StaticTarget=StaticTarget(),
              demangle = true,
-             strip_llvm = false,
-             strip_asm  = true,
              kwargs...)
 ```
 Low level interface for compiling object code (`.o`) for for function `f` given
@@ -608,8 +567,6 @@ generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), filenamebase:
              demangle = false,
              emit_llvm_only = false,
              dllexport = false,
-             strip_llvm = false,
-             strip_asm  = true,
              kwargs...)
 ```
 Low level interface for compiling object code (`.o`) for an array of Tuples
@@ -627,14 +584,12 @@ function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), file
                         demangle = true,
                         emit_llvm_only = false,
                         dllexport = false,
-                        strip_llvm = false,
-                        strip_asm = true,
                         kwargs...)
     f, tt = funcs[1]
     mkpath(path)
     # compile and generate code in one context, which the module can't outlive
     GPUCompiler.JuliaContext() do context
-      @dispose mod=compile_llvm_module(funcs; demangle, kwargs...) begin
+      @dispose mod=compile_llvm_module(funcs; demangle, target, kwargs...) begin
         dllexport && add_dllexport!(mod, funcs; demangle)
         if emit_llvm_only # (Required on Windows)
           ir_path = joinpath(path, "$filenamebase.ll")
