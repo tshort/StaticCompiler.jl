@@ -339,7 +339,7 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
     # Compile!
     if Sys.isapple() && !llvm_to_clang
         # Apple no longer uses _start, so we can just specify a custom entry
-        run(`$cc -e _$fn $cflags $obj_or_ir_path -o $exec_path`)
+        run(`$cc -e _$fn $obj_or_ir_path $cflags -o $exec_path`)
     else
         # Write a minimal wrapper to avoid having to specify a custom entry
         wrapper_path = joinpath(path, "wrapper$(rand(UInt)).c")
@@ -355,7 +355,7 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
 
         # Depending on whether llvm_to_clang is set, 
         # this may either be compiling from LLVM IR or just linking object files
-        run(`$cc $wrapper_path $cflags $obj_or_ir_path -o $exec_path`)
+        run(`$cc $wrapper_path $obj_or_ir_path $cflags -o $exec_path`)
 
         # Clean up
         rm(wrapper_path)
@@ -426,7 +426,7 @@ function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), file
                                      
     # Compile!
     llvm_to_clang && (cflags = `-Wno-override-module $cflags`)
-    run(`$cc -shared $cflags $obj_or_ir_path -o $lib_path `)
+    run(`$cc -shared $obj_or_ir_path $cflags -o $lib_path `)
 
     return path, filename
 end
