@@ -73,8 +73,13 @@ Attempt to compile a standalone executable that runs function `f` with a type si
 If there are extra methods you would like to protect from name mangling in the produced binary for whatever reason,
 you can provide them as a vector of tuples of functions and types, i.e. `[(f1, types1), (f2, types2), ...]`
 
-`llvm_postprocess`, if given, is called with each `LLVM.Module` that is generated, before it is checked and compiled,
-and may modify it in place (for instance, to define the runtime functions that the code calls).
+The `llvm_postprocess` keyword, if given, allows users to specify a function that will be called on each `LLVM.Module` 
+that is generated, before it is checked and compiled, and may modify it in place 
+(for instance, to define the runtime functions that the code calls).
+
+Other keywords will be forwarded to `static_job`. This may include `params`, which if given, 
+is a `GPUCompiler.AbstractCompilerParams` object (default `StaticCompilerParams()`) which
+is passed to `GPUCompiler.CompilerConfig`. 
 
 ### Examples
 ```julia

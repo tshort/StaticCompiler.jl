@@ -93,27 +93,29 @@ function GPUCompiler.llvm_machine(target::StaticCompilerTarget)
 end
 
 GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = StaticRuntime
-GPUCompiler.runtime_module(::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) = StaticRuntime
 
 
-GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget, StaticCompilerParams}) = true
 GPUCompiler.can_throw(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = true
 
 GPUCompiler.uses_julia_runtime(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget}) = job.config.target.julia_runtime
 GPUCompiler.method_table(@nospecialize(job::GPUCompiler.CompilerJob{<:StaticCompilerTarget})) = job.config.target.method_table
 
 
+# `params` is the `GPUCompiler.AbstractCompilerParams` of the job. Other packages can pass a type of their own, to
+# specialize GPUCompiler's functions (`inference_params`, `optimize!`, ...) for their compilations only, without
+# adding methods for `StaticCompilerTarget` and `StaticCompilerParams`, which are ours. All the methods above
+# are for any `params`.
 function static_job(@nospecialize(func), @nospecialize(types);
     name = fix_name(func),
     kernel::Bool = false,
     target::StaticTarget = StaticTarget(),
-    method_table=method_table,
+    params::GPUCompiler.AbstractCompilerParams = StaticCompilerParams(),
+    method_table = method_table,
     kwargs...
 )
     source = GPUCompiler.methodinstance(typeof(func), Base.to_tuple_type(types))
     tm = target.tm
     gputarget = StaticCompilerTarget(tm.triple, tm.cpu, tm.features, target.julia_runtime, method_table)
-    params = StaticCompilerParams()
-    config = GPUCompiler.CompilerConfig(gputarget, params; name = name, kernel = kernel, kwargs...)
+    config = GPUCompiler.CompilerConfig(gputarget, params; name, kernel, kwargs...)
     return GPUCompiler.CompilerJob(source, config), Dict{}()
 end
