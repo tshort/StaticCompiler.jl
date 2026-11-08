@@ -18,5 +18,5 @@ function randn_matrix(argc::Int, argv::Ptr{Ptr{UInt8}})
 end
 
 # Attempt to compile
-# cflags=`-lm`: need to explicitly include libm math library on linux
-path = compile_executable(randn_matrix, (Int64, Ptr{Ptr{UInt8}}), "./", cflags=`-lm`)
+# cflags=`-lm`: need to explicitly include libm math library on linux (not needed, or available, on Windows)
+path = compile_executable(randn_matrix, (Int64, Ptr{Ptr{UInt8}}), "./", cflags=(Sys.iswindows() ? `` : `-lm`))
