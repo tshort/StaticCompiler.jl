@@ -2,7 +2,8 @@ using StaticCompiler
 using StaticTools
 
 function interop(argc, argv)
-    lib = StaticTools.dlopen(c"libm")
+    # On Linux, `libm.so` is typically a linker script (or absent), so use the versioned soname
+    lib = StaticTools.dlopen(@static(Sys.islinux() ? c"libm.so.6" : c"libm"))
     printf(lib)
     sin = StaticTools.dlsym(lib, c"sin")
     printf(sin)

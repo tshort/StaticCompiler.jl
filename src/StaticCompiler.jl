@@ -64,6 +64,7 @@ compile_executable(f::Function, types::Tuple, [path::String=pwd()], [name::Strin
     cflags = ``,                            # Specify libraries you would like to link against, and other compiler options here
     llvm_to_clang = Sys.iswindows(),
     method_table = StaticCompiler.method_table,
+    llvm_postprocess = nothing,
     kwargs...
 )
     
@@ -71,6 +72,14 @@ compile_executable(f::Function, types::Tuple, [path::String=pwd()], [name::Strin
 Attempt to compile a standalone executable that runs function `f` with a type signature given by the tuple of `types`.
 If there are extra methods you would like to protect from name mangling in the produced binary for whatever reason,
 you can provide them as a vector of tuples of functions and types, i.e. `[(f1, types1), (f2, types2), ...]`
+
+The `llvm_postprocess` keyword, if given, allows users to specify a function that will be called on each `LLVM.Module` 
+that is generated, before it is checked and compiled, and may modify it in place 
+(for instance, to define the runtime functions that the code calls).
+
+Other keywords will be forwarded to `static_job`. This may include `params`, which if given, 
+is a `GPUCompiler.AbstractCompilerParams` object (default `StaticCompilerParams()`) which
+is passed to `GPUCompiler.CompilerConfig`. 
 
 ### Examples
 ```julia
@@ -330,7 +339,7 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
     # Compile!
     if Sys.isapple() && !llvm_to_clang
         # Apple no longer uses _start, so we can just specify a custom entry
-        run(`$cc -e _$fn $cflags $obj_or_ir_path -o $exec_path`)
+        run(`$cc -e _$fn $obj_or_ir_path $cflags -o $exec_path`)
     else
         # Write a minimal wrapper to avoid having to specify a custom entry
         wrapper_path = joinpath(path, "wrapper$(rand(UInt)).c")
@@ -346,7 +355,7 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
 
         # Depending on whether llvm_to_clang is set, 
         # this may either be compiling from LLVM IR or just linking object files
-        run(`$cc $wrapper_path $cflags $obj_or_ir_path -o $exec_path`)
+        run(`$cc $wrapper_path $obj_or_ir_path $cflags -o $exec_path`)
 
         # Clean up
         rm(wrapper_path)
@@ -417,22 +426,22 @@ function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), file
                                      
     # Compile!
     llvm_to_clang && (cflags = `-Wno-override-module $cflags`)
-    run(`$cc -shared $cflags $obj_or_ir_path -o $lib_path `)
+    run(`$cc -shared $obj_or_ir_path $cflags -o $lib_path `)
 
     return path, filename
 end
 
-function static_code_llvm(@nospecialize(func), @nospecialize(types); target::StaticTarget=StaticTarget(), kwargs...)
+function static_code_llvm(@nospecialize(func), @nospecialize(types); target::StaticTarget=StaticTarget(), llvm_postprocess=nothing, kwargs...)
     job, kwargs = static_job(func, types; target, kwargs...)
     GPUCompiler.code_llvm(stdout, job; libraries=false, kwargs...)
 end
 
-function static_code_typed(@nospecialize(func), @nospecialize(types); target::StaticTarget=StaticTarget(), kwargs...)
+function static_code_typed(@nospecialize(func), @nospecialize(types); target::StaticTarget=StaticTarget(), llvm_postprocess=nothing, kwargs...)
     job, kwargs = static_job(func, types; target, kwargs...)
     GPUCompiler.code_typed(job; kwargs...)
 end
 
-function static_code_native(@nospecialize(f), @nospecialize(tt), fname=fix_name(f); target::StaticTarget=StaticTarget(), kwargs...)
+function static_code_native(@nospecialize(f), @nospecialize(tt), fname=fix_name(f); target::StaticTarget=StaticTarget(), llvm_postprocess=nothing, kwargs...)
     job, kwargs = static_job(f, tt; name=fname, target, kwargs...)
     GPUCompiler.code_native(stdout, job; libraries=false, kwargs...)
 end
@@ -492,13 +501,23 @@ function with_module_context(f)
 end
 
 # compile to a module in the active (Julia) context, which must outlive the module
-function compile_llvm_module(f, tt, name=fix_name(f); demangle=true, target::StaticTarget=StaticTarget(), kwargs...)
+function compile_llvm_module(f, tt, name=fix_name(f); 
+        target::StaticTarget=StaticTarget(), 
+        demangle=true, 
+        strip=true,
+        only_entry=false, 
+        validate=false, 
+        libraries=false, 
+        llvm_postprocess=nothing, 
+        kwargs...,
+    )
     if !demangle
         name = "julia_"*name
     end
-    job, kwargs = static_job(f, tt; name, target, strip=true, only_entry=false, validate=false, libraries=false, kwargs...)
+    job, kwargs = static_job(f, tt; name, target, strip, only_entry, validate, libraries, kwargs...)
     m, _ = GPUCompiler.compile(:llvm, job; kwargs...)
     try
+        isnothing(llvm_postprocess) || llvm_postprocess(m)
         locate_pointers_and_runtime_calls(m)
     catch
         dispose(m)
@@ -584,12 +603,13 @@ function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), file
                         demangle = true,
                         emit_llvm_only = false,
                         dllexport = false,
+                        llvm_postprocess = nothing,
                         kwargs...)
     f, tt = funcs[1]
     mkpath(path)
     # compile and generate code in one context, which the module can't outlive
     GPUCompiler.JuliaContext() do context
-      @dispose mod=compile_llvm_module(funcs; demangle, target, kwargs...) begin
+      @dispose mod=compile_llvm_module(funcs; demangle, target, llvm_postprocess, kwargs...) begin
         dllexport && add_dllexport!(mod, funcs; demangle)
         if emit_llvm_only # (Required on Windows)
           ir_path = joinpath(path, "$filenamebase.ll")

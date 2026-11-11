@@ -27,6 +27,9 @@ end
     @test bumper_test(8) == @ccall($fptr(8::Int)::Float64)
 end
 
+# To remove output files
+cleanup(files...) = foreach(f -> isfile(f) && rm(f), files)
+
 @testset "Standalone Executable Integration" begin
 
     jlpath = joinpath(Sys.BINDIR, Base.julia_exename()) # Get path to julia executable
@@ -37,9 +40,9 @@ end
         # We have to start a new Julia process to get around the fact that Pkg.test
         # disables `@inbounds`, but ironically we can use `--compile=min` to make that
         # faster.
+        cleanup("times_table")
         status = -1
         try
-            isfile("times_table") && rm("times_table")
             status = run(`$jlpath --startup=no --compile=min $testpath/scripts/times_table.jl`)
         catch e
             @warn "Could not compile $testpath/scripts/times_table.jl"
@@ -49,10 +52,11 @@ end
         @test isa(status, Base.Process) && status.exitcode == 0
 
         # Attempt to run
-        println("5x5 times table:")
+        cleanup("table.tsv", "table.b")
+        println("4x4 times table (MallocArray):")
         status = -1
         try
-            status = run(`./times_table 5 5`)
+            status = run(`./times_table 4 4`)
         catch e
             @warn "Could not run $(scratch)/times_table"
             println(e)
@@ -60,17 +64,89 @@ end
         @test isa(status, Base.Process)
         @test isa(status, Base.Process) && status.exitcode == 0
         # Test ascii output
-        @test_broken parsedlm(Int, c"table.tsv", '\t') == (1:5)*(1:5)' broken=Sys.isapple()
+        @test parsedlm(Int, c"table.tsv", '\t') == (1:4)*(1:4)'
+        # Test binary output
+        @test fread!(szeros(Int, 4,4), c"table.b") == (1:4)*(1:4)'
+    end
+
+    ## --- As above but with staticarray
+
+    let
+        # Compile...
+        cleanup("stack_times_table")
+        status = -1
+        try
+            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/stack_times_table.jl`)
+        catch e
+            @warn "Could not compile $testpath/scripts/stack_times_table.jl"
+            println(e)
+        end
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
+
+        # Run..
+        cleanup("table.tsv", "table.b")
+        println("5x5 times table (StackArray):")
+        status = -1
+        try
+            status = run(`./stack_times_table`)
+        catch e
+            @warn "Could not run $(scratch)/stack_times_table"
+            println(e)
+        end
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
+        # Test ascii output
+        @test parsedlm(Int, c"table.tsv", '\t') == (1:5)*(1:5)'
         # Test binary output
         @test fread!(szeros(Int, 5,5), c"table.b") == (1:5)*(1:5)'
     end
 
+
+    ## --- Reading from written files
+
+    let
+        # Compile...
+        cleanup("readwrite")
+        status = -1
+        try
+            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/readwrite.jl`)
+        catch e
+            @warn "Could not compile $testpath/scripts/readwrite.jl"
+            println(e)
+        end
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
+
+        # Run...
+        cleanup("table.tsv", "table.b", "tableb.tsv", "tables.tsv", "tablets.tsv")
+        println("5x5 times table, read from file:")
+        status = -1
+        try
+            status = run(`./readwrite 5 5`)
+        catch e
+            @warn "Could not run $(scratch)/readwrite"
+            println(e)
+        end
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
+        # Test binary output
+        @test fread!(szeros(Int, 5,5), c"table.b") == (1:5)*(1:5)'
+        # Test ascii output
+        @test parsedlm(Int, c"table.tsv", '\t') == (1:5)*(1:5)'
+        @test parsedlm(Int, c"tableb.tsv", '\t') == (1:5)*(1:5)'
+        @test parsedlm(Int, c"tables.tsv", '\t') == (1:5)*(1:5)'
+        @test parsedlm(Int, c"tablets.tsv", '\t') == (1:5)*(1:5)'
+
+    end
+
+
     ## --- "withmallocarray"-type do-block pattern
     let
         # Compile...
+        cleanup("withmallocarray")
         status = -1
         try
-            isfile("withmallocarray") && rm("withmallocarray")
             status = run(`$jlpath --startup=no --compile=min $testpath/scripts/withmallocarray.jl`)
         catch e
             @warn "Could not compile $testpath/scripts/withmallocarray.jl"
@@ -95,9 +171,9 @@ end
     ## --- Random number generation
     let
         # Compile...
+        cleanup("rand_matrix")
         status = -1
         try
-            isfile("rand_matrix") && rm("rand_matrix")
             status = run(`$jlpath --startup=no --compile=min $testpath/scripts/rand_matrix.jl`)
         catch e
             @warn "Could not compile $testpath/scripts/rand_matrix.jl"
@@ -121,15 +197,15 @@ end
 
     let
         # Compile...
+        cleanup("randn_matrix")
         status = -1
         try
-            isfile("randn_matrix") && rm("randn_matrix")
             status = run(`$jlpath --startup=no --compile=min $testpath/scripts/randn_matrix.jl`)
         catch e
             @warn "Could not compile $testpath/scripts/randn_matrix.jl"
             println(e)
         end
-        if Sys.isbsd()
+        @static if Sys.isbsd()
             @test isa(status, Base.Process)
             @test isa(status, Base.Process) && status.exitcode == 0
         end
@@ -143,110 +219,174 @@ end
             @warn "Could not run $(scratch)/randn_matrix"
             println(e)
         end
-        if Sys.isbsd()
+        @static if Sys.isbsd()
             @test isa(status, Base.Process)
             @test isa(status, Base.Process) && status.exitcode == 0
         end
     end
 
-
-    ## --- Test LoopVectorization integration
-    if Bool(LoopVectorization.VectorizationBase.has_feature(Val{:x86_64_avx2}))
-        let
-            # Compile...
-            status = -1
-            try
-                isfile("loopvec_product") && rm("loopvec_product")
-                status = run(`$jlpath --startup=no --compile=min $testpath/scripts/loopvec_product.jl`)
-            catch e
-                @warn "Could not compile $testpath/scripts/loopvec_product.jl"
-                println(e)
-            end
-            @test_broken isa(status, Base.Process)
-            @test_broken isa(status, Base.Process) && status.exitcode == 0
-
-            # Run...
-            println("10x10 table sum:")
-            status = -1
-            try
-                status = run(`./loopvec_product 10 10`)
-            catch e
-                @warn "Could not run $(scratch)/loopvec_product"
-                println(e)
-            end
-            @test_broken isa(status, Base.Process)
-            @test_broken isa(status, Base.Process) && status.exitcode == 0
-            @test_broken parsedlm(c"product.tsv",'\t')[] == 3025
+    ## --- Test matrix multiplication by plain @inbounds loops
+    let
+        # Compile...
+        cleanup("inbounds_product")
+        status = -1
+        try
+            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/inbounds_product.jl`)
+        catch e
+            @warn "Could not compile $testpath/scripts/inbounds_product.jl"
+            println(e)
         end
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
+
+        # Run...
+        cleanup("product.tsv")
+        println("10x10 table sum:")
+        status = -1
+        try
+            status = run(`./inbounds_product 10 10`)
+        catch e
+            @warn "Could not run $(scratch)/inbounds_product"
+            println(e)
+        end
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
+        @test parsedlm(c"product.tsv",'\t')[] == 3025
     end
 
     let
         # Compile...
+        cleanup("inbounds_matrix")
         status = -1
         try
-            isfile("loopvec_matrix") && rm("loopvec_matrix")
-            status = run(`$jlpath --startup=no $testpath/scripts/loopvec_matrix.jl`)
+            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/inbounds_matrix.jl`)
         catch e
-            @warn "Could not compile $testpath/scripts/loopvec_matrix.jl"
+            @warn "Could not compile $testpath/scripts/inbounds_matrix.jl"
             println(e)
         end
-        @test_broken isa(status, Base.Process)
-        @test_broken isa(status, Base.Process) && status.exitcode == 0
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
 
         # Run...
-        println("10x5 matrix product:")
+        cleanup("table.tsv", "table.b")
+        println("10x5 MallocMatrix product, manual inbounds:")
         status = -1
         try
-            status = run(`./loopvec_matrix 10 5`)
+            status = run(`./inbounds_matrix 10 5`)
         catch e
-            @warn "Could not run $(scratch)/loopvec_matrix"
+            @warn "Could not run $(scratch)/inbounds_matrix"
             println(e)
         end
-        @test_broken isa(status, Base.Process)
-        @test_broken isa(status, Base.Process) && status.exitcode == 0
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
         A = (1:10) * (1:5)'
         # Check ascii output
-        @test_broken parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.isapple()
+        @test parsedlm(c"table.tsv",'\t') == A' * A
         # Check binary output
-        @test_broken fread!(szeros(5,5), c"table.b") == A' * A
+        @test fread!(szeros(5,5), c"table.b") == A' * A
     end
 
     let
         # Compile...
+        cleanup("inbounds_matrix_stack")
         status = -1
         try
-            isfile("loopvec_matrix_stack") && rm("loopvec_matrix_stack")
-            status = run(`$jlpath --startup=no  $testpath/scripts/loopvec_matrix_stack.jl`)
+            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/inbounds_matrix_stack.jl`)
         catch e
-            @warn "Could not compile $testpath/scripts/loopvec_matrix_stack.jl"
+            @warn "Could not compile $testpath/scripts/inbounds_matrix_stack.jl"
             println(e)
         end
-        @test_broken isa(status, Base.Process)
-        @test_broken isa(status, Base.Process) && status.exitcode == 0
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
 
         # Run...
-        println("10x5 matrix product:")
+        cleanup("table.tsv")
+        println("10x5 StackMatrix product, manual inbounds:")
         status = -1
         try
-            status = run(`./loopvec_matrix_stack`)
+            status = run(`./inbounds_matrix_stack`)
         catch e
-            @warn "Could not run $(scratch)/loopvec_matrix_stack"
+            @warn "Could not run $(scratch)/inbounds_matrix_stack"
             println(e)
         end
-        @test_broken isa(status, Base.Process)
-        @test_broken isa(status, Base.Process) && status.exitcode == 0
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
         A = (1:10) * (1:5)'
-        @test_broken parsedlm(c"table.tsv",'\t') == A' * A broken=Sys.isapple()
+        @test parsedlm(c"table.tsv",'\t') == A' * A
     end
 
+    ## --- Test built-in matrix multiplication
+    let
+        # Compile...
+        cleanup("matmul")
+        status = -1
+        try
+            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/matmul.jl`)
+        catch e
+            @warn "Could not compile $testpath/scripts/matmul.jl"
+            println(e)
+        end
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
+
+        # Run...
+        cleanup("table.tsv", "table.b")
+        println("10x5 MallocMatrix product:")
+        status = -1
+        try
+            status = run(`./matmul 10 5`)
+        catch e
+            @warn "Could not run $(scratch)/matmul"
+            println(e)
+        end
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
+        A = (1:10) * (1:5)'
+        # Check ascii output
+        @test parsedlm(c"table.tsv",'\t') == A' * A
+        # Check binary output
+        @test fread!(szeros(5,5), c"table.b") == A' * A
+    end
+
+    let
+        # Compile...
+        cleanup("matmul_stack")
+        status = -1
+        try
+            status = run(`$jlpath --compile=min $testpath/scripts/matmul_stack.jl`)
+        catch e
+            @warn "Could not compile $testpath/scripts/matmul_stack.jl"
+            println(e)
+        end
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
+
+        # Run...
+        cleanup("table.tsv", "table.b")
+        println("10x5 StackMatrix product:")
+        status = -1
+        try
+            status = run(`./matmul_stack`)
+        catch e
+            @warn "Could not run $(scratch)/matmul_stack"
+            println(e)
+        end
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
+        A = (1:10) * (1:5)'
+        # Check ascii output
+        @test parsedlm(c"table.tsv",'\t') == A' * A
+        # Check binary output
+        @test fread!(szeros(5,5), c"table.b") == A' * A
+    end
 
     ## --- Test string handling
 
     let
         # Compile...
+        cleanup("print_args")
         status = -1
         try
-            isfile("print_args") && rm("print_args")
             status = run(`$jlpath --startup=no --compile=min $testpath/scripts/print_args.jl`)
         catch e
             @warn "Could not compile $testpath/scripts/print_args.jl"
@@ -268,13 +408,41 @@ end
         @test isa(status, Base.Process) && status.exitcode == 0
     end
 
+    ## --- Test string iteration
+
+    let
+        # Compile...
+        cleanup("iterate")
+        status = -1
+        try
+            status = run(`$jlpath --startup=no $testpath/scripts/iterate.jl`)
+        catch e
+            @warn "Could not compile $testpath/scripts/iterate.jl"
+            println(e)
+        end
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
+
+        # Run...
+        println("Iteration:")
+        status = -1
+        try
+            status = run(`./iterate`)
+        catch e
+            @warn "Could not run $(scratch)/iterate"
+            println(e)
+        end
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
+    end
+
     ## --- Test error throwing
 
     let
         # Compile...
+        cleanup("maybe_throw") 
         status = -1
         try
-            isfile("maybe_throw") && rm("maybe_throw")
             status = run(`$jlpath --startup=no --compile=min $testpath/scripts/throw_errors.jl`)
         catch e
             @warn "Could not compile $testpath/scripts/throw_errors.jl"
@@ -300,43 +468,37 @@ end
         catch e
             @info "maybe_throw: task failed sucessfully!"
         end
-        if Sys.iswindows()
-            @info "maybe_throw: task doesn't fail on Windows."
-            @test status.exitcode == 0
-        else
-            @test status === -1
-        end
+        @test status === -1
     end
 
     ## --- Test interop
-
-    if Sys.isbsd()
-        let
-            # Compile...
-            status = -1
-            try
-                isfile("interop") && rm("interop")
-                status = run(`$jlpath --startup=no --compile=min $testpath/scripts/interop.jl`)
-            catch e
-                @warn "Could not compile $testpath/scripts/interop.jl"
-                println(e)
-            end
-            @test isa(status, Base.Process)
-            @test isa(status, Base.Process) && status.exitcode == 0
-
-            # Run...
-            println("Interop:")
-            status = -1
-            try
-                status = run(`./interop`)
-            catch e
-                @warn "Could not run $(scratch)/interop"
-                println(e)
-            end
-            @test isa(status, Base.Process)
-            @test isa(status, Base.Process) && status.exitcode == 0
+    
+    # (dlopen/dlsym are not available on Windows)
+    @static if !Sys.iswindows() let
+        # Compile...
+        cleanup("interop")
+        status = -1
+        try
+            status = run(`$jlpath --startup=no --compile=min $testpath/scripts/interop.jl`)
+        catch e
+            @warn "Could not compile $testpath/scripts/interop.jl"
+            println(e)
         end
-    end
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
+
+        # Run...
+        println("Interop:")
+        status = -1
+        try
+            status = run(`./interop`)
+        catch e
+            @warn "Could not run $(scratch)/interop"
+            println(e)
+        end
+        @test isa(status, Base.Process)
+        @test isa(status, Base.Process) && status.exitcode == 0
+    end end
 
 end
 
