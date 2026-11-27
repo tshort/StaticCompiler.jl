@@ -278,6 +278,11 @@ end
     @test target.retarget.triple == "aarch64-unknown-linux-gnu" && LLVM.cpu(target.tm) in ("", "generic")
     ir = StaticCompiler.generate_ir(div128, Tuple{Int,Int}; target)
     @test occursin("target triple = \"aarch64-unknown-linux-gnu\"", ir) && occursin(r"define [^\n]*@__udivti3", ir) && !occursin("target datalayout", ir)
+    # (linked into the module of a target that is not retargeted, which has a data layout: with no warning of different layouts)
+    arch = String(first(split(LLVM.default_triple(), '-')))
+    plain = StaticCompiler.StaticTarget("$arch-unknown-linux-gnu"; toolchain = StaticCompiler.LLD(:gnu; sysroot = "/nonexistent"))
+    plain_ir = @test_logs min_level = Base.CoreLogging.Warn StaticCompiler.generate_ir(div128, Tuple{Int,Int}; target = plain)
+    @test occursin(r"define [^\n]*@__udivti3", plain_ir) && occursin("target datalayout", plain_ir)
     ir = StaticCompiler.generate_ir(div128, Tuple{Int,Int}; target = StaticCompiler.StaticTarget("aarch64-unknown-linux-gnu"; toolchain = StaticCompiler.LLD(:gnu; builtins = false), retarget = true))
     @test !occursin("@__udivti3", ir)
 
@@ -324,16 +329,16 @@ end
     @test StaticCompiler.glibc_sysroot(Base.BinaryPlatforms.Platform(host_arch, "linux"; libc = "glibc")) == sysroot
     lin_main(argc::Int, argv::Ptr{Ptr{UInt8}}) = (argc + 41) % Int
     target = StaticCompiler.StaticTarget(triple; toolchain = StaticCompiler.LLD(:gnu; sysroot))
+    # An object that cannot be made is refused, before the linker is asked for it
+    nobackend = StaticCompiler.StaticTarget("fakearch64-unknown-linux-gnu"; toolchain = StaticCompiler.LLD(:gnu; sysroot))
+    @test_throws ArgumentError compile_executable(lin_main, (Int, Ptr{Ptr{UInt8}}), mktempdir(), "nobackend"; target = nobackend)
+    div128(a::Int, b::Int) = (UInt128(a) ÷ UInt128(b)) % Int
     exe = compile_executable(lin_main, (Int, Ptr{Ptr{UInt8}}), mktempdir(), "lin_main"; target)
     @test read(exe, 4) == UInt8[0x7f, 0x45, 0x4c, 0x46] # ELF
     lib = compile_shlib(lin_main, (Int, Ptr{Ptr{UInt8}}), mktempdir(), "lin_lib"; target)
     @test endswith(lib, ".so") && read(lib, 4) == UInt8[0x7f, 0x45, 0x4c, 0x46]
     # (and the builtins that an `lld` link has not: a division of `i128` links)
-    div128(a::Int, b::Int) = (UInt128(a) ÷ UInt128(b)) % Int
     @test isfile(compile_shlib(div128, (Int, Int), mktempdir(), "div128"; target))
-    # (an object that cannot be made is refused as such, before the linker is asked for it: here there is no code generator for the architecture, and no `llc`)
-    nobackend = StaticCompiler.StaticTarget("fakearch64-unknown-linux-gnu"; toolchain = StaticCompiler.LLD(:gnu; sysroot))
-    @test_throws ArgumentError compile_executable(lin_main, (Int, Ptr{Ptr{UInt8}}), mktempdir(), "nobackend"; target = nobackend)
 end
 
 @testset "The finished module" begin

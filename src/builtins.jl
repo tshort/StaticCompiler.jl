@@ -252,10 +252,11 @@ that is linked by `lld` alone has not. Which are needed is what the module says:
 function add_builtins!(mod::LLVM.Module, triple::AbstractString)
     for name in needed_builtins(string(mod), triple)
         builtins = parse(LLVM.Module, getfield(@__MODULE__, name))
-        # (the linker of modules takes a `linkonce_odr` definition only where something in the module calls it, and nothing does: the code generator will. `weak_odr` is as well replaced by a definition of the program's own)
         for f in LLVM.functions(builtins)
             LLVM.isdeclaration(f) || LLVM.linkage!(f, LLVM.API.LLVMWeakODRLinkage)
         end
+        LLVM.triple!(builtins, LLVM.triple(mod))
+        LLVM.datalayout!(builtins, LLVM.datalayout(mod))
         LLVM.link!(mod, builtins)
     end
     return mod

@@ -665,6 +665,7 @@ function link(tc::Driver, target::StaticTarget, inputs::Vector{String}, output::
 end
 function link(tc::LLD, target::StaticTarget, inputs::Vector{String}, output::String; kind::Symbol = :executable, entry = nothing, cflags = ``)
     # Link using an LLD driver
+    threads = lld_threads()
     any(endswith(".ll"), inputs) && throw(ArgumentError("`LLD` links objects, not LLVM IR: make the objects (the target has to be one that Julia's LLVM has the code generator for)"))
     if tc.flavor === :gnu
         sysroot = tc.sysroot
@@ -672,17 +673,18 @@ function link(tc::LLD, target::StaticTarget, inputs::Vector{String}, output::Str
         dir = crt_directory(sysroot)
         libs = ["-l$l" for l in tc.libs]
         if kind === :shared
-            run(`$(lld()) -flavor gnu -shared -o $output $inputs -L$dir $libs $(tc.flags) $cflags`)
+            run(`$(lld()) -flavor gnu $threads -shared -o $output $inputs -L$dir $libs $(tc.flags) $cflags`)
         else
             loader = something(tc.dynamic_linker, default_dynamic_linker(target))
-            run(`$(lld()) -flavor gnu -o $output -dynamic-linker $loader $(joinpath(dir, "crt1.o")) $(joinpath(dir, "crti.o")) $inputs -L$dir $libs $(joinpath(dir, "crtn.o")) $(tc.flags) $cflags`)
+            run(`$(lld()) -flavor gnu $threads -o $output -dynamic-linker $loader $(joinpath(dir, "crt1.o")) $(joinpath(dir, "crti.o")) $inputs -L$dir $libs $(joinpath(dir, "crtn.o")) $(tc.flags) $cflags`)
         end
     else # :wasm
         kind === :shared && throw(ArgumentError("a shared library for WebAssembly is not supported"))
         bits = startswith(target_triple(target), "wasm64") ? "-mwasm64" : "-mwasm32"
-        run(`$(lld()) -flavor wasm $bits --no-entry --export=main --export-memory --allow-undefined -o $output $inputs $(tc.flags) $cflags`)
+        run(`$(lld()) -flavor wasm $threads $bits --no-entry --export=main --export-memory --allow-undefined -o $output $inputs $(tc.flags) $cflags`)
     end
     return output
 end
+lld_threads() = Sys.iswindows() ? `--threads=1` : `` # The available `lld` seems to crash when run multithreaded on Windows, so limit it to one thread
 
 end # module
