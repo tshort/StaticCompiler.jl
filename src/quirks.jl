@@ -151,6 +151,19 @@ end
     y == 0 && @print_and_throw c"Integer division error"
     Core.Intrinsics.udiv_int(x, y)
 end
+# (`fld` and `cld` of signed integers, with wrapping arithmetic by the intrinsics (`+%` is syntax of Julia 1.14 only): Julia 1.14 has methods that check the arguments and throw themselves, which do not go through `div` above. The same code, with the error that is ours)
+@device_override function Base.div(x::T, y::T, ::typeof(RoundDown)) where {T<:Base.BitSigned}
+    (iszero(y) | ((x == typemin(T)) & (y == -1))) && @print_and_throw c"Integer division error"
+    k = 8sizeof(T) - 1
+    dsign = y >> k
+    nsign = (x | Core.Intrinsics.add_int(x, dsign)) >> k
+    return Core.Intrinsics.add_int(Core.Intrinsics.sdiv_int(Core.Intrinsics.add_int(x, dsign - nsign), y), nsign ⊻ dsign)
+end
+@device_override function Base.div(x::T, y::T, ::typeof(RoundUp)) where {T<:Base.BitSigned}
+    (iszero(y) | ((x == typemin(T)) & (y == -1))) && @print_and_throw c"Integer division error"
+    s = ifelse(y < 0, -(x < 0) % T, (x > 0) % T)
+    return Core.Intrinsics.add_int(Core.Intrinsics.sdiv_int(Core.Intrinsics.sub_int(x, s), y), T(s != 0))
+end
 @device_override function Base.rem(x::T, y::T) where {T<:Base.BitSigned}
     y == 0 && @print_and_throw c"Integer division error"
     y == -1 ? zero(T) : Core.Intrinsics.srem_int(x, y)
