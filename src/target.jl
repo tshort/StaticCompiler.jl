@@ -1,9 +1,9 @@
 """
 ```julia
     StaticTarget() # Native target
-    StaticTarget(platform::Base.BinaryPlatforms.Platform) # Specific target with generic CPU
-    StaticTarget(platform::Platform, cpu::String) # Specific target with specific CPU
-    StaticTarget(platform::Platform, cpu::String, features::String) # Specific target with specific CPU and features
+    StaticTarget(platform_or_triple) # Specific target with generic CPU (a `Base.BinaryPlatforms.Platform` or a triple string)
+    StaticTarget(platform_or_triple, cpu::String) # Specific target with specific CPU
+    StaticTarget(platform_or_triple, cpu::String, features::String) # Specific target with specific CPU and features
 ```
 Struct that defines a target for the compilation
 Beware that currently the compilation assumes that the code is on the host so platform specific code like:
@@ -12,6 +12,9 @@ Beware that currently the compilation assumes that the code is on the host so pl
 ```
 does not behave as expected.
 By default `StaticTarget()` is the native target.
+
+If Julia's LLVM has no code generator for the target (x86-64 where LLVM has only AArch64 and WebAssembly, say), the target is made anyway, with `ir_triple` set: IR can be made for it
+(`generate_ir`, `emit_llvm_only = true`, `llvm_to_clang = true`: the IR has the target's triple and no host CPU or features), and an external `clang` or `llc` that has the code generator makes the object.
 
 For cross-compilation of executables and shared libraries, one also needs to call `set_compiler!` with the path to a valid C compiler
 for the target platform. For example, to cross-compile for aarch64 using a compiler from homebrew, one can use:
@@ -22,29 +25,45 @@ for the target platform. For example, to cross-compile for aarch64 using a compi
 mutable struct StaticTarget
     platform::Union{Platform,Nothing}
     tm::LLVM.TargetMachine
-    compiler::Union{String,Nothing}
+    compiler::Union{String,Nothing} # A target-specific compiler, else nothing
+    ir_triple::Union{String,Nothing} # A target that requires us to output IR only, else nothing
     julia_runtime::Bool
 end
-
-clean_triple(platform::Platform) = arch(platform) * os_str(platform) * libc_str(platform)
+StaticTarget(platform, tm, compiler, julia_runtime) = StaticTarget(platform, tm, compiler, nothing, julia_runtime)
 StaticTarget() = StaticTarget(HostPlatform(), LLVM.host_cpu_name(), LLVM.host_cpu_features())
-StaticTarget(platform::Platform) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform)), nothing, false)
-StaticTarget(platform::Platform, cpu::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform); cpu), nothing, false)
-StaticTarget(platform::Platform, cpu::String, features::String) = StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = clean_triple(platform)), clean_triple(platform); cpu, features), nothing, false)
 
-function StaticTarget(triple::String, cpu::String, features::String)
-    platform = tryparse(Platform, triple)
-    StaticTarget(platform, LLVM.TargetMachine(LLVM.Target(triple = triple), triple; cpu, features), nothing, false)
+# The target for a platform or a triple, with the generic CPU of its architecture unless `cpu` and `features` say otherwise. Julia's LLVM may have no code generator for it: then `ir_triple` is set, `tm`
+# is the host's, and only IR can be made (see above).
+function StaticTarget(target::Union{Platform,AbstractString}, cpu::AbstractString = "", features::AbstractString = "")
+    platform = target isa Platform ? target : tryparse(Platform, target)
+    triple = target isa Platform ? clean_triple(target) : String(target)
+    tm = try
+        LLVM.TargetMachine(LLVM.Target(triple = triple), triple; cpu, features)
+    catch err
+        # (`ArgumentError`: "No available targets are compatible with triple")
+        err isa ArgumentError || rethrow()
+        return StaticTarget(platform, host_generic_machine(), nothing, LLVM.normalize(triple), false)
+    end
+    return StaticTarget(platform, tm, nothing, nothing, false)
 end
+clean_triple(platform::Platform) = arch(platform) * os_str(platform) * libc_str(platform)
+
+# the host's target machine without its CPU and its features, which are not those of another architecture's code (and not to be in its IR)
+host_generic_machine() = LLVM.TargetMachine(LLVM.Target(triple = LLVM.default_triple()), LLVM.default_triple())
+
+"The triple that the target is for: the one of its IR if it has no code generator in Julia's LLVM, and else the one of its target machine"
+target_triple(target::StaticTarget) = something(target.ir_triple, LLVM.triple(target.tm))
 
 """
-Set the compiler for cross compilation
-    ```julia
-    set_compiler!(StaticTarget(parse(Platform,"aarch64-gnu-linux")), "/opt/homebrew/bin/aarch64-elf-gcc")
+```julia
+set_compiler!(target::StaticTarget, compiler::String)
+```
+Set the compiler for cross compilation. For example:
+```julia
+set_compiler!(StaticTarget(parse(Platform,"aarch64-gnu-linux")), "/opt/homebrew/bin/aarch64-elf-gcc")
 ```
 """
 set_compiler!(target::StaticTarget, compiler::String) = (target.compiler = compiler)
-
 
 set_runtime!(target::StaticTarget, julia_runtime::Bool) = (target.julia_runtime = julia_runtime)
 

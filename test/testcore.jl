@@ -165,3 +165,44 @@ Base.Experimental.@overlay AnotherTable SubFoo.rand() = 3
         @test @ccall($fptr()::Int) == 6
     end
 end
+
+@testset "The target is not the host" begin
+    using Base.BinaryPlatforms
+    # The target machine is the host's: only the platform is considered, and not every LLVM has the code generator of each platform
+    t(p) = StaticCompiler.StaticTarget(p, StaticCompiler.StaticTarget().tm, nothing, false)
+    # Ensure we are checking the target, no the host
+    @test StaticCompiler.iswindows(t(Platform("x86_64", "windows"))) && !StaticCompiler.isapple(t(Platform("x86_64", "windows")))
+    @test StaticCompiler.isapple(t(Platform("aarch64", "macos"))) && !StaticCompiler.iswindows(t(Platform("aarch64", "macos")))
+    @test !StaticCompiler.iswindows(t(Platform("aarch64", "linux"))) && !StaticCompiler.isapple(t(Platform("aarch64", "linux")))
+    # A triple that `Platform` does not parse
+    wasm = StaticCompiler.StaticTarget("wasm32-unknown-unknown", "generic", "")
+    @test isnothing(wasm.platform) && !StaticCompiler.iswindows(wasm) && !StaticCompiler.isapple(wasm)
+end
+
+@testset "LLVM IR as text" begin
+    ir = StaticCompiler.generate_ir(fib, Tuple{Int})
+    @test ir isa String && occursin("define", ir) && occursin("fib", ir) && occursin("target triple", ir)
+    path, ir_path = StaticCompiler.generate_obj(((fib, Tuple{Int}),), mktempdir(), "fibir"; emit_llvm_only = true)
+    @test isfile(ir_path) && occursin("define", read(ir_path, String))
+end
+
+@testset "A target that Julia's LLVM has no code generator for" begin
+    triple = "x86_64-unknown-linux-gnu"
+    ir_target = StaticCompiler.StaticTarget(tryparse(Base.BinaryPlatforms.Platform, triple), StaticCompiler.host_generic_machine(), nothing, triple, false)
+    @test StaticCompiler.target_triple(ir_target) == triple && StaticCompiler.needs_ir(ir_target)
+    @test occursin("--target=$triple", string(StaticCompiler.clang_target_flags(ir_target)))
+    ir = StaticCompiler.generate_ir(fib, Tuple{Int}; target = ir_target)
+    @test occursin("target triple = \"$triple\"", ir) && !occursin("target datalayout", ir) && !occursin("target-cpu", ir) && !occursin("target-features", ir)
+    @test_throws ArgumentError StaticCompiler.generate_obj(((fib, Tuple{Int}),), mktempdir(), "fibobj"; target = ir_target)
+    path, ir_path = StaticCompiler.generate_obj(((fib, Tuple{Int}),), mktempdir(), "fibir"; target = ir_target, emit_llvm_only = true)
+    @test occursin("target triple = \"$triple\"", read(ir_path, String))
+    # the host's own target is untouched
+    host = StaticCompiler.StaticTarget()
+    @test isnothing(host.ir_triple) && StaticCompiler.needs_ir(host) == Sys.iswindows()
+    @test isempty(StaticCompiler.clang_target_flags(host))
+    # where there is no code generator for the triple, the constructors make such a target
+    for t in ("x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu", "riscv64-unknown-linux-gnu")
+        has_backend = try; LLVM.Target(triple = t); true; catch; false; end
+        has_backend || @test StaticCompiler.StaticTarget(t, "generic", "").ir_triple == LLVM.normalize(t)
+    end
+end

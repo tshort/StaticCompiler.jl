@@ -9,6 +9,7 @@ using StaticTools
 # using StrideArraysCore
 using MacroTools
 using LLD_jll
+using LLVM
 using Bumper
 
 addprocs(1)
