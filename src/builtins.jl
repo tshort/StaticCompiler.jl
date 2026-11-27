@@ -1,0 +1,262 @@
+## Builtins: the LLVM functions that the code generator may calls and that a C runtime library would have supplied
+
+# When an object is linked by `lld` alone, nothing supplies the functions that codegen calls that the CPU has no instruction for.
+# For example, `__udivti3` for the division of `i128`, `__extendhfsf2` for `Float16`. 
+# They are defined here in IR, `linkonce_odr` and `hidden`: 
+# a definition of the program's own, or of a library that is linked, wins, and the module has only those that it uses. 
+# A toolchain asks for them with `builtins = true` (`LLD` does by default; a `Driver` does not, as the compiler driver links its runtime library).
+
+# Conversions between `Float16` and `Float32` that the code generator for x86-64 calls where the CPU is not said to have them: with the instructions that do them (F16C: from 2012 on).
+const X86_HALF_BUILTINS = """
+define linkonce_odr hidden float @__extendhfsf2(half %a) #9999 {
+  %r = fpext half %a to float
+  ret float %r
+}
+define linkonce_odr hidden half @__truncsfhf2(float %a) #9999 {
+  %r = fptrunc float %a to half
+  ret half %r
+}
+attributes #9999 = { nounwind "target-features"="+f16c" }
+"""
+
+# 128-bit division (`__udivti3` and the others of libgcc and compiler-rt, which a Linux program is not linked with): by shifting and subtracting, with instructions of `i128` that are not calls
+# (a division of `i128` in them would be a call of themselves).
+const LINUX_INT128_BUILTINS = """
+define linkonce_odr hidden i128 @__static_udivmod(i128 %a, i128 %b, i1 %rem) {
+entry:
+  ; (operands of 64 bits, the usual: the instruction of the CPU; a divisor of zero is left to the loop, which does not trap)
+  %ah = lshr i128 %a, 64
+  %bh = lshr i128 %b, 64
+  %hi = or i128 %ah, %bh
+  %nohi = icmp eq i128 %hi, 0
+  %bnz = icmp ne i128 %b, 0
+  %small = and i1 %nohi, %bnz
+  br i1 %small, label %fast, label %loop
+fast:
+  %a64 = trunc i128 %a to i64
+  %b64 = trunc i128 %b to i64
+  %fq = udiv i64 %a64, %b64
+  %fr = urem i64 %a64, %b64
+  %fqx = zext i64 %fq to i128
+  %frx = zext i64 %fr to i128
+  %fres = select i1 %rem, i128 %frx, i128 %fqx
+  ret i128 %fres
+loop:
+  %i = phi i32 [ 127, %entry ], [ %i1, %loop ]
+  %q = phi i128 [ 0, %entry ], [ %q2, %loop ]
+  %r = phi i128 [ 0, %entry ], [ %r3, %loop ]
+  %i128 = zext i32 %i to i128
+  %sh = lshr i128 %a, %i128
+  %bit = and i128 %sh, 1
+  %r1 = shl i128 %r, 1
+  %r2 = or i128 %r1, %bit
+  %ge = icmp uge i128 %r2, %b
+  %rs = sub i128 %r2, %b
+  %r3 = select i1 %ge, i128 %rs, i128 %r2
+  %one = shl i128 1, %i128
+  %qo = or i128 %q, %one
+  %q2 = select i1 %ge, i128 %qo, i128 %q
+  %i1 = sub i32 %i, 1
+  %done = icmp slt i32 %i1, 0
+  br i1 %done, label %exit, label %loop
+exit:
+  %res = select i1 %rem, i128 %r3, i128 %q2
+  ret i128 %res
+}
+define linkonce_odr hidden i128 @__udivti3(i128 %a, i128 %b) {
+  %r = call i128 @__static_udivmod(i128 %a, i128 %b, i1 false)
+  ret i128 %r
+}
+define linkonce_odr hidden i128 @__umodti3(i128 %a, i128 %b) {
+  %r = call i128 @__static_udivmod(i128 %a, i128 %b, i1 true)
+  ret i128 %r
+}
+define linkonce_odr hidden i128 @__divti3(i128 %a, i128 %b) {
+  %sa = icmp slt i128 %a, 0
+  %sb = icmp slt i128 %b, 0
+  %na = sub i128 0, %a
+  %nb = sub i128 0, %b
+  %ua = select i1 %sa, i128 %na, i128 %a
+  %ub = select i1 %sb, i128 %nb, i128 %b
+  %q = call i128 @__static_udivmod(i128 %ua, i128 %ub, i1 false)
+  %neg = xor i1 %sa, %sb
+  %nq = sub i128 0, %q
+  %r = select i1 %neg, i128 %nq, i128 %q
+  ret i128 %r
+}
+define linkonce_odr hidden i128 @__modti3(i128 %a, i128 %b) {
+  %sa = icmp slt i128 %a, 0
+  %sb = icmp slt i128 %b, 0
+  %na = sub i128 0, %a
+  %nb = sub i128 0, %b
+  %ua = select i1 %sa, i128 %na, i128 %a
+  %ub = select i1 %sb, i128 %nb, i128 %b
+  %m = call i128 @__static_udivmod(i128 %ua, i128 %ub, i1 true)
+  %nm = sub i128 0, %m
+  %r = select i1 %sa, i128 %nm, i128 %m
+  ret i128 %r
+}
+"""
+
+# The same conversions for WebAssembly, which has no instruction for it.
+# by integer arithmetic (the rounding is to the nearest, ties to even)
+const WASM_HALF_BUILTINS = """
+define linkonce_odr hidden float @__extendhfsf2(half %a) {
+  %h = bitcast half %a to i16
+  %hi = zext i16 %h to i32
+  %s1 = lshr i32 %hi, 15
+  %s2 = shl i32 %s1, 31
+  %e1 = lshr i32 %hi, 10
+  %e = and i32 %e1, 31
+  %m = and i32 %hi, 1023
+  %en = add i32 %e, 112
+  %en2 = shl i32 %en, 23
+  %m13 = shl i32 %m, 13
+  %n1 = or i32 %s2, %en2
+  %normal = or i32 %n1, %m13
+  %i1 = or i32 %s2, 2139095040
+  %infnan = or i32 %i1, %m13
+  %mf = uitofp i32 %m to float
+  %sub = fmul float %mf, 0x3E70000000000000
+  %subb = bitcast float %sub to i32
+  %subs = or i32 %subb, %s2
+  %isz = icmp eq i32 %e, 0
+  %isi = icmp eq i32 %e, 31
+  %r1 = select i1 %isi, i32 %infnan, i32 %normal
+  %r = select i1 %isz, i32 %subs, i32 %r1
+  %f = bitcast i32 %r to float
+  ret float %f
+}
+define linkonce_odr hidden half @__truncsfhf2(float %a) {
+  %x = bitcast float %a to i32
+  %s1 = lshr i32 %x, 16
+  %sign = and i32 %s1, 32768
+  %e1 = lshr i32 %x, 23
+  %e = and i32 %e1, 255
+  %m = and i32 %x, 8388607
+  %ne = sub i32 %e, 112
+  ; infinity and NaN
+  %m13 = lshr i32 %m, 13
+  %nanm = or i32 %m13, 512
+  %hasm = icmp ne i32 %m, 0
+  %nanbits = select i1 %hasm, i32 %nanm, i32 0
+  %infnan = or i32 %nanbits, 31744
+  ; normal
+  %ne10 = shl i32 %ne, 10
+  %hn = or i32 %ne10, %m13
+  %rem = and i32 %m, 8191
+  %gt = icmp ugt i32 %rem, 4096
+  %eq = icmp eq i32 %rem, 4096
+  %odd1 = and i32 %hn, 1
+  %odd = icmp ne i32 %odd1, 0
+  %tie = and i1 %eq, %odd
+  %up = or i1 %gt, %tie
+  %upi = zext i1 %up to i32
+  %hn2 = add i32 %hn, %upi
+  ; subnormal
+  %mm = or i32 %m, 8388608
+  %shift = sub i32 14, %ne
+  %shiftc = call i32 @llvm.umin.i32(i32 %shift, i32 31)
+  %hs = lshr i32 %mm, %shiftc
+  %one = shl i32 1, %shiftc
+  %mask = sub i32 %one, 1
+  %rem2 = and i32 %mm, %mask
+  %half1 = lshr i32 %one, 1
+  %gt2 = icmp ugt i32 %rem2, %half1
+  %eq2 = icmp eq i32 %rem2, %half1
+  %odd2a = and i32 %hs, 1
+  %odd2 = icmp ne i32 %odd2a, 0
+  %tie2 = and i1 %eq2, %odd2
+  %up2 = or i1 %gt2, %tie2
+  %up2i = zext i1 %up2 to i32
+  %hs2 = add i32 %hs, %up2i
+  ; which
+  %isinf = icmp eq i32 %e, 255
+  %ovf = icmp sge i32 %ne, 31
+  %isnorm = icmp sge i32 %ne, 1
+  %issub = icmp sge i32 %ne, -10
+  %r1 = select i1 %issub, i32 %hs2, i32 0
+  %r2 = select i1 %isnorm, i32 %hn2, i32 %r1
+  %r3 = select i1 %ovf, i32 31744, i32 %r2
+  %r4 = select i1 %isinf, i32 %infnan, i32 %r3
+  %r5 = or i32 %r4, %sign
+  %r16 = trunc i32 %r5 to i16
+  %h = bitcast i16 %r16 to half
+  ret half %h
+}
+declare i32 @llvm.umin.i32(i32, i32)
+; double to half: through float with the rounding to odd (inexact results get an odd last bit: the second rounding is then the one of the double), and half to double
+define linkonce_odr hidden half @__truncdfhf2(double %a) {
+  %f = fptrunc double %a to float
+  %back = fpext float %f to double
+  %exact = fcmp oeq double %back, %a
+  %isnan = fcmp uno double %a, %a
+  %fb = bitcast float %f to i32
+  %odd = and i32 %fb, 1
+  %isodd = icmp ne i32 %odd, 0
+  %nb = fneg double %back
+  %bneg = fcmp olt double %back, 0.0
+  %ab = select i1 %bneg, double %nb, double %back
+  %na = fneg double %a
+  %aneg = fcmp olt double %a, 0.0
+  %aa = select i1 %aneg, double %na, double %a
+  %up = fcmp ogt double %ab, %aa
+  %dec = sub i32 %fb, 1
+  %inc = add i32 %fb, 1
+  %adj = select i1 %up, i32 %dec, i32 %inc
+  %isinf = fcmp oeq float %f, 0x7FF0000000000000
+  %k1 = or i1 %exact, %isodd
+  %k2 = or i1 %k1, %isnan
+  %k3 = or i1 %k2, %isinf
+  %r = select i1 %k3, i32 %fb, i32 %adj
+  %rf = bitcast i32 %r to float
+  %h = call half @__truncsfhf2(float %rf)
+  ret half %h
+}
+define linkonce_odr hidden double @__extendhfdf2(half %a) {
+  %f = call float @__extendhfsf2(half %a)
+  %d = fpext float %f to double
+  ret double %d
+}
+"""
+
+# The builtins that the IR needs for the target: the names of the constants above. `text` is the IR; the system and the architecture are the triple's.
+function needed_builtins(text::AbstractString, triple::AbstractString)
+    family = llvm_family(first(split(triple, '-')))
+    has_half = occursin(r"\bhalf\b", text)
+    needed = Symbol[]
+    family == "x86" && startswith(triple, "x86_64") && has_half && push!(needed, :X86_HALF_BUILTINS)
+    family == "wasm" && has_half && push!(needed, :WASM_HALF_BUILTINS)
+    occursin("linux", triple) && occursin(r"\b(udiv|sdiv|urem|srem) i128\b", text) && push!(needed, :LINUX_INT128_BUILTINS)
+    return needed
+end
+
+"""
+    add_builtins(text::AbstractString, triple::AbstractString) -> String
+
+The LLVM IR `text` with the definitions of the builtins that it needs for `triple` (see [`add_builtins!`](@ref)).
+"""
+function add_builtins(text::AbstractString, triple::AbstractString)
+    for name in needed_builtins(text, triple)
+        text = string(text, "\n", getfield(@__MODULE__, name))
+    end
+    return text
+end
+
+"""
+    add_builtins!(mod::LLVM.Module, triple::AbstractString) -> mod
+
+Define in the module the builtins that it needs for the target `triple`: the functions that the code generator calls for what the CPU has no instruction for, which a C runtime library (libgcc, compiler-rt) has and an object
+that is linked by `lld` alone has not. Which are needed is what the module says: `i128` division on Linux, `Float16` conversions on x86-64 and WebAssembly.
+"""
+function add_builtins!(mod::LLVM.Module, triple::AbstractString)
+    for name in needed_builtins(string(mod), triple)
+        builtins = parse(LLVM.Module, getfield(@__MODULE__, name))
+        # (the linker of modules takes a `linkonce_odr` definition only where something in the module calls it, and nothing does: the code generator will. `weak_odr` is as well replaced by a definition of the program's own)
+        for f in LLVM.functions(builtins)
+            LLVM.isdeclaration(f) || LLVM.linkage!(f, LLVM.API.LLVMWeakODRLinkage)
+        end
+        LLVM.link!(mod, builtins)
+    end
+    return mod
+end

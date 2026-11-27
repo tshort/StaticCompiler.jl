@@ -10,6 +10,7 @@ using StaticTools
 using MacroTools
 using LLD_jll
 using LLVM
+using Glibc_jll, Pkg # (the extension that has the C library of a Linux target)
 using Bumper
 
 addprocs(1)

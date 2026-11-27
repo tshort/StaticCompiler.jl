@@ -15,68 +15,18 @@ using Base: BinaryPlatforms.platform_dlext, BinaryPlatforms.arch, BinaryPlatform
 export load_function, compile_shlib, compile_executable
 export static_code_llvm, static_code_typed, static_llvm_module, static_code_native
 export @device_override, @print_and_throw
-export StaticTarget
+export StaticTarget, Driver, LLD
+
+abstract type Toolchain end # (the field of `StaticTarget`; see toolchain.jl)
 
 include("quirks.jl")
 include("target.jl")
-include("pointer_warning.jl")
-include("dllexport.jl")
+include("toolchain.jl")
+include("builtins.jl")
+include("llvm.jl")
 
 fix_name(f::Function) = fix_name(string(nameof(f)))
 fix_name(s) = String(GPUCompiler.safe_name(s))
-
-# Generally prefer Clang_jll clang (which should probably be at least as new as Julia's LLVM)
-# and fall back to the system one on platforms where Clang_jll is not available or not expected to work
-function clang()
-    Clang_jll.is_available() || return `clang` # Fall back to system clang if Clang_jll is not available
-    cmd = Clang_jll.clang()
-    # Clang_jll may not know where to find the macOS SDK (e.g. for `-lSystem`)
-    if Sys.isapple() && !haskey(ENV, "SDKROOT") 
-        isnothing(Sys.which("xcrun")) && return `clang` # Fall back to system clang if we can't figure out the SDK path
-        cmd = addenv(cmd, "SDKROOT" => readchomp(`xcrun --show-sdk-path`))
-    end
-    return cmd
-end
-
-# shared library extension of the target (that of the host, unless cross-compiling)
-dlext(target::StaticTarget) = isnothing(target.platform) ? Libdl.dlext : platform_dlext(target.platform)
-
-# Make any OS-specific choices on the basis of the target, not the host
-iswindows(target::StaticTarget) = isnothing(target.platform) ? occursin(r"windows|mingw|msvc|cygwin"i, target_triple(target)) : Sys.iswindows(target.platform)
-isapple(target::StaticTarget) = isnothing(target.platform) ? occursin(r"apple|darwin|macos"i, target_triple(target)) : Sys.isapple(target.platform)
-
-# Whether the IR has to go through an external compiler (`clang`, `llc`) to be an object: on Windows (always), or where Julia's LLVM has no code generator for the target
-needs_ir(target::StaticTarget) = iswindows(target) || !isnothing(target.ir_triple)
-
-# `clang` makes code for its own host unless it is told the target (it replaces the triple of the IR, which `-Wno-override-module` hides)
-function clang_target_flags(target::StaticTarget)
-    host = HostPlatform()
-    foreign = !isnothing(target.ir_triple) || (!isnothing(target.platform) && (arch(target.platform) != arch(host) || os(target.platform) != os(host)))
-    return foreign ? `--target=$(target_triple(target))` : ``
-end
-
-# the family that an architecture's intrinsics (`llvm.<family>.`) are named by
-llvm_family(arch::AbstractString) = startswith(arch, "aarch64") || startswith(arch, "arm64") ? "aarch64" : startswith(arch, "arm") ? "arm" : arch in ("x86_64", "i686", "i386", "x86") ? "x86" : startswith(arch, "wasm") ? "wasm" : arch
-
-# The IR of a target that has no code generator here (`target.ir_triple`) was made for the host, by Julia's code generation: it gets the triple of the target, no data layout (the code generator that makes the
-# object has the target's), and no attributes that name the host's CPU and features. IR that has intrinsics of the host's architecture is refused: it can not be made for another.
-function retarget!(mod::LLVM.Module, target::StaticTarget)
-    triple = target.ir_triple
-    isnothing(triple) && return mod
-    family = llvm_family(first(split(triple, '-')))
-    for f in LLVM.functions(mod)
-        m = match(r"^llvm\.(aarch64|arm|x86|wasm)\.", LLVM.name(f))
-        isnothing(m) || m.captures[1] == family || throw(ArgumentError("the program uses `$(LLVM.name(f))`, an intrinsic of the code generator of the host's architecture: it can not be made for $triple"))
-        attrs = LLVM.function_attributes(f)
-        for kind in ("target-cpu", "target-features", "tune-cpu")
-            delete!(attrs, kind)
-        end
-    end
-    LLVM.triple!(mod, triple)
-    LLVM.datalayout!(mod, "")
-    return mod
-end
-
 
 # Check that `f(types...)` is compilable to a native entry point, returning the tuple type of `types`
 function check_signature(f, types; target::StaticTarget=StaticTarget(), kwargs...)
@@ -194,8 +144,7 @@ function compile_executable(funcs::Union{Array,Tuple}, path::String=pwd(), name=
     isexecutableargtype || @warn "input type signature $types should be either `()` or `(Int, Ptr{Ptr{UInt8}})` for standard executables"
 
     generate_executable(funcs, path, name, filename; target, demangle, cc, cflags, llvm_to_clang, kwargs...)
-    iswindows(target) && (filename *= ".exe")
-    joinpath(abspath(path), filename)
+    joinpath(abspath(path), output_name(isnothing(cc) ? toolchain(target) : Driver(cc), target, filename))
 end
 
 """
@@ -270,7 +219,7 @@ function compile_shlib(funcs::Union{Array,Tuple}, path::String=pwd();
 
     generate_shlib(funcs, path, filename; target, demangle, cc, cflags, llvm_to_clang, kwargs...)
 
-    joinpath(abspath(path), filename * "." * dlext(target))
+    joinpath(abspath(path), output_name(isnothing(cc) ? toolchain(target) : Driver(cc), target, filename; kind = :shared))
 end
 
 
@@ -360,42 +309,17 @@ function generate_executable(funcs::Union{Array,Tuple}, path=tempname(), name=fi
                              llvm_to_clang::Bool = needs_ir(target),
                              kwargs...
                             )
-    # Choice of compiler
-    isnothing(cc) && (cc = isnothing(target.compiler) ? clang() : `$(target.compiler)`)
+    # How it is linked: what `cc` says, or the toolchain of the target
+    tc = isnothing(cc) ? toolchain(target) : Driver(cc)
 
-    # Prepare objects or (if llvm_to_clang is set) IR
-    exec_path = joinpath(path, filename)
-    _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, emit_llvm_only=llvm_to_clang, kwargs...)
-
-    # Update paths and flags given options
+    # Prepare objects or (if llvm_to_clang is set) IR. A linker that is not a compiler driver is given an object that has a `main`
     fn = demangle ? "$name" : "julia_$name"
-    iswindows(target) && (exec_path *= ".exe")
-    llvm_to_clang && (cflags = `-Wno-override-module $(clang_target_flags(target)) $cflags`)
+    main_wrapper = tc isa Driver ? nothing : fn
+    _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, emit_llvm_only=llvm_to_clang, main_wrapper, kwargs...)
 
-    # Compile!
-    if isapple(target) && !llvm_to_clang
-        # Apple no longer uses _start, so we can just specify a custom entry
-        run(`$cc -e _$fn $obj_or_ir_path $cflags -o $exec_path`)
-    else
-        # Write a minimal wrapper to avoid having to specify a custom entry
-        wrapper_path = joinpath(path, "wrapper$(rand(UInt)).c")
-        f = open(wrapper_path, "w")
-        print(f, """int $fn(int argc, char** argv);
-        void* __stack_chk_guard = (void*) $(rand(UInt) >> 1);
-
-        int main(int argc, char** argv)
-        {
-            return $fn(argc, argv);
-        }""")
-        close(f)
-
-        # Depending on whether llvm_to_clang is set, 
-        # this may either be compiling from LLVM IR or just linking object files
-        run(`$cc $wrapper_path $obj_or_ir_path $cflags -o $exec_path`)
-
-        # Clean up
-        rm(wrapper_path)
-    end
+    # Link!
+    exec_path = joinpath(path, output_name(tc, target, filename))
+    link(tc, target, [obj_or_ir_path], exec_path; kind = :executable, entry = fn, cflags)
     return path, name
 end
 
@@ -452,17 +376,16 @@ function generate_shlib(funcs::Union{Array,Tuple}, path::String=tempname(), file
         llvm_to_clang::Bool = needs_ir(target),
         kwargs...
     )
-    # Choice of compiler
-    isnothing(cc) && (cc = isnothing(target.compiler) ? clang() : `$(target.compiler)`)
+    # How it is linked: what `cc` says, or the toolchain of the target
+    tc = isnothing(cc) ? toolchain(target) : Driver(cc)
 
     # Prepare objects or (if llvm_to_clang is set) IR
-    lib_path = joinpath(path, "$filename.$(dlext(target))")
+    lib_path = joinpath(path, output_name(tc, target, filename; kind = :shared))
     _, obj_or_ir_path = generate_obj(funcs, path, filename; demangle, target, emit_llvm_only=llvm_to_clang,
                                      dllexport=iswindows(target), kwargs...)
-                                     
-    # Compile!
-    llvm_to_clang && (cflags = `-Wno-override-module $(clang_target_flags(target)) $cflags`)
-    run(`$cc -shared $obj_or_ir_path $cflags -o $lib_path `)
+
+    # Link!
+    link(tc, target, [obj_or_ir_path], lib_path; kind = :shared, cflags)
 
     return path, filename
 end
@@ -634,29 +557,44 @@ This is a struct of the type StaticTarget()
 The defaults compile to the native target.
 
 If `dllexport` is set, the functions are exported from a Windows DLL.
+
+If `main_wrapper` is the name of one of the functions, the object will be given a `main` that calls it, 
+possibly preceeded by any code added by `main_prologue(builder, mod)`.
+
+`llvm_finalize(mod)`, if given, is called on the whole module when complete.
 """
 function generate_obj(funcs::Union{Array,Tuple}, path::String = tempname(), filenamebase::String="obj";
                         target::StaticTarget=StaticTarget(),
                         demangle = true,
                         emit_llvm_only = false,
                         dllexport = false,
+                        main_wrapper = nothing,
+                        main_prologue = nothing,
                         llvm_postprocess = nothing,
+                        llvm_finalize = nothing,
                         kwargs...)
     f, tt = funcs[1]
     mkpath(path)
     if emit_llvm_only # (Required on Windows)
         ir_path = joinpath(path, "$filenamebase.ll")
-        write(ir_path, generate_ir(funcs; demangle, target, dllexport, llvm_postprocess, kwargs...))
+        write(ir_path, generate_ir(funcs; demangle, target, dllexport, main_wrapper, main_prologue, llvm_postprocess, llvm_finalize, kwargs...))
         return path, ir_path
     end
-    isnothing(target.ir_triple) || throw(ArgumentError("Julia's LLVM has no code generator for $(target.ir_triple), so no object can be made for it here: use `emit_llvm_only = true` (or `generate_ir`) and give the IR to a compiler that has one"))
+    can_emit_object(target) || throw(ArgumentError("no object can be made for $(target_triple(target)) here: Julia's LLVM has no code generator for it, and no `llc` is given (`StaticTarget(...; llc)`). Use `emit_llvm_only = true` (or `generate_ir`) and give the IR to a compiler that has one"))
     # compile and generate code in one context, which the module can't outlive
     GPUCompiler.JuliaContext() do context
       @dispose mod=compile_llvm_module(funcs; demangle, target, llvm_postprocess, kwargs...) begin
         dllexport && add_dllexport!(mod, funcs; demangle)
+        isnothing(main_wrapper) || add_main_wrapper!(mod, main_wrapper, target; prologue = main_prologue)
+        uses_builtins(target.toolchain) && add_builtins!(mod, target_triple(target))
+        isnothing(llvm_finalize) || llvm_finalize(mod)
         obj_path = joinpath(path, "$filenamebase.o")
-        fakejob, _ = static_job(f, tt; target, kwargs...)
-        obj, _ = GPUCompiler.emit_asm(fakejob, mod, LLVM.CodeGenFileType.Object)
+        if isnothing(target.retarget)
+            fakejob, _ = static_job(f, tt; target, kwargs...)
+            obj, _ = GPUCompiler.emit_asm(fakejob, mod, LLVM.CodeGenFileType.Object)
+        else
+            obj = emit_object(mod, target) # (by the code generator of the target, which is not the host's)
+        end
         open(obj_path, "w") do io
             write(io, obj)
         end
@@ -673,14 +611,81 @@ generate_ir(f, tt; kwargs...) -> String
 The LLVM IR (as text) of the functions that `generate_obj` would compile to an object file, for tools that take IR instead (a downstream package that makes the object or
 the executable of a target by itself, for example): nothing is written to the file system, and the module (which cannot outlive its context) is not returned.
 """
-function generate_ir(funcs::Union{Array,Tuple}; target::StaticTarget=StaticTarget(), demangle = true, dllexport = false, llvm_postprocess = nothing, kwargs...)
+function generate_ir(funcs::Union{Array,Tuple}; target::StaticTarget=StaticTarget(), demangle = true, dllexport = false, main_wrapper = nothing, main_prologue = nothing, llvm_postprocess = nothing, llvm_finalize = nothing, kwargs...)
     GPUCompiler.JuliaContext() do context
       @dispose mod=compile_llvm_module(funcs; demangle, target, llvm_postprocess, kwargs...) begin
         dllexport && add_dllexport!(mod, funcs; demangle)
+        isnothing(main_wrapper) || add_main_wrapper!(mod, main_wrapper, target; prologue = main_prologue)
+        uses_builtins(target.toolchain) && add_builtins!(mod, target_triple(target))
+        isnothing(llvm_finalize) || llvm_finalize(mod)
         return string(mod)
       end
     end
 end
 generate_ir(f, tt; kwargs...) = generate_ir(((f, tt),); kwargs...)
+
+
+"""
+    link(toolchain, target, inputs::Vector{String}, output::String; kind = :executable, entry = nothing, cflags = ``) -> path
+
+Link the `inputs` (object files, or LLVM IR files if the toolchain is a `Driver`) 
+into an executable (`kind = :executable`) or shared library (`kind = :shared`), and return its path. 
+
+If given, `entry` is the name of the function that an executable runs (`int f(int argc, char **argv)`); 
+with `entry = nothing` the inputs define `main` already, and are linked as they are.
+"""
+function link(tc::Driver, target::StaticTarget, inputs::Vector{String}, output::String; kind::Symbol = :executable, entry = nothing, cflags = ``)
+    # Link using a C compiler driver
+    cc = tc.cc
+    # (IR, which `clang` compiles itself: it is told what the target is, as it replaces the triple of the IR by the host's)
+    ir = any(endswith(".ll"), inputs)
+    ir && (cflags = `-Wno-override-module $(clang_target_flags(target)) $cflags`)
+    if kind === :shared
+        run(`$cc -shared $inputs $cflags -o $output`)
+    elseif isnothing(entry)
+        run(`$cc $inputs $cflags -o $output`) # (`main` is in the inputs)
+    elseif isapple(target) && !ir
+        # Apple no longer uses _start, so we can just specify a custom entry
+        run(`$cc -e _$entry $inputs $cflags -o $output`)
+    else
+        # Write a minimal wrapper to avoid having to specify a custom entry
+        wrapper_path = joinpath(dirname(output), "wrapper$(rand(UInt)).c")
+        write(wrapper_path, """int $entry(int argc, char** argv);
+        void* __stack_chk_guard = (void*) $(rand(UInt) >> 1);
+
+        int main(int argc, char** argv)
+        {
+            return $entry(argc, argv);
+        }""")
+        try
+            # (compiling from LLVM IR, or just linking object files, depending on the inputs)
+            run(`$cc $wrapper_path $inputs $cflags -o $output`)
+        finally
+            rm(wrapper_path; force = true)
+        end
+    end
+    return output
+end
+function link(tc::LLD, target::StaticTarget, inputs::Vector{String}, output::String; kind::Symbol = :executable, entry = nothing, cflags = ``)
+    # Link using an LLD driver
+    any(endswith(".ll"), inputs) && throw(ArgumentError("`LLD` links objects, not LLVM IR: make the objects (the target has to be one that Julia's LLVM has the code generator for)"))
+    if tc.flavor === :gnu
+        sysroot = tc.sysroot
+        isnothing(sysroot) && throw(ArgumentError("linking for $(target_triple(target)) needs the C library of the target: give `sysroot = ...` to `LLD(:gnu; ...)`"))
+        dir = crt_directory(sysroot)
+        libs = ["-l$l" for l in tc.libs]
+        if kind === :shared
+            run(`$(lld()) -flavor gnu -shared -o $output $inputs -L$dir $libs $(tc.flags) $cflags`)
+        else
+            loader = something(tc.dynamic_linker, default_dynamic_linker(target))
+            run(`$(lld()) -flavor gnu -o $output -dynamic-linker $loader $(joinpath(dir, "crt1.o")) $(joinpath(dir, "crti.o")) $inputs -L$dir $libs $(joinpath(dir, "crtn.o")) $(tc.flags) $cflags`)
+        end
+    else # :wasm
+        kind === :shared && throw(ArgumentError("a shared library for WebAssembly is not supported"))
+        bits = startswith(target_triple(target), "wasm64") ? "-mwasm64" : "-mwasm32"
+        run(`$(lld()) -flavor wasm $bits --no-entry --export=main --export-memory --allow-undefined -o $output $inputs $(tc.flags) $cflags`)
+    end
+    return output
+end
 
 end # module

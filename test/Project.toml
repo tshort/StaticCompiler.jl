@@ -1,4 +1,6 @@
 [deps]
+Glibc_jll = "452aa2e7-e185-58db-8ff9-d3c1fa4bc997"
+Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 Formatting = "59287772-0a20-5a39-b81b-1366585eb4c0"
 GPUCompiler = "61eb1bfa-7361-4325-ad38-22787b887f55"
