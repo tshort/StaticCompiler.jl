@@ -15,6 +15,10 @@ using Pkg
 Pkg.add("StaticCompiler")
 ```
 
+## Approach
+
+This package uses the [GPUCompiler package](https://github.com/JuliaGPU/GPUCompiler.jl) to generate code.
+
 ### Standalone compilation
 StaticCompiler.jl provides the functions `compile_executable` and `compile_shlib` for compiling a Julia function to a native executable or shared library for use from outside of Julia:
 ```julia
@@ -68,17 +72,30 @@ we define overrides such as
 
 If for some reason, you wish to use a different method table (defined with `Base.Experimental.@MethodTable` and `Base.Experimental.@overlay`) than the default one provided by StaticCompiler.jl, you can provide it to `compile_executable` and `compile_shlib` via a keyword argument `method_table`.
 
+`StaticCompiler.empty_table` is available as a method table with no overrides at all, if you do not wish to use StaticCompiler's `@device_override`s.Your own overrides can be added to a table of your own, or to this one, with `Base.Experimental.@overlay(StaticCompiler.empty_table, ...)`.
 
-## Approach
+### Cross-compilation
 
-This package uses the [GPUCompiler package](https://github.com/JuliaGPU/GPUCompiler.jl) to generate code.
+`compile_executable` and `compile_shlib` accept a `target`, so a program can be made on one system for another:
+
+```julia
+julia> using StaticCompiler, Glibc_jll, Pkg # (Glibc_jll and Pkg fetch the C library of a Linux target; Mingw_jll does the same for Windows)
+
+julia> target = StaticTarget("aarch64-unknown-linux-gnu"; retarget = true, toolchain = LLDToolchain(:gnu; sysroot = StaticCompiler.glibc_sysroot("aarch64-unknown-linux-gnu")));
+
+julia> compile_executable(hello, (), "./", "hello"; filename = "hello_aarch64", target)
+```
+
+The toolchain can be either a [`CCToolchain`](@ref) specifying a C compiler, or an [`LLDToolchain`](@ref) object specifying an LLVM `lld` to be used (flavors include `:gnu` for Linux, `:darwin` for macOS, `:mingw` for Windows, and `:wasm` for WebAssembly). Julia's LLVM contains the code generators for its own architecture and for WebAssembly only. For any other architecture, the IR can be made (`emit_llvm_only = true`), and `StaticTarget(...; llc = "/path/to/llc")` makes the object with an `llc` that has the desired backend for the same LLVM version.
+
+The [`cross-matrix.yml`](.github/workflows/cross-matrix.yml) CI workfoow tests cross-compilation to and from Linux (x86-64 and AArch64), macOS, and Windows.
 
 ## Limitations
 
 * GC-tracked allocations and global variables do *not* work with `compile_executable` or `compile_shlib`. This has some interesting consequences, including that all functions _within_ the function you want to compile must either be inlined or return only native types (otherwise Julia would have to allocate a place to put the results, which will fail).
 * Since error handling relies on libjulia, you can only throw errors from standalone-compiled (`compile_executable` / `compile_shlib`) code if an explicit overload has been defined for that particular error with `@device_override` (see [quirks.jl](src/quirks.jl)).
 * Type instability. Type unstable code cannot currently be statically compiled via this package.
-* Extra experimental on Windows (PRs welcome if you encounter issues). Should work in WSL on Windows 10+. 
+* Extra experimental on Windows (PRs welcome if you encounter issues). Should work in WSL on Windows 10+.
 
 ## Guide for Package Authors
 

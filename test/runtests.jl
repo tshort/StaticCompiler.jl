@@ -9,7 +9,7 @@ using StaticTools
 # using StrideArraysCore
 using LLD_jll
 using LLVM
-using Glibc_jll, Pkg # (the extension that has the C library of a Linux target)
+using Glibc_jll, Mingw_jll, Pkg # (the extensions that have the C libraries of a Linux and a Windows target)
 using Bumper
 
 addprocs(1)

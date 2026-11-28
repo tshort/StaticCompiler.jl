@@ -1,4 +1,4 @@
-# The C library of a Linux target, for linking by `LLD(:gnu; sysroot)`: the artifact of `Glibc_jll` for the platform of the target, fetched for any host.
+# The C library of a Linux target, for linking by `LLDToolchain(:gnu; sysroot)`: the artifact of `Glibc_jll` for the platform of the target, fetched for any host.
 module StaticCompilerGlibcExt
 
 using StaticCompiler: StaticCompiler, StaticTarget
@@ -21,6 +21,6 @@ function StaticCompiler.glibc_sysroot(triple::AbstractString)
     return StaticCompiler.glibc_sysroot(platform)
 end
 
-StaticCompiler.glibc_sysroot(target::StaticTarget) = target.platform === nothing ? StaticCompiler.glibc_sysroot(StaticCompiler.target_triple(target)) : StaticCompiler.glibc_sysroot(target.platform)
+StaticCompiler.glibc_sysroot(target::StaticTarget) = StaticCompiler.glibc_sysroot(StaticCompiler.target_triple(target))
 
 end

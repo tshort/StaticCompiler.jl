@@ -55,13 +55,13 @@ data_warnings(inst, frames) = for frame ∈ frames
           inlined = inlined)
 end
 
-# The IR of a target that requires retargeting (`target.retarget`) gets the triple of the target, 
+# The IR of a target that is retargeted (`is_retargeted(target)`) gets the triple of the target, 
 # no data layout (the code generator that makes the object has the target's), 
 # and no attributes that name the host's CPU and features. 
 # IR that has intrinsics of the host's architecture is refused.
 function retarget!(mod::LLVM.Module, target::StaticTarget)
-    isnothing(target.retarget) && return mod
-    triple = target.retarget.triple
+    is_retargeted(target) || return mod
+    triple = target_triple(target)
     family = llvm_family(first(split(triple, '-')))
     for f in LLVM.functions(mod)
         m = match(r"^llvm\.(aarch64|arm|x86|wasm)\.", LLVM.name(f))
@@ -135,15 +135,15 @@ end
     emit_object(mod::LLVM.Module, target::StaticTarget) -> Vector{UInt8}
     emit_object(ir::AbstractString, target::StaticTarget) -> Vector{UInt8}
 
-The object file (the bytes) of the IR, which was made for the host and retargeted (see [`Retarget`](@ref) and [`retarget!`](@ref)), for the target: by the code generator of Julia's LLVM if it has one for the
-triple, and else by the `llc` of the target. The CPU and the features are those of the `Retarget`, and the code is position independent (WebAssembly: static).
+The object file (the bytes) of the IR, which was made for the host and retargeted (see [`StaticTarget`](@ref) and [`retarget!`](@ref)), for the target: by the code generator of Julia's LLVM if it has one for the
+triple, and else by the `llc` of the target. The CPU and the features are those of the target's `machine`, and the code is position independent (WebAssembly: static).
 """
 function emit_object(mod::LLVM.Module, target::StaticTarget)
-    r = target.retarget
-    isnothing(r) && throw(ArgumentError("only the objects of a target that is made for by retargeting are made by `emit_object` (see `Retarget`)"))
-    julia_llvm_has(r.triple) || return emit_object_llc(string(mod), r)
-    tm = LLVM.TargetMachine(LLVM.Target(; triple = r.triple), r.triple; cpu = r.cpu, features = r.features, opt_level = LLVM.API.LLVMCodeGenLevelDefault,
-                            reloc = startswith(r.triple, "wasm") ? LLVM.API.LLVMRelocStatic : LLVM.API.LLVMRelocPIC)
+    check_retargeted(target)
+    julia_llvm_has(target_triple(target)) || return emit_object_llc(string(mod), target)
+    m = target.machine
+    tm = LLVM.TargetMachine(LLVM.Target(; triple = m.triple), m.triple; cpu = m.cpu, features = m.features, opt_level = LLVM.API.LLVMCodeGenLevelDefault,
+                            reloc = startswith(m.triple, "wasm") ? LLVM.API.LLVMRelocStatic : LLVM.API.LLVMRelocPIC)
     try
         return LLVM.emit(tm, mod, LLVM.API.LLVMObjectFile)
     finally
@@ -151,9 +151,8 @@ function emit_object(mod::LLVM.Module, target::StaticTarget)
     end
 end
 function emit_object(ir::AbstractString, target::StaticTarget)
-    r = target.retarget
-    isnothing(r) && throw(ArgumentError("only the objects of a target that is made for by retargeting are made by `emit_object` (see `Retarget`)"))
-    julia_llvm_has(r.triple) || return emit_object_llc(ir, r)
+    check_retargeted(target)
+    julia_llvm_has(target_triple(target)) || return emit_object_llc(ir, target)
     LLVM.@dispose ctx = LLVM.Context() begin
         mod = parse(LLVM.Module, ir)
         try
@@ -163,17 +162,16 @@ function emit_object(ir::AbstractString, target::StaticTarget)
         end
     end
 end
+check_retargeted(target::StaticTarget) = is_retargeted(target) || throw(ArgumentError("only the objects of a target that is made for by retargeting are made by `emit_object` (see `StaticTarget`)"))
 
 # Emit the object file via `llc`, if it has a code generator that Julia's LLVM has not
-function emit_object_llc(ir::AbstractString, r::Retarget)
-    isnothing(r.llc) && throw(ArgumentError("no object can be made for $(r.triple): Julia's LLVM has no code generator for it, and no `llc` is given (`StaticTarget(...; llc = ...)`, of the LLVM version that Julia has, with the code generator for it). The IR can be made (`generate_ir`, `emit_llvm_only = true`)"))
-    dir = mktempdir()
-    try
+function emit_object_llc(ir::AbstractString, target::StaticTarget)
+    m = target.machine
+    isnothing(target.llc) && throw(ArgumentError("no object can be made for $(m.triple): Julia's LLVM has no code generator for it, and no `llc` is given (`StaticTarget(...; llc = ...)`, of the LLVM version that Julia has, with the code generator for it). The IR can be made (`generate_ir`, `emit_llvm_only = true`)"))
+    mktempdir() do dir
         ll, obj = joinpath(dir, "module.ll"), joinpath(dir, "module.o")
         write(ll, ir)
-        run(`$(r.llc) -O2 -filetype=obj -mtriple=$(r.triple) -mcpu=$(isempty(r.cpu) ? "generic" : r.cpu) -mattr=$(r.features) -relocation-model=pic $ll -o $obj`)
+        run(`$(target.llc) -O2 -filetype=obj -mtriple=$(m.triple) -mcpu=$(isempty(m.cpu) ? "generic" : m.cpu) -mattr=$(m.features) -relocation-model=pic $ll -o $obj`)
         return read(obj)
-    finally
-        rm(dir; recursive = true, force = true)
     end
 end

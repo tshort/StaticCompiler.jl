@@ -4,7 +4,7 @@
 # For example, `__udivti3` for the division of `i128`, `__extendhfsf2` for `Float16`. 
 # They are defined here in IR, `linkonce_odr` and `hidden`: 
 # a definition of the program's own, or of a library that is linked, wins, and the module has only those that it uses. 
-# A toolchain asks for them with `builtins = true` (`LLD` does by default; a `Driver` does not, as the compiler driver links its runtime library).
+# A toolchain asks for them with `builtins = true` (`LLDToolchain` does by default; a `CCToolchain` does not, as the compiler driver links its runtime library).
 
 # Conversions between `Float16` and `Float32` that the code generator for x86-64 calls where the CPU is not said to have them: with the instructions that do them (F16C: from 2012 on).
 const X86_HALF_BUILTINS = """
@@ -220,16 +220,61 @@ define linkonce_odr hidden double @__extendhfdf2(half %a) {
 }
 """
 
-# The builtins that the IR needs for the target: the names of the constants above. `text` is the IR; the system and the architecture are the triple's.
-function needed_builtins(text::AbstractString, triple::AbstractString)
+# The probe of the stack for x86-64 Windows (`___chkstk_ms` of libgcc and compiler-rt): the runtime of MinGW-w64 calls it itself (`pseudo-reloc.o`, which every program has), and the libraries that `Mingw_jll`
+# has do not have it. It touches each page of the stack that a function of a large frame is about to use, as the system's guard page needs. It is assembly, which the module has as its own (`module asm`).
+const MINGW_X64_BUILTINS = raw"""
+module asm ".text"
+module asm ".globl ___chkstk_ms"
+module asm ".def ___chkstk_ms; .scl 2; .type 32; .endef"
+module asm "___chkstk_ms:"
+module asm "  pushq %rcx"
+module asm "  pushq %rax"
+module asm "  cmpq $0x1000, %rax"
+module asm "  leaq 24(%rsp), %rcx"
+module asm "  jb 2f"
+module asm "1:"
+module asm "  subq $0x1000, %rcx"
+module asm "  orl $0, (%rcx)"
+module asm "  subq $0x1000, %rax"
+module asm "  cmpq $0x1000, %rax"
+module asm "  ja 1b"
+module asm "2:"
+module asm "  subq %rax, %rcx"
+module asm "  orl $0, (%rcx)"
+module asm "  popq %rax"
+module asm "  popq %rcx"
+module asm "  ret"
+"""
+
+# The builtins that the IR needs for the target: the names of the constants above. What the IR has that needs them (`Float16`, the division of `i128`) is `has_half` and `has_i128div`; the system and the architecture are the triple's.
+function needed_builtins(has_half::Bool, has_i128div::Bool, triple::AbstractString)
     family = llvm_family(first(split(triple, '-')))
-    has_half = occursin(r"\bhalf\b", text)
     needed = Symbol[]
     family == "x86" && startswith(triple, "x86_64") && has_half && push!(needed, :X86_HALF_BUILTINS)
     family == "wasm" && has_half && push!(needed, :WASM_HALF_BUILTINS)
-    occursin("linux", triple) && occursin(r"\b(udiv|sdiv|urem|srem) i128\b", text) && push!(needed, :LINUX_INT128_BUILTINS)
+    occursin("linux", triple) && has_i128div && push!(needed, :LINUX_INT128_BUILTINS)
+    # (the runtime of MinGW-w64 needs the probe of the stack whatever the program is)
+    startswith(triple, "x86_64") && occursin(r"windows|mingw", triple) && push!(needed, :MINGW_X64_BUILTINS)
     return needed
 end
+# (of the text of IR)
+needed_builtins(text::AbstractString, triple::AbstractString) =
+    needed_builtins(occursin(r"\bhalf\b", text), occursin(r"\b(udiv|sdiv|urem|srem) i128\b", text), triple)
+# (of a module: by its instructions, without printing it)
+function needed_builtins(mod::LLVM.Module, triple::AbstractString)
+    has_half = has_i128div = false
+    for f in LLVM.functions(mod), bb in LLVM.blocks(f), inst in LLVM.instructions(bb)
+        has_half = has_half || mentions_half(LLVM.value_type(inst)) || any(op -> mentions_half(LLVM.value_type(op)), LLVM.operands(inst))
+        if !has_i128div && LLVM.opcode(inst) in (LLVM.API.LLVMUDiv, LLVM.API.LLVMSDiv, LLVM.API.LLVMURem, LLVM.API.LLVMSRem)
+            ty = LLVM.value_type(inst)
+            has_i128div = ty isa LLVM.IntegerType && LLVM.width(ty) == 128
+        end
+        has_half && has_i128div && break
+    end
+    return needed_builtins(has_half, has_i128div, triple)
+end
+# (a `half`, or a vector of them)
+mentions_half(ty::LLVM.LLVMType) = ty isa LLVM.HalfType || (ty isa LLVM.VectorType && LLVM.eltype(ty) isa LLVM.HalfType)
 
 """
     add_builtins(text::AbstractString, triple::AbstractString) -> String
@@ -250,7 +295,7 @@ Define in the module the builtins that it needs for the target `triple`: the fun
 that is linked by `lld` alone has not. Which are needed is what the module says: `i128` division on Linux, `Float16` conversions on x86-64 and WebAssembly.
 """
 function add_builtins!(mod::LLVM.Module, triple::AbstractString)
-    for name in needed_builtins(string(mod), triple)
+    for name in needed_builtins(mod, triple)
         builtins = parse(LLVM.Module, getfield(@__MODULE__, name))
         for f in LLVM.functions(builtins)
             LLVM.isdeclaration(f) || LLVM.linkage!(f, LLVM.API.LLVMWeakODRLinkage)

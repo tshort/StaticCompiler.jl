@@ -1,7 +1,7 @@
 name = "StaticCompiler"
 uuid = "81625895-6c0f-48fc-b932-11a18313743c"
 authors = ["Tom Short and contributors"]
-version = "0.7.6"
+version = "0.8.0"
 
 
 [deps]
@@ -14,10 +14,12 @@ StaticTools = "86c06d3c-3f03-46de-9781-57580aa96d0a"
 
 [weakdeps]
 Glibc_jll = "452aa2e7-e185-58db-8ff9-d3c1fa4bc997"
+Mingw_jll = "2d94bacf-4d71-535d-a47c-45e808015115"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [extensions]
 StaticCompilerGlibcExt = ["Glibc_jll", "Pkg"]
+StaticCompilerMingwExt = ["Mingw_jll", "Pkg"]
 
 [compat]
 Clang_jll = "16, 18, 20, 23"

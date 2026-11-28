@@ -7,7 +7,7 @@ makedocs(;
     repo="https://github.com/tshort/StaticCompiler.jl/blob/{commit}{path}#L{line}",
     sitename="StaticCompiler.jl",
     format=Documenter.HTML(;
-        prettyurls = prettyurls = get(ENV, "CI", nothing) == "true",
+        prettyurls = get(ENV, "CI", nothing) == "true",
         # canonical="https://tshort.github.io/StaticCompiler.jl",
         # assets=String[],
     ),

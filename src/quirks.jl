@@ -1,9 +1,5 @@
-@static if isdefined(Base.Experimental, Symbol("@overlay"))
-    Base.Experimental.@MethodTable(method_table)
-    Base.Experimental.@MethodTable(empty_table)
-else
-    const method_table = nothing
-end
+Base.Experimental.@MethodTable(method_table)
+Base.Experimental.@MethodTable(empty_table) # (no overrides: `method_table = StaticCompiler.empty_table` compiles with Julia's own methods)
 
 """
 ```julia
