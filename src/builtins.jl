@@ -85,11 +85,27 @@ define linkonce_odr hidden i128 @__modti3(i128 %a, i128 %b) {
 }
 """
 
+# The same, for the convention of x86-64 Windows: the code generator calls `__udivti3` and the others with the addresses of the two operands (in `rcx` and `rdx`, as the C convention of Windows passes what is larger than a
+# register), and reads the result from `xmm0`, as a vector of two integers of 64 bits (as libgcc, which has them, returns what `__int128` is). (Checked with `llc` of LLVM 23.)
+function windows_int128_builtins(text::AbstractString)
+    for name in ("__udivti3", "__umodti3", "__divti3", "__modti3")
+        from = "define linkonce_odr hidden i128 @$name(i128 %a, i128 %b) {\n"
+        occursin(from, text) || error("the text of the division of 128 bits has changed: `$from` is not in it")
+        text = replace(text, from => "define linkonce_odr hidden <2 x i64> @$name(ptr %pa, ptr %pb) {\n  %a = load i128, ptr %pa, align 8\n  %b = load i128, ptr %pb, align 8\n")
+    end
+    returned = "  ret i128 %r\n"
+    count(returned, text) == 4 || error("the text of the division of 128 bits has changed: it has not four functions that return `%r`")
+    return replace(text, returned => "  %v = bitcast i128 %r to <2 x i64>\n  ret <2 x i64> %v\n")
+end
+const WINDOWS_INT128_BUILTINS = windows_int128_builtins(LINUX_INT128_BUILTINS)
+
 # Conversions between `Float16`, `Float32`, and `Float64` that the code generator calls where the CPU has no instruction for them.
 # For example: WebAssembly has none, nor has generic/older x86-64 (F16C is from 2012 on, and Rosetta before macOS 15 does not have it)
-# Insteade, we make the conversion by integer arithmetic, as compiler-rt definitions
+# Instead, we make the conversion by integer arithmetic, as compiler-rt definitions
 # Rounding is to nearest, ties to even
-const WASM_HALF_BUILTINS = """
+# These are called with the convention of the *library calls* that the code generator makes, which varies by target. 
+# (Checked with `llc` of LLVM 23: the caller reads the result of `__truncsfhf2` from `xmm0`, and passes the argument of `__extendhfsf2` there.)
+const HALF_BUILTINS = """
 define linkonce_odr hidden float @__extendhfsf2(half %a) {
   %h = bitcast half %a to i16
   %hi = zext i16 %h to i32
@@ -209,8 +225,10 @@ define linkonce_odr hidden double @__extendhfdf2(half %a) {
 }
 """
 
-# The same, for the convention of x86-64: the `half` of the signatures and of the calls is an `i16`, and what is made of it by `bitcast` is the value itself.
-function x86_half_builtins(text::AbstractString)
+# The same, for the convention of x86-64 macOS, where the library calls pass a `Float16` as an `i16` in an integer register 
+# The `half` of the signatures and of the calls is an `i16`, and what is made of it by `bitcast` is the value itself.
+# (the argument in `edi`, the result in `ax`). 
+function macos_x86_half_builtins(text::AbstractString)
     replacements = [
         "define linkonce_odr hidden float @__extendhfsf2(half %a) {\n  %h = bitcast half %a to i16\n" => "define linkonce_odr hidden float @__extendhfsf2(i16 %h) {\n",
         "define linkonce_odr hidden half @__truncsfhf2(float %a) {" => "define linkonce_odr hidden i16 @__truncsfhf2(float %a) {",
@@ -225,7 +243,7 @@ function x86_half_builtins(text::AbstractString)
     end
     return text
 end
-const X86_HALF_BUILTINS = x86_half_builtins(WASM_HALF_BUILTINS)
+const MACOS_X86_HALF_BUILTINS = macos_x86_half_builtins(HALF_BUILTINS)
 
 # The probe of the stack for x86-64 Windows (`___chkstk_ms` of libgcc and compiler-rt): the runtime of MinGW-w64 calls it itself (`pseudo-reloc.o`, which every program has), and the libraries that `Mingw_jll`
 # has do not have it. It touches each page of the stack that a function of a large frame is about to use, as the system's guard page needs. It is assembly, which the module has as its own (`module asm`).
@@ -257,9 +275,11 @@ module asm "  ret"
 function needed_builtins(has_half::Bool, has_i128div::Bool, triple::AbstractString)
     family = llvm_family(first(split(triple, '-')))
     needed = Symbol[]
-    family == "x86" && startswith(triple, "x86_64") && has_half && push!(needed, :X86_HALF_BUILTINS)
-    family == "wasm" && has_half && push!(needed, :WASM_HALF_BUILTINS)
+    x86_64 = family == "x86" && startswith(triple, "x86_64")
+    x86_64 && has_half && push!(needed, occursin(r"apple|darwin|macos", triple) ? :MACOS_X86_HALF_BUILTINS : :HALF_BUILTINS)
+    family == "wasm" && has_half && push!(needed, :HALF_BUILTINS)
     occursin("linux", triple) && has_i128div && push!(needed, :LINUX_INT128_BUILTINS)
+    x86_64 && occursin(r"windows|mingw", triple) && has_i128div && push!(needed, :WINDOWS_INT128_BUILTINS)
     # (the runtime of MinGW-w64 needs the probe of the stack whatever the program is)
     startswith(triple, "x86_64") && occursin(r"windows|mingw", triple) && push!(needed, :MINGW_X64_BUILTINS)
     return needed

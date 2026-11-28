@@ -284,24 +284,32 @@ end
     @test isempty(StaticCompiler.needed_builtins(i128ir, "aarch64-apple-macosx11.0.0")) # (macOS has them in its C library)
     @test StaticCompiler.needed_builtins("", "x86_64-w64-windows-gnu") == [:MINGW_X64_BUILTINS] && StaticCompiler.needed_builtins("", "x86_64-w64-mingw32") == [:MINGW_X64_BUILTINS] # (the runtime of MinGW has to have the probe of the stack)
     @test isempty(StaticCompiler.needed_builtins("", "x86_64-unknown-linux-gnu")) && occursin("___chkstk_ms:", StaticCompiler.add_builtins("", "x86_64-w64-windows-gnu"))
-    @test StaticCompiler.needed_builtins(halfir, "x86_64-unknown-linux-gnu") == [:X86_HALF_BUILTINS]
-    @test StaticCompiler.needed_builtins(halfir, "wasm64-unknown-unknown") == [:WASM_HALF_BUILTINS]
+    @test StaticCompiler.needed_builtins(halfir, "x86_64-unknown-linux-gnu") == [:HALF_BUILTINS] && StaticCompiler.needed_builtins(halfir, "wasm64-unknown-unknown") == [:HALF_BUILTINS]
+    @test StaticCompiler.needed_builtins(halfir, "x86_64-w64-windows-gnu") == [:HALF_BUILTINS, :MINGW_X64_BUILTINS] # (the convention of `xmm0`: the one of the IR with `half`, as on Linux)
+    @test StaticCompiler.needed_builtins(halfir, "x86_64-apple-macosx11.0.0") == [:MACOS_X86_HALF_BUILTINS] # (the one of Apple: an `i16` in an integer register)
+    @test StaticCompiler.needed_builtins(i128ir, "x86_64-w64-windows-gnu") == [:WINDOWS_INT128_BUILTINS, :MINGW_X64_BUILTINS]
     # (by integer arithmetic, with no instruction of F16C, which not every machine that runs an x86-64 program has; with the conversions of `Float64` too; and for x86-64 with the `i16` of the
     # library calls of its code generator, where WebAssembly has `half`)
-    soft = StaticCompiler.add_builtins(halfir, "x86_64-unknown-linux-gnu")
+    soft = StaticCompiler.add_builtins(halfir, "x86_64-apple-macosx11.0.0")
     added = soft[length(halfir)+1:end]
     @test !occursin("f16c", soft) && !occursin(r"^[^;\n]*\bhalf\b"m, added) # (no `half` outside of the comments)
     @test all(occursin(r"define linkonce_odr hidden \S+ @" * f * r"\(", added) for f in ("__extendhfsf2", "__truncsfhf2", "__truncdfhf2", "__extendhfdf2"))
     @test occursin("define linkonce_odr hidden i16 @__truncsfhf2(float", added) && occursin("define linkonce_odr hidden float @__extendhfsf2(i16", added)
-    wasm = StaticCompiler.add_builtins(halfir, "wasm64-unknown-unknown")
-    @test occursin("define linkonce_odr hidden half @__truncsfhf2(float", wasm) && occursin("define linkonce_odr hidden float @__extendhfsf2(half", wasm)
+    for triple in ("wasm64-unknown-unknown", "x86_64-unknown-linux-gnu", "x86_64-w64-windows-gnu")
+        wasm = StaticCompiler.add_builtins(halfir, triple)
+        @test occursin("define linkonce_odr hidden half @__truncsfhf2(float", wasm) && occursin("define linkonce_odr hidden float @__extendhfsf2(half", wasm) && !occursin("f16c", wasm)
+    end
+    # (128-bit division for Windows: the operands by address, and the result a vector of two integers of 64 bits; for Linux the integers themselves)
+    windows = StaticCompiler.add_builtins(i128ir, "x86_64-w64-windows-gnu")
+    @test all(occursin("define linkonce_odr hidden <2 x i64> @$f(ptr %pa, ptr %pb)", windows) for f in ("__udivti3", "__umodti3", "__divti3", "__modti3"))
+    @test occursin("define linkonce_odr hidden i128 @__udivti3(i128 %a, i128 %b)", StaticCompiler.add_builtins(i128ir, "x86_64-unknown-linux-gnu"))
     @test isempty(StaticCompiler.needed_builtins(halfir, "aarch64-unknown-linux-gnu")) # (the CPU converts)
     # (the same by the instructions of a module, which is not printed to be searched; and a name that says `half` is not a `half`)
     namedir = "define i32 @half(i32 %a) {\n %r = add i32 %a, 1\n ret i32 %r\n}\n"
     LLVM.@dispose ctx = LLVM.Context() begin
         needed(ir, triple) = (mod = parse(LLVM.Module, ir); try; StaticCompiler.needed_builtins(mod, triple); finally; LLVM.dispose(mod); end)
         @test needed(i128ir, "aarch64-unknown-linux-gnu") == [:LINUX_INT128_BUILTINS] && isempty(needed(i128ir, "aarch64-apple-macosx11.0.0"))
-        @test needed(halfir, "x86_64-unknown-linux-gnu") == [:X86_HALF_BUILTINS] && needed(halfir, "wasm64-unknown-unknown") == [:WASM_HALF_BUILTINS]
+        @test needed(halfir, "x86_64-unknown-linux-gnu") == [:HALF_BUILTINS] && needed(halfir, "wasm64-unknown-unknown") == [:HALF_BUILTINS] && needed(halfir, "x86_64-apple-macosx11.0.0") == [:MACOS_X86_HALF_BUILTINS]
         @test isempty(needed(halfir, "aarch64-unknown-linux-gnu")) && isempty(needed(namedir, "wasm64-unknown-unknown"))
         @test needed("", "x86_64-w64-windows-gnu") == [:MINGW_X64_BUILTINS]
     end
