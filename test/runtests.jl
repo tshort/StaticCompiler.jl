@@ -7,8 +7,9 @@ using ManualMemory
 using Distributed
 using StaticTools
 # using StrideArraysCore
-using MacroTools
 using LLD_jll
+using LLVM
+using Glibc_jll, Mingw_jll, Pkg # (the extensions that have the C libraries of a Linux and a Windows target)
 using Bumper
 
 addprocs(1)

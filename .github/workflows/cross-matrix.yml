@@ -1,0 +1,82 @@
+name: Cross-compiling matrix
+# What can be made from each kind of host, for each target (test/cross/matrix.jl, a table in the summary of each job), and whether what was made runs on a machine of its target (test/cross/run.jl).
+# The hosts: Linux (x86-64 and AArch64), macOS (Apple Silicon) and Windows. The targets: Linux, macOS, Windows (MinGW-w64) and WebAssembly. A host makes what Julia's LLVM has the code generator for (its own architecture,
+# and WebAssembly), and what it has the libraries for: those of Linux and Windows are fetched (Glibc_jll, Mingw_jll); the SDK of macOS is Xcode's, or one that is downloaded (phracker/MacOSX-SDKs) on a host that is not a Mac (Linux and Windows).
+on:
+  push:
+    branches:
+      - cross-target
+    paths:
+      - 'src/**'
+      - 'ext/**'
+      - 'test/cross/**'
+      - '.github/workflows/cross-matrix.yml'
+  workflow_dispatch:
+jobs:
+  build:
+    name: Make on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - macos-latest
+          - windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.12'
+      - uses: julia-actions/cache@v2
+      - name: An SDK of macOS, for the programs for macOS that are made on Linux and on Windows
+        if: runner.os != 'macOS'
+        shell: bash
+        run: |
+          curl -fsSL -o sdk.tar.xz https://github.com/phracker/MacOSX-SDKs/releases/download/11.3/MacOSX11.3.sdk.tar.xz
+          if [ "$RUNNER_OS" = Windows ]; then
+            # (a program of C needs `usr/lib`, the stubs of `libSystem`: `System` has the frameworks, with symbolic links that Windows does not make; and the path has to be Windows's)
+            # (the links of `usr/lib` are needed, `libSystem.tbd` is one: MSYS makes real ones, which the runner's administrator may, with `nativestrict`, and not the copies that it does by default, which fail when the target is not yet extracted)
+            MSYS=winsymlinks:nativestrict tar xJf sdk.tar.xz --exclude='MacOSX11.3.sdk/System'
+            test -e MacOSX11.3.sdk/usr/lib/libSystem.tbd
+            echo "SDKROOT=$(pwd -W)/MacOSX11.3.sdk" >> "$GITHUB_ENV"
+          else
+            tar xJf sdk.tar.xz
+            echo "SDKROOT=$PWD/MacOSX11.3.sdk" >> "$GITHUB_ENV"
+          fi
+          rm sdk.tar.xz
+      - name: What is made
+        run: julia test/cross/matrix.jl made
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: made-${{ matrix.os }}
+          path: made
+  run:
+    name: Run on ${{ matrix.os }}
+    needs: build
+    # (what a host made is run wherever it was made: a build that failed on one host does not stop what the others made from being run)
+    if: ${{ !cancelled() }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - macos-latest
+          - macos-15-intel # (the last runner with an Intel CPU: `macos-13` is retired)
+          - windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.12'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: made-*
+          path: made
+          merge-multiple: true
+      - name: Run what was made for this machine
+        run: julia test/cross/run.jl made
