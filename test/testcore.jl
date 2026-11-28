@@ -286,6 +286,15 @@ end
     @test isempty(StaticCompiler.needed_builtins("", "x86_64-unknown-linux-gnu")) && occursin("___chkstk_ms:", StaticCompiler.add_builtins("", "x86_64-w64-windows-gnu"))
     @test StaticCompiler.needed_builtins(halfir, "x86_64-unknown-linux-gnu") == [:X86_HALF_BUILTINS]
     @test StaticCompiler.needed_builtins(halfir, "wasm64-unknown-unknown") == [:WASM_HALF_BUILTINS]
+    # (by integer arithmetic, with no instruction of F16C, which not every machine that runs an x86-64 program has; with the conversions of `Float64` too; and for x86-64 with the `i16` of the
+    # library calls of its code generator, where WebAssembly has `half`)
+    soft = StaticCompiler.add_builtins(halfir, "x86_64-unknown-linux-gnu")
+    added = soft[length(halfir)+1:end]
+    @test !occursin("f16c", soft) && !occursin(r"^[^;\n]*\bhalf\b"m, added) # (no `half` outside of the comments)
+    @test all(occursin(r"define linkonce_odr hidden \S+ @" * f * r"\(", added) for f in ("__extendhfsf2", "__truncsfhf2", "__truncdfhf2", "__extendhfdf2"))
+    @test occursin("define linkonce_odr hidden i16 @__truncsfhf2(float", added) && occursin("define linkonce_odr hidden float @__extendhfsf2(i16", added)
+    wasm = StaticCompiler.add_builtins(halfir, "wasm64-unknown-unknown")
+    @test occursin("define linkonce_odr hidden half @__truncsfhf2(float", wasm) && occursin("define linkonce_odr hidden float @__extendhfsf2(half", wasm)
     @test isempty(StaticCompiler.needed_builtins(halfir, "aarch64-unknown-linux-gnu")) # (the CPU converts)
     # (the same by the instructions of a module, which is not printed to be searched; and a name that says `half` is not a `half`)
     namedir = "define i32 @half(i32 %a) {\n %r = add i32 %a, 1\n ret i32 %r\n}\n"

@@ -6,19 +6,6 @@
 # a definition of the program's own, or of a library that is linked, wins, and the module has only those that it uses. 
 # A toolchain asks for them with `builtins = true` (`LLDToolchain` does by default; a `CCToolchain` does not, as the compiler driver links its runtime library).
 
-# Conversions between `Float16` and `Float32` that the code generator for x86-64 calls where the CPU is not said to have them: with the instructions that do them (F16C: from 2012 on).
-const X86_HALF_BUILTINS = """
-define linkonce_odr hidden float @__extendhfsf2(half %a) #9999 {
-  %r = fpext half %a to float
-  ret float %r
-}
-define linkonce_odr hidden half @__truncsfhf2(float %a) #9999 {
-  %r = fptrunc float %a to half
-  ret half %r
-}
-attributes #9999 = { nounwind "target-features"="+f16c" }
-"""
-
 # 128-bit division (`__udivti3` and the others of libgcc and compiler-rt, which a Linux program is not linked with): by shifting and subtracting, with instructions of `i128` that are not calls
 # (a division of `i128` in them would be a call of themselves).
 const LINUX_INT128_BUILTINS = """
@@ -98,8 +85,10 @@ define linkonce_odr hidden i128 @__modti3(i128 %a, i128 %b) {
 }
 """
 
-# The same conversions for WebAssembly, which has no instruction for it.
-# by integer arithmetic (the rounding is to the nearest, ties to even)
+# Conversions between `Float16`, `Float32`, and `Float64` that the code generator calls where the CPU has no instruction for them.
+# For example: WebAssembly has none, nor has generic/older x86-64 (F16C is from 2012 on, and Rosetta before macOS 15 does not have it)
+# Insteade, we make the conversion by integer arithmetic, as compiler-rt definitions
+# Rounding is to nearest, ties to even
 const WASM_HALF_BUILTINS = """
 define linkonce_odr hidden float @__extendhfsf2(half %a) {
   %h = bitcast half %a to i16
@@ -219,6 +208,24 @@ define linkonce_odr hidden double @__extendhfdf2(half %a) {
   ret double %d
 }
 """
+
+# The same, for the convention of x86-64: the `half` of the signatures and of the calls is an `i16`, and what is made of it by `bitcast` is the value itself.
+function x86_half_builtins(text::AbstractString)
+    replacements = [
+        "define linkonce_odr hidden float @__extendhfsf2(half %a) {\n  %h = bitcast half %a to i16\n" => "define linkonce_odr hidden float @__extendhfsf2(i16 %h) {\n",
+        "define linkonce_odr hidden half @__truncsfhf2(float %a) {" => "define linkonce_odr hidden i16 @__truncsfhf2(float %a) {",
+        "  %h = bitcast i16 %r16 to half\n  ret half %h" => "  ret i16 %r16",
+        "define linkonce_odr hidden half @__truncdfhf2(double %a) {" => "define linkonce_odr hidden i16 @__truncdfhf2(double %a) {",
+        "  %h = call half @__truncsfhf2(float %rf)\n  ret half %h" => "  %h = call i16 @__truncsfhf2(float %rf)\n  ret i16 %h",
+        "define linkonce_odr hidden double @__extendhfdf2(half %a) {\n  %f = call float @__extendhfsf2(half %a)" => "define linkonce_odr hidden double @__extendhfdf2(i16 %a) {\n  %f = call float @__extendhfsf2(i16 %a)",
+    ]
+    for (from, to) in replacements
+        occursin(from, text) || error("the text of the conversions of `Float16` has changed: `$from` is not in it")
+        text = replace(text, from => to)
+    end
+    return text
+end
+const X86_HALF_BUILTINS = x86_half_builtins(WASM_HALF_BUILTINS)
 
 # The probe of the stack for x86-64 Windows (`___chkstk_ms` of libgcc and compiler-rt): the runtime of MinGW-w64 calls it itself (`pseudo-reloc.o`, which every program has), and the libraries that `Mingw_jll`
 # has do not have it. It touches each page of the stack that a function of a large frame is about to use, as the system's guard page needs. It is assembly, which the module has as its own (`module asm`).
